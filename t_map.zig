@@ -3,7 +3,7 @@ const std = @import("std");
 const testing = std.testing;
 const fmt = std.fmt;
 const RSB = @import("./types/string_buffer.zig").RedisStringBuffer;
-const perfectHash = @import("./perfecthash.zig").perfectHash;
+const perfectHash = @import("./lib/perfect_hash.zig").perfectHash;
 
 pub const MapParser = struct {
     pub const IsContainer = true;

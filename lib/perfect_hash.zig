@@ -1,3 +1,6 @@
+// Taken from https://andrewkelley.me/post/string-matching-comptime-perfect-hashing-zig.html
+// and adapted to the new changes in Zig.
+
 const std = @import("std");
 pub fn perfectHash(comptime strs: []const []const u8) type {
     const Op = union(enum) {
