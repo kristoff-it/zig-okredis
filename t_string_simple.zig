@@ -6,13 +6,18 @@ const testing = std.testing;
 pub const SimpleStringParser = struct {
     pub fn isSupported(comptime T: type) bool {
         return switch (@typeInfo(T)) {
-            .Int, .Float, .Array => true,
+            .Void, .Int, .Float, .Array => true,
             else => false,
         };
     }
 
     pub fn parse(comptime T: type, comptime _: type, msg: var) !T {
         switch (@typeInfo(T)) {
+            .Void => {
+                // TODO: add a max limit maybe?
+                var ch = try msg.readByte();
+                while (ch != '\n') ch = try msg.readByte();
+            },
             .Int => {
                 var buf: [100]u8 = undefined;
                 var end: usize = 0;

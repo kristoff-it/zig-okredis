@@ -3,10 +3,10 @@ const std = @import("std");
 const fmt = std.fmt;
 const InStream = std.io.InStream;
 
-pub const FloatParser = struct {
+pub const NumberParser = struct {
     pub fn isSupported(comptime T: type) bool {
         return switch (@typeId(T)) {
-            .Void, .Float => true,
+            .Void, .Float, .Int => true,
             else => false,
         };
     }
@@ -26,6 +26,7 @@ pub const FloatParser = struct {
         try msg.skipBytes(1);
         return switch (@typeInfo(T)) {
             .Void => {},
+            .Int => try fmt.parseInt(T, buf[0..end], 10),
             .Float => try fmt.parseFloat(T, buf[0..end]),
             else => @compileError("Unhandled Conversion"),
         };

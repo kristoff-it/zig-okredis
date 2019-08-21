@@ -11,12 +11,12 @@ pub const MapParser = struct {
     // TODO: add support for [_][2]T
     pub fn isSupported(comptime T: type) bool {
         return switch (@typeId(T)) {
-            .Struct => true,
+            .Void, .Struct => true,
             else => false,
         };
     }
 
-    pub fn parse(comptime T: type, comptime rootParser: type, msg: var) !T {
+    pub fn parse(comptime T: type, comptime rootParser: type, msg: var) anyerror!T {
         // TODO: write real implementation
         var buf: [100]u8 = undefined;
         var end: usize = 0;
@@ -31,9 +31,14 @@ pub const MapParser = struct {
         try msg.skipBytes(1);
         const size = try fmt.parseInt(usize, buf[0..end], 10);
 
-        if (@hasDecl(T, "Redis")) return T.Redis.parse('%', size, msg);
-
         switch (@typeInfo(T)) {
+            .Void => {
+                var i: usize = 0;
+                while (i < size) : (i += 1) {
+                    try rootParser.parse(void, msg);
+                    try rootParser.parse(void, msg);
+                }
+            },
             .Struct => |stc| {
                 comptime var max_len = 0;
                 comptime var fieldNames: [stc.fields.len][]const u8 = undefined;

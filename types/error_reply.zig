@@ -24,7 +24,7 @@ pub fn OrErr(comptime T: type) type {
         },
 
         const Self = @This();
-        const Redis = struct {
+        pub const Redis = struct {
             pub fn parse(tag: u8, comptime rootParser: type, msg: var) !Self {
                 switch (tag) {
                     else => return Self{ .Ok = try rootParser.parseFromTag(T, tag, msg) },
@@ -103,6 +103,7 @@ pub fn OrErr(comptime T: type) type {
 
                         // Seek through the rest of the message,
                         // discarding it.
+                        // TODO: add a max limit maybe?
                         while (ch != '\n') ch = try msg.readByte();
                         return res;
                     },

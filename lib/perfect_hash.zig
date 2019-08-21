@@ -51,6 +51,7 @@ pub fn perfectHash(comptime strs: []const []const u8) type {
 
     const plan = have_a_plan: {
         var seed: u32 = 0x45d9f3b;
+        // var seed: u32 = 0xdeadbeef;
         var index_i: usize = 0;
         const try_seed_count = 50;
         const try_index_count = 50;

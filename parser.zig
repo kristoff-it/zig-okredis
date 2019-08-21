@@ -5,6 +5,7 @@ const testing = std.testing;
 const InStream = std.io.InStream;
 const Allocator = std.mem.Allocator;
 
+const NumberParser = @import("./t_number.zig").NumberParser;
 const BoolParser = @import("./t_bool.zig").BoolParser;
 const BlobStringParser = @import("./t_string_blob.zig").BlobStringParser;
 const SimpleStringParser = @import("./t_string_simple.zig").SimpleStringParser;
@@ -44,6 +45,7 @@ pub const RESP3Parser = struct {
             return res;
         } else {
             var res: T = switch (tag) {
+                ':' => try ifSupported(NumberParser, RealType, msg),
                 ',' => try ifSupported(FloatParser, RealType, msg),
                 '#' => try ifSupported(BoolParser, RealType, msg),
                 '$' => try ifSupported(BlobStringParser, RealType, msg),
@@ -103,6 +105,7 @@ pub const RESP3Parser = struct {
             @hasDecl(RealType, "Redis"))
             try RealType.parseAlloc(tag, rootParser, allocator, msg)
         else switch (tag) {
+            ':' => try ifSupportedAlloc(NumberParser, RealType, allocator, msg),
             ',' => try ifSupportedAlloc(FloatParser, RealType, allocator, msg),
             '#' => try ifSupportedAlloc(BoolParser, RealType, allocator, msg),
             '$' => try ifSupportedAlloc(BlobStringParser, RealType, allocator, msg),
