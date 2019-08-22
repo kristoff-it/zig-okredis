@@ -1,7 +1,9 @@
 const std = @import("std");
 const fmt = std.fmt;
 
-pub fn RedisStringBuffer(comptime size: usize) type {
+/// It's a fixed length buffer, useful for parsing strings 
+/// without requiring an allocator, but requires 
+pub fn FixBuf(comptime size: usize) type {
     return struct {
         buf: [size]u8,
         len: usize,

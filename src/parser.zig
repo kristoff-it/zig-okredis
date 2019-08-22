@@ -9,18 +9,51 @@ const NumberParser = @import("./t_number.zig").NumberParser;
 const BoolParser = @import("./t_bool.zig").BoolParser;
 const BlobStringParser = @import("./t_string_blob.zig").BlobStringParser;
 const SimpleStringParser = @import("./t_string_simple.zig").SimpleStringParser;
-const FloatParser = @import("./t_float.zig").FloatParser;
+const DoubleParser = @import("./t_double.zig").DoubleParser;
 const ListParser = @import("./t_list.zig").ListParser;
 const MapParser = @import("./t_map.zig").MapParser;
 
+/// This is the RESP3 parser. It reads an OutStream and returns redis replies.
+/// The user is required to specify how they want to decode the reply.
+///
+/// The parser supports all 1:1 translations (e.g. RedisNumber -> Int) and
+/// a couple quality-of-life custom ones:
+///     - RedisStrings can be parsed to numbers (the parser will use fmt.parse{Int,Float})
+///     - RedisHashes can be parsed into HashMaps and Structs
+///
+/// Additionally, the parser can be extented. If the type requested declares
+/// a `Redis` member, then their .parse/.parseAlloc will be called.
+///
+/// There are two included types that implement the `Redis` trait
+///     - OrErr(T) is a union over a user type that parses Redis errors
+///     - FixBuf(N) is a fixed-length buffer used to decode strings
+///       without dynamic allocations.
+///
+/// Redis Errors are treated as special values, so there is no way
+/// to parse them other than wrapping the expected result type with OrErr().
+/// Asking for an incompatible return type will return a Zig error and
+/// will leave the connection in a corrupted state.
+/// (this constraint might be relaxed in the future)
+///
+/// If the return value of a command is not needed, it's also possible to
+/// use the `void` type. This will succesfully decode any type of response
+/// to a command _except_ for RedisErrors. Use OrErr(void) to ensure a command
+/// decode step never fails.
 pub const RESP3Parser = struct {
     const rootParser = @This();
 
+    /// This is the parsing interface that doesn't requre an allocator.
+    /// As such it doesn't support pointers, but it can still use objects
+    /// That implement the `Redis` trait. The easiest way to decode strings
+    /// using this function is to use a FixBuf wherever a string is expected.
     pub inline fn parse(comptime T: type, msg: var) !T {
         const tag = try msg.readByte();
         return parseFromTag(T, tag, msg);
     }
 
+    /// Used by the sub-parsers and `Redis` types to delegate parsing to another
+    /// parser. It's used for example by OrErr to continue parsing in the event
+    /// that the reply is not a Redis error.
     pub fn parseFromTag(comptime T: type, tag: u8, msg: var) !T {
         comptime var RealType = T;
         switch (@typeInfo(T)) {
@@ -36,28 +69,22 @@ pub const RESP3Parser = struct {
             else => {},
         }
 
-        if ((@typeId(RealType) == .Struct or
-            @typeId(RealType) == .Enum or
-            @typeId(RealType) == .Union) and
+        if ((@typeId(RealType) == .Struct or @typeId(RealType) == .Enum or @typeId(RealType) == .Union) and
             @hasDecl(RealType, "Redis"))
-        {
-            var res: T = try RealType.Redis.parse(tag, rootParser, msg);
-            return res;
-        } else {
-            var res: T = switch (tag) {
-                ':' => try ifSupported(NumberParser, RealType, msg),
-                ',' => try ifSupported(FloatParser, RealType, msg),
-                '#' => try ifSupported(BoolParser, RealType, msg),
-                '$' => try ifSupported(BlobStringParser, RealType, msg),
-                '+' => try ifSupported(SimpleStringParser, RealType, msg),
-                '-', '!' => return error.UnexpectedErrorReply,
-                '*' => try ifSupported(ListParser, RealType, msg),
-                '%' => try ifSupported(MapParser, RealType, msg),
-                // '_' => error.UnexpectedNilReply, // TODO: consider supporting it only for CRedisReply types!
-                else => @panic("Encountered grave protocol error"),
-            };
-            return res;
-        }
+            return RealType.Redis.parse(tag, rootParser, msg);
+
+        return switch (tag) {
+            ':' => try ifSupported(NumberParser, RealType, msg),
+            ',' => try ifSupported(DoubleParser, RealType, msg),
+            '#' => try ifSupported(BoolParser, RealType, msg),
+            '$' => try ifSupported(BlobStringParser, RealType, msg),
+            '+' => try ifSupported(SimpleStringParser, RealType, msg),
+            '-', '!' => return error.UnexpectedErrorReply,
+            '*' => try ifSupported(ListParser, RealType, msg),
+            '%' => try ifSupported(MapParser, RealType, msg),
+            // '_' => error.UnexpectedNilReply, // TODO: consider supporting it only for CRedisReply types!
+            else => @panic("Encountered grave protocol error"),
+        };
     }
     // TODO: if no parser supports the type conversion, @compileError!
     // The whole job of this function is to cut away calls to sub-parsers
@@ -71,8 +98,16 @@ pub const RESP3Parser = struct {
             return error.UnsupportedConversion;
     }
 
+    /// This is the interface that accepts an allocator. It will allocate memory for
+    /// every pointer-type passed to it, but not when a concrete type is requested.
+    /// This allows the caller to decide where to put the memory for the "top-level"
+    /// part of the return value.
     pub fn parseAlloc(comptime T: type, allocator: *Allocator, msg: var) !T {
         const tag = try msg.readByte();
+        return parseAllocFromTag(T, tag, allocator, msg);
+    }
+
+    pub fn parseAllocFromTag(comptime T: type, tag: u8, allocator: *Allocator, msg: var) !T {
         comptime var RealType = T;
         switch (@typeInfo(T)) {
             .Optional => |opt| {
@@ -103,10 +138,10 @@ pub const RESP3Parser = struct {
             @typeId(RealType) == .Enum or
             @typeId(RealType) == .Union) and
             @hasDecl(RealType, "Redis"))
-            try RealType.parseAlloc(tag, rootParser, allocator, msg)
+            try RealType.Redis.parseAlloc(tag, rootParser, allocator, msg)
         else switch (tag) {
             ':' => try ifSupportedAlloc(NumberParser, RealType, allocator, msg),
-            ',' => try ifSupportedAlloc(FloatParser, RealType, allocator, msg),
+            ',' => try ifSupportedAlloc(DoubleParser, RealType, allocator, msg),
             '#' => try ifSupportedAlloc(BoolParser, RealType, allocator, msg),
             '$' => try ifSupportedAlloc(BlobStringParser, RealType, allocator, msg),
             '+' => try ifSupportedAlloc(SimpleStringParser, RealType, allocator, msg),

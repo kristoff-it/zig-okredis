@@ -3,6 +3,7 @@ const std = @import("std");
 const fmt = std.fmt;
 const testing = std.testing;
 
+/// Parses RedisBoolean values (#t and #f)
 pub const BoolParser = struct {
     pub fn isSupported(comptime T: type) bool {
         return switch (@typeId(T)) {

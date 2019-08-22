@@ -3,6 +3,7 @@ const std = @import("std");
 const fmt = std.fmt;
 const InStream = std.io.InStream;
 
+/// Parses RedisNumber values
 pub const NumberParser = struct {
     pub fn isSupported(comptime T: type) bool {
         return switch (@typeId(T)) {

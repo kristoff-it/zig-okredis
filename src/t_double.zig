@@ -3,7 +3,8 @@ const std = @import("std");
 const fmt = std.fmt;
 const InStream = std.io.InStream;
 
-pub const FloatParser = struct {
+/// Parses RedisDouble values (e.g. ,123.45)
+pub const DoubleParser = struct {
     pub fn isSupported(comptime T: type) bool {
         return switch (@typeId(T)) {
             .Void, .Float => true,

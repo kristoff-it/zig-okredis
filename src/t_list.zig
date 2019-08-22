@@ -2,6 +2,8 @@ const builtin = @import("builtin");
 const std = @import("std");
 const fmt = std.fmt;
 
+/// Parses RedisList values.
+/// Uses RESP3Parser to delegate parsing of the list contents recursively.
 pub const ListParser = struct {
     // TODO: prevent users from unmarshaling structs out of strings
     pub fn isSupported(comptime T: type) bool {

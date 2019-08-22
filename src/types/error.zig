@@ -3,6 +3,10 @@ const fmt = std.fmt;
 const testing = std.testing;
 const Allocator = std.mem.Allocator;
 
+/// Creates a union over T that is capable of optionally parse
+/// Redis Errors. It's the only way of successfully decode a
+/// server error, in order to ensure that error replies don't
+/// get silently ignored.
 pub fn OrErr(comptime T: type) type {
     return union(enum) {
         Ok: T,
@@ -24,6 +28,13 @@ pub fn OrErr(comptime T: type) type {
         },
 
         const Self = @This();
+        pub fn freeErrorMessage(self: Self, allocator: *Allocator) void {
+            switch (self) {
+                .Err => |err| if (err.message) |msg| allocator.free(msg),
+                else => {},
+            }
+        }
+
         pub const Redis = struct {
             pub fn parse(tag: u8, comptime rootParser: type, msg: var) !Self {
                 switch (tag) {
@@ -112,7 +123,7 @@ pub fn OrErr(comptime T: type) type {
 
             pub fn parseAlloc(tag: u8, comptime rootParser: type, allocator: *Allocator, msg: var) !Self {
                 switch (tag) {
-                    else => return Self{ .Ok = try rootParser.parseFromTag(T, tag, msg) },
+                    else => return Self{ .Ok = try rootParser.parseAllocFromTag(T, tag, allocator, msg) },
                     '_' => {
                         try msg.skipBytes(2);
                         return Self{ .Nil = {} };

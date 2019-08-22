@@ -2,8 +2,8 @@ const builtin = @import("builtin");
 const std = @import("std");
 const fmt = std.fmt;
 const testing = std.testing;
-const RSB = @import("./types/string_buffer.zig").RedisStringBuffer;
 
+/// Parses RedisBlobString values
 pub const BlobStringParser = struct {
     pub fn isSupported(comptime T: type) bool {
         return switch (@typeInfo(T)) {
@@ -69,16 +69,24 @@ pub const BlobStringParser = struct {
     pub fn isSupportedAlloc(comptime T: type) bool {
         return switch (@typeInfo(T)) {
             .Pointer => |ptr| switch (ptr.size) {
-                .Slice, .C => true,
-                .One, .Many => false,
+                .One, .Slice, .C => true,
+                .Many => false,
             },
             else => isSupported(T),
         };
     }
 
-    pub fn parseAlloc(comptime T: type, comptime _: type, allocator: *std.mem.Allocator, msg: var) !T {
+    pub fn parseAlloc(comptime T: type, comptime rootParser: type, allocator: *std.mem.Allocator, msg: var) !T {
         switch (@typeInfo(T)) {
             .Pointer => |ptr| {
+                // If pointer to only one element,
+                // allocate it and recur.
+                if (ptr.size == .One) {
+                    var res = try allocator.create(ptr.child);
+                    res.* = try rootParser.parseAllocFromTag(ptr.child, '$', allocator, msg);
+                    return res;
+                }
+
                 // TODO: write real implementation
                 var buf: [100]u8 = undefined;
                 var end: usize = 0;

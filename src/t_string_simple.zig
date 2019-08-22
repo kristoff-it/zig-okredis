@@ -3,6 +3,7 @@ const std = @import("std");
 const fmt = std.fmt;
 const testing = std.testing;
 
+/// Parses RedisSimpleString values
 pub const SimpleStringParser = struct {
     pub fn isSupported(comptime T: type) bool {
         return switch (@typeInfo(T)) {
