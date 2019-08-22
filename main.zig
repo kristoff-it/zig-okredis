@@ -34,7 +34,7 @@ pub fn main() !void {
     }
 
     // To decode strings without allocating, use a FixBuf type.
-    // FixBuf is just an array + lenght, so it allows decoding
+    // FixBuf is just an array + length, so it allows decoding
     // strings up to its length. If the buffer is not big enough,
     // an error is returned.
     try client.send(void, "SET stringkey 'Hello World!'");
@@ -66,17 +66,10 @@ pub fn main() !void {
         },
     }
 
-    // Normally speaking you probably are fine with allocating memory,
+    // Normally, you probably are fine with allocating memory,
     // and don't want to have to preemptively size FixBufs.
     const allocator = std.heap.direct_allocator;
-    // try client.send(void,
-    //     \\SET divne 'When half way through the journey of our life
-    //     \\I found that I was in a gloomy wood,
-    //     \\because the path which led aright was lost.
-    //     \\And ah, how hard it is to say just what
-    //     \\this wild and rough and stubborn woodland was,
-    //     \\the very thought of which renews my fear!'
-    // );
+
     try client.send(void, "SET divine 'When half way through the journey of our life - I found that I was in a gloomy wood'");
 
     // Using parseAlloc you can dynamically parse replies from Redis,
