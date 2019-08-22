@@ -3,10 +3,11 @@ const fmt = std.fmt;
 const testing = std.testing;
 const Allocator = std.mem.Allocator;
 
-/// Creates a union over T that is capable of optionally parse
-/// Redis Errors. It's the only way of successfully decode a
+/// Creates a union over T that is capable of optionally parsing
+/// Redis Errors. It's the only way to successfully decode a
 /// server error, in order to ensure that error replies don't
-/// get silently ignored.
+/// get silently ignored. In other words, the main parser
+/// always errors out when trying to parse Redis Error replies.
 pub fn OrErr(comptime T: type) type {
     return union(enum) {
         Ok: T,
