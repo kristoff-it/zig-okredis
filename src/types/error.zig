@@ -6,16 +6,28 @@ const Allocator = std.mem.Allocator;
 pub const Error = struct {
     // TODO: Size based on @sizeOf(T). If we have to
     //       allocate more space anyway, let's use it.
+    _buf: [32]u8,
+    end: usize,
+
+    const Self = @This();
+    pub fn getCode(self: Self) []u8 {
+        return self._buf[0..self.end];
+    }
+};
+
+pub const FullError = struct {
+    // TODO: Size based on @sizeOf(T). If we have to
+    //       allocate more space anyway, let's use it.
     // TODO: How hard would it be to make different
     //       Ts based on `parse` vs `parseAlloc`?
     //       To remove `message` from the struct.
-    buf: [32]u8,
+    _buf: [32]u8,
     end: usize,
     message: ?[]u8,
 
-    const Inner = @This();
-    pub fn getCode(self: Inner) []u8 {
-        return self.buf[0..self.end];
+    const Self = @This();
+    pub fn getCode(self: Self) []u8 {
+        return self._buf[0..self.end];
     }
 };
 
@@ -34,8 +46,29 @@ pub fn OrErr(comptime T: type) type {
         pub const Redis = struct {
             pub const Parser = struct {
                 pub fn parse(tag: u8, comptime rootParser: type, msg: var) !Self {
+                    return switch (tag) {
+                        '_', '-', '!' => internalParse(tag, rootParser, msg),
+                        else => Self{ .Ok = try rootParser.parseFromTag(T, tag, msg) },
+                    };
+                }
+
+                pub inline fn destroy(self: Self, comptime rootParser: type, allocator: *Allocator) void {
+                    switch (self) {
+                        .Ok => |ok| rootParser.freeReply(ok, allocator),
+                        else => {},
+                    }
+                }
+
+                pub fn parseAlloc(tag: u8, comptime rootParser: type, allocator: *Allocator, msg: var) !Self {
+                    return switch (tag) {
+                        '_', '-', '!' => internalParse(tag, rootParser, msg),
+                        else => return Self{ .Ok = try rootParser.parseAllocFromTag(T, tag, allocator, msg) },
+                    };
+                }
+
+                fn internalParse(tag: u8, comptime rootParser: type, msg: var) !Self {
                     switch (tag) {
-                        else => return Self{ .Ok = try rootParser.parseFromTag(T, tag, msg) },
+                        else => unreachable,
                         '_' => {
                             try msg.skipBytes(2);
                             return Self{ .Nil = {} };
@@ -56,20 +89,21 @@ pub fn OrErr(comptime T: type) type {
                             try msg.skipBytes(1);
                             var size = try fmt.parseInt(usize, buf[0..end], 10);
                             var res = Self{ .Err = undefined };
-                            res.Err.message = null;
 
                             // Parse the Code part
                             var ch = try msg.readByte();
-                            for (res.Err.buf) |*elem, i| {
+                            for (res.Err._buf) |*elem, i| {
                                 if (i == size) {
                                     elem.* = ch;
                                     res.Err.end = i;
+                                    // res.Err.code = res.Err._buf[0..i];
                                     try msg.skipBytes(2);
                                     return res;
                                 }
                                 switch (ch) {
                                     ' ' => {
                                         res.Err.end = i;
+                                        // res.Err.code = res.Err._buf[0..i];
                                         break;
                                     },
                                     else => {
@@ -86,18 +120,19 @@ pub fn OrErr(comptime T: type) type {
                         },
                         '-' => {
                             var res = Self{ .Err = undefined };
-                            res.Err.message = null;
 
                             // Parse the Code part
                             var ch = try msg.readByte();
-                            for (res.Err.buf) |*elem, i| {
+                            for (res.Err._buf) |*elem, i| {
                                 switch (ch) {
                                     ' ' => {
                                         res.Err.end = i;
+                                        // res.Err.code = res.Err._buf[0..i];
                                         break;
                                     },
                                     '\r' => {
                                         res.Err.end = i;
+                                        // res.Err.code = res.Err._buf[0..i];
                                         try msg.skipBytes(1);
                                         return res;
                                     },
@@ -109,13 +144,29 @@ pub fn OrErr(comptime T: type) type {
                             }
                             if (ch != ' ') return error.ErrorCodeBufTooSmall;
 
-                            // Seek through the rest of the message,
-                            // discarding it.
-                            // TODO: add a max limit maybe?
+                            // Seek through the rest of the message, discarding it.
                             while (ch != '\n') ch = try msg.readByte();
                             return res;
                         },
                     }
+                }
+            };
+        };
+    };
+}
+
+// Like OrErr, but it uses an allocator to store the msg error message
+pub fn OrFullErr(comptime T: type) type {
+    return union(enum) {
+        Ok: T,
+        Nil: void,
+        Err: FullError,
+
+        const Self = @This();
+        pub const Redis = struct {
+            pub const Parser = struct {
+                pub fn parse(tag: u8, comptime rootParser: type, msg: var) !Self {
+                    @compileError("OrFullErr requires an allocator, use `OrErr` to parse just the error code without the need of an allocator.");
                 }
 
                 pub inline fn destroy(self: Self, comptime rootParser: type, allocator: *Allocator) void {
@@ -153,16 +204,18 @@ pub fn OrErr(comptime T: type) type {
 
                             // Parse the Code part
                             var ch = try msg.readByte();
-                            for (res.Err.buf) |*elem, i| {
+                            for (res.Err._buf) |*elem, i| {
                                 if (i == size) {
                                     elem.* = ch;
                                     res.Err.end = i;
+                                    // res.Err.code = res.Err._buf[0..i];
                                     try msg.skipBytes(2);
                                     return res;
                                 }
                                 switch (ch) {
                                     ' ' => {
                                         res.Err.end = i;
+                                        // res.Err.code = res.Err._buf[0..i];
                                         break;
                                     },
                                     else => {
@@ -173,8 +226,9 @@ pub fn OrErr(comptime T: type) type {
                             }
 
                             if (ch != ' ') return error.ErrorCodeBufTooSmall;
+
                             // Alloc difference:
-                            const remainder = size - res.Err.end; // +2 because of `\r\n`
+                            const remainder = size - res.Err.end;
                             if (remainder == 0) return res;
                             var slice = try allocator.alloc(u8, remainder);
                             errdefer allocator.free(slice);
@@ -190,14 +244,16 @@ pub fn OrErr(comptime T: type) type {
 
                             // Parse the Code part
                             var ch = try msg.readByte();
-                            for (res.Err.buf) |*elem, i| {
+                            for (res.Err._buf) |*elem, i| {
                                 switch (ch) {
                                     ' ' => {
                                         res.Err.end = i;
+                                        // res.Err.code = res.Err._buf[0..i];
                                         break;
                                     },
                                     '\r' => {
                                         res.Err.end = i;
+                                        // res.Err.code = res.Err._buf[0..i];
                                         try msg.skipBytes(1);
                                         return res;
                                     },
@@ -221,43 +277,42 @@ pub fn OrErr(comptime T: type) type {
         };
     };
 }
-
 test "parse simple errors" {
-    switch (try OrErr(u8).Redis.parse('_', fakeParser, &MakeNil().stream)) {
+    switch (try OrErr(u8).Redis.Parser.parse('_', fakeParser, &MakeNil().stream)) {
         .Ok, .Err => unreachable,
         .Nil => testing.expect(true),
     }
-    switch (try OrErr(u8).Redis.parse('!', fakeParser, &MakeBlobErr().stream)) {
+    switch (try OrErr(u8).Redis.Parser.parse('!', fakeParser, &MakeBlobErr().stream)) {
         .Ok, .Nil => unreachable,
         .Err => |err| testing.expectEqualSlices(u8, "ERRN\r\nOGOODFOOD", err.getCode()),
     }
 
-    switch (try OrErr(u8).Redis.parse('-', fakeParser, &MakeErr().stream)) {
+    switch (try OrErr(u8).Redis.Parser.parse('-', fakeParser, &MakeErr().stream)) {
         .Ok, .Nil => unreachable,
         .Err => |err| testing.expectEqualSlices(u8, "ERRNOGOODFOOD", err.getCode()),
     }
 
-    switch (try OrErr(u8).Redis.parse('-', fakeParser, &MakeErroji().stream)) {
+    switch (try OrErr(u8).Redis.Parser.parse('-', fakeParser, &MakeErroji().stream)) {
         .Ok, .Nil => unreachable,
         .Err => |err| testing.expectEqualSlices(u8, "😈", err.getCode()),
     }
 
-    switch (try OrErr(u8).Redis.parse('-', fakeParser, &MakeShortErr().stream)) {
+    switch (try OrErr(u8).Redis.Parser.parse('-', fakeParser, &MakeShortErr().stream)) {
         .Ok, .Nil => unreachable,
         .Err => |err| testing.expectEqualSlices(u8, "ABC", err.getCode()),
     }
 
-    testing.expectError(error.ErrorCodeBufTooSmall, OrErr(u8).Redis.parse('-', fakeParser, &MakeBadErr().stream));
+    testing.expectError(error.ErrorCodeBufTooSmall, OrErr(u8).Redis.Parser.parse('-', fakeParser, &MakeBadErr().stream));
 
     const allocator = std.heap.direct_allocator;
-    switch (try OrErr(u8).Redis.parseAlloc('-', fakeParser, allocator, &MakeErroji().stream)) {
+    switch (try OrFullErr(u8).Redis.Parser.parseAlloc('-', fakeParser, allocator, &MakeErroji().stream)) {
         .Ok, .Nil => unreachable,
         .Err => |err| {
             testing.expectEqualSlices(u8, "😈", err.getCode());
             testing.expectEqualSlices(u8, "your Redis belongs to us", err.message.?);
         },
     }
-    switch (try OrErr(u8).Redis.parseAlloc('!', fakeParser, allocator, &MakeBlobErr().stream)) {
+    switch (try OrFullErr(u8).Redis.Parser.parseAlloc('!', fakeParser, allocator, &MakeBlobErr().stream)) {
         .Ok, .Nil => unreachable,
         .Err => |err| {
             testing.expectEqualSlices(u8, "ERRN\r\nOGOODFOOD", err.getCode());
@@ -270,6 +325,9 @@ const fakeParser = struct {
         return error.Errror;
     }
     pub inline fn parseFromTag(comptime T: type, tag: u8, msg: var) !T {
+        return error.Errror;
+    }
+    pub inline fn parseAllocFromTag(comptime T: type, tag: u8, allocator: *Allocator, msg: var) !T {
         return error.Errror;
     }
 };

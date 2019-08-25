@@ -7,10 +7,16 @@ const ArgSerializer = @import("./serializer.zig").ArgSerializer;
 pub const Client = struct {
     broken: bool = false,
     fd: os.fd_t,
+    sock: std.fs.File,
     in: std.fs.File.InStream,
     out: std.fs.File.OutStream,
+    bufin: InBuff,
+    bufout: OutBuff,
 
     const Self = @This();
+    const InBuff = std.io.BufferedInStream(std.fs.File.InStream.Error);
+    const OutBuff = std.io.BufferedOutStream(std.fs.File.OutStream.Error);
+
     pub fn initIp4(addr: []const u8, port: u16) !Self {
         const sockfd = try os.socket(os.AF_INET, os.SOCK_STREAM, 0);
         errdefer os.close(sockfd);
@@ -22,13 +28,15 @@ pub const Client = struct {
         sock_addr.in.zero = [_]u8{0} ** 8;
 
         try os.connect(sockfd, &sock_addr, @sizeOf(os.sockaddr_in));
-        var sock = std.fs.File.openHandle(sockfd);
 
-        var new = Self{
-            .fd = sockfd,
-            .in = sock.inStream(),
-            .out = sock.outStream(),
-        };
+        var new: Self = undefined;
+        new.broken = false;
+        new.fd = sockfd;
+        new.sock = std.fs.File.openHandle(sockfd);
+        new.in = new.sock.inStream();
+        new.out = new.sock.outStream();
+        new.bufin = InBuff.init(&new.in.stream);
+        new.bufout = OutBuff.init(&new.out.stream);
 
         try new.out.stream.write("*2\r\n$5\r\nHELLO\r\n$1\r\n3\r\n");
         try RESP3.parse(void, &new.in.stream);

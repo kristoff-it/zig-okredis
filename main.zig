@@ -89,17 +89,21 @@ pub fn main() !void {
     defer allocator.free(inferno);
     std.debug.warn("\ndivine comedy - inferno 1: \n{}\n\n", inferno);
 
-    // When using sendAlloc, OrErr will store not just the error code
-    // but also the full error message. That too needs to be freed, of course.
-    // Note that the OrErr union is not dynamically allocated, only the message.
-    var incrErr = try client.sendAlloc(OrErr(i64), allocator, "INCR", "divine");
+    // When using sendAlloc, you can use OrFullErr to parse not just the error code
+    // but also the full error message. The error message is allocated with `allocator`
+    // so it will need to be freed. (the next example will free it)
+    const OrFullErr = @import("./src/types/error.zig").OrFullErr;
+    var incrErr = try client.sendAlloc(OrFullErr(i64), allocator, "INCR", "divine");
     switch (incrErr) {
         .Ok, .Nil => unreachable,
         .Err => |err| std.debug.warn("error code = {} message = '{}'\n", err.getCode(), err.message.?),
     }
 
     // To help deallocating resources allocated by `sendAlloc`, you can use `freeReply`.
+    // `freeReply` knows how to deallocate values created by `sendAlloc`.
     const freeReply = @import("./src/parser.zig").freeReply;
+
+    // For example, instead of freeing directly incrErr.Err.message.?, you can do this:
     defer freeReply(incrErr, allocator);
 
     // In general, sendAlloc will only allocate where the type you specify is a
@@ -140,8 +144,6 @@ pub fn main() !void {
     const dynReply = try client.sendAlloc(DynamicReply, allocator, "HGETALL", "myhash");
     defer freeReply(dynReply, allocator);
 
-    std.debug.warn("\nmyhash decoded as DynamicReply:\n");
-
     // DynamicReply is a union that represents all possible replies.
     // The basic types are straightforward, container types are recursive and
     // maps have an intermediaty KV struct:
@@ -159,6 +161,7 @@ pub fn main() !void {
     //         value: V,
     //     };
     // }
+    std.debug.warn("\nmyhash decoded as DynamicReply:\n");
     switch (dynReply) {
         .Nil, .Bool, .Number, .Double, .String, .List => {},
         .Map => |kvs| {

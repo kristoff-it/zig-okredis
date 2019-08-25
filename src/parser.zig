@@ -12,12 +12,7 @@ const SimpleStringParser = @import("./parser/t_string_simple.zig").SimpleStringP
 const DoubleParser = @import("./parser/t_double.zig").DoubleParser;
 const ListParser = @import("./parser/t_list.zig").ListParser;
 const MapParser = @import("./parser/t_map.zig").MapParser;
-
-inline fn isParserType(comptime T: type) bool {
-    const tid = @typeId(T);
-    return (tid == .Struct or tid == .Enum or tid == .Union) and
-        @hasDecl(T, "Redis") and @hasDecl(T.Redis, "Parser");
-}
+const traits = @import("./traits.zig");
 
 /// Function that recursively frees a value
 /// created by `sendAlloc`.
@@ -67,7 +62,7 @@ pub const RESP3Parser = struct {
     pub fn parseFromTag(comptime T: type, tag: u8, msg: var) !T {
         comptime var RealType = T;
         switch (@typeInfo(T)) {
-            .Pointer => @compileError("`parse` can't perform allocations so it can't handle pointers. Use `parseAlloc` instead."),
+            .Pointer => @compileError("`parse` can't perform allocations so it can't handle pointers, use `parseAlloc` instead."),
             .Optional => |opt| {
                 RealType = opt.child;
                 // Null micro-parser:
@@ -79,12 +74,8 @@ pub const RESP3Parser = struct {
             else => {},
         }
 
-        // Here we check for the `Redis` trait, in order to delegate the parsing job.
-        // A {struct, enum, union} that contains a `Redis` declaration
-        // will presumably know how to parse itself.
-        // TODO: we should probably inspect a bit better if it
-        // contains the appropriate functions.
-        if (comptime isParserType(RealType)) {
+        // Here we check for the `Redis.Parser` trait, in order to delegate the parsing job.
+        if (comptime traits.isParserType(RealType)) {
             return RealType.Redis.Parser.parse(tag, rootParser, msg);
         }
 
@@ -104,9 +95,9 @@ pub const RESP3Parser = struct {
     }
     // TODO: if no parser supports the type conversion, @compileError!
     // The whole job of this function is to cut away calls to sub-parsers
-    // if we know that the Zig type is not supported. This has both the benefit
-    // of reducing code size and allows sub-parsers to @compileError when
-    // the type requested is not supported.
+    // if we know that the Zig type is not supported.
+    // It's a good way to report a comptime error if no parser supports a
+    // given type.
     inline fn ifSupported(comptime parser: type, comptime T: type, msg: var) !T {
         return if (comptime parser.isSupported(T))
             parser.parse(T, rootParser, msg)
@@ -114,10 +105,7 @@ pub const RESP3Parser = struct {
             return error.UnsupportedConversion;
     }
 
-    /// This is the interface that accepts an allocator. It will allocate memory for
-    /// every pointer-type passed to it, but not when a concrete type is requested.
-    /// This allows the caller to decide where to put the memory for the "top-level"
-    /// part of the return value.
+    /// This is the interface that accepts an allocator.
     pub fn parseAlloc(comptime T: type, allocator: *Allocator, msg: var) !T {
         const tag = try msg.readByte();
         return parseAllocFromTag(T, tag, allocator, msg);
@@ -150,7 +138,7 @@ pub const RESP3Parser = struct {
             else => {},
         }
 
-        if (comptime isParserType(RealType))
+        if (comptime traits.isParserType(RealType))
             return RealType.Redis.Parser.parseAlloc(tag, rootParser, allocator, msg);
 
         return switch (tag) {
@@ -232,14 +220,14 @@ pub const RESP3Parser = struct {
                     allocator.destroy(val);
                 },
             },
-            .Union => |unn| if (comptime isParserType(T)) {
+            .Union => |unn| if (comptime traits.isParserType(T)) {
                 T.Redis.Parser.destroy(val, rootParser, allocator);
             } else {
                 @compileError("sendAlloc cannot return Unions or Enums that don't implement " ++
                     "custom parsing logic. You are passing the wrong value!");
             },
             .Struct => |stc| {
-                if (comptime isParserType(T)) {
+                if (comptime traits.isParserType(T)) {
                     T.Redis.Parser.destroy(val, rootParser, allocator);
                 } else {
                     inline for (stc.fields) |f| {

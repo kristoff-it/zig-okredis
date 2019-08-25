@@ -16,18 +16,17 @@ pub const DynamicReply = union(enum) {
     Number: i64,
     Double: f64,
     String: []u8,
-    Map: []KV(Self, Self),
-    List: []Self,
+    Map: []KV(DynamicReply, DynamicReply),
+    List: []DynamicReply,
     // Set: std.AutoHash(Reply, void),
 
-    const Self = @This();
     pub const Redis = struct {
         pub const Parser = struct {
-            pub fn parse(tag: u8, comptime _: type, msg: var) !Self {
+            pub fn parse(tag: u8, comptime _: type, msg: var) !DynamicReply {
                 @compileError("Redis Reply objects require an allocator. Use `sendAlloc`!");
             }
 
-            pub fn destroy(self: Self, comptime rootParser: type, allocator: *Allocator) void {
+            pub fn destroy(self: DynamicReply, comptime rootParser: type, allocator: *Allocator) void {
                 switch (self) {
                     .Nil, .Bool, .Number, .Double => {},
                     .String => |str| allocator.free(str),
@@ -43,17 +42,17 @@ pub const DynamicReply = union(enum) {
                 }
             }
 
-            pub fn parseAlloc(tag: u8, comptime rootParser: type, allocator: *Allocator, msg: var) anyerror!Self {
+            pub fn parseAlloc(tag: u8, comptime rootParser: type, allocator: *Allocator, msg: var) anyerror!DynamicReply {
                 return switch (tag) {
                     else => return error.ProtocolError,
-                    '_' => Self{ .Nil = {} },
-                    '#' => Self{ .Bool = try rootParser.parseFromTag(bool, '#', msg) },
-                    ':' => Self{ .Number = try rootParser.parseFromTag(i64, ':', msg) },
-                    ',' => Self{ .Double = try rootParser.parseFromTag(f64, ',', msg) },
-                    '$' => Self{ .String = try rootParser.parseAllocFromTag([]u8, '$', allocator, msg) },
-                    '+' => Self{ .String = try rootParser.parseAllocFromTag([]u8, '+', allocator, msg) },
-                    '%' => Self{ .Map = try rootParser.parseAllocFromTag([]KV(Self, Self), '%', allocator, msg) },
-                    '*' => Self{ .List = try rootParser.parseAllocFromTag([]Self, '*', allocator, msg) },
+                    '_' => DynamicReply{ .Nil = {} },
+                    '#' => DynamicReply{ .Bool = try rootParser.parseFromTag(bool, '#', msg) },
+                    ':' => DynamicReply{ .Number = try rootParser.parseFromTag(i64, ':', msg) },
+                    ',' => DynamicReply{ .Double = try rootParser.parseFromTag(f64, ',', msg) },
+                    '$' => DynamicReply{ .String = try rootParser.parseAllocFromTag([]u8, '$', allocator, msg) },
+                    '+' => DynamicReply{ .String = try rootParser.parseAllocFromTag([]u8, '+', allocator, msg) },
+                    '%' => DynamicReply{ .Map = try rootParser.parseAllocFromTag([]KV(DynamicReply, DynamicReply), '%', allocator, msg) },
+                    '*' => DynamicReply{ .List = try rootParser.parseAllocFromTag([]DynamicReply, '*', allocator, msg) },
                 };
             }
         };

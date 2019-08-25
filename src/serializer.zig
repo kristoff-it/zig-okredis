@@ -1,18 +1,23 @@
 const std = @import("std");
+const traits = @import("./traits.zig");
+
+const errorMsg = "Valid arguments are just numbers, booleans " ++
+    "(which become 0 or 1) and strings (either as []u8 or as [_]u8), " ++
+    "unless the type implements `Redis.ArgSerializer`.";
 
 pub const ArgSerializer = struct {
     pub fn serialize(msg: var, vals: ...) !void {
-        // We first need to write to the
-        // stream how many arguments we're going to send.
-        // This could be as simple as `vals.len`, but this
-        // library offers two quality-of-life features:
-        //    - Optionals are skipped when null
-        //    - Types can define their own serialization
-        // The second point is of particular interest
-        // because it allows types to serialize themselves
-        // to more than one command argument.
-        // For this reason we need to first count to how
-        // many Redis arguments `vals` is going to correspond to.
+        // Client commands start by stating the number of arguments they have.
+        // Types that define their own serialization have the option of writing
+        // themselves as multiple arguments. This option is given because, while
+        // Redis can reply with arbitrarily complex data structures, client
+        // commands must be unstructured. There are common patterns that emerge,
+        // like with HMSET, where it makes sense to translate a struct to a
+        // sequence of `field` `value`.
+        // Types that implement the `Redis.ArgSerializer` trait must implement
+        // a method that returns how many arguments a given value is going to
+        // translate to, and then make sure to produce the same amount of args,
+        // once ArgSerializer asks to serialize the value.
         var argNum: usize = 0;
 
         // Loop over arguments to obtain the number of arguments
@@ -21,30 +26,28 @@ pub const ArgSerializer = struct {
             var val = vals[i];
             comptime var T = @typeOf(val);
             switch (@typeInfo(T)) {
-                else => {
-                    argNum += if (comptime isArgType(T))
-                        T.Redis.ArgParse.numArgs(val)
-                    else
-                        1;
+                else => @compileError(errorMsg),
+                .Int, .Float, .Bool => argNum += 1,
+                .Array => |arr| {
+                    if (arr.child != u8) @compileError(errorMsg);
+                    argNum += 1;
                 },
-                .Optional => |opt| {
-                    if (val) |unwrapped_val| {
-                        argNum += if (comptime isArgType(opt.child))
-                            T.Redis.ArgParse.numArgs(val)
-                        else
-                            1;
-                    }
-                    // We do nothing otherwise, the argument is skipped.
+                .Union, .Enum, .Struct => {
+                    argNum += if (comptime traits.isArgType(ptr.child))
+                        T.Redis.ArgParse.numArgs(val.*)
+                    else
+                        @compileError(errorMsg);
                 },
                 .Pointer => |ptr| switch (ptr.size) {
-                    .Many, .C => @compileError("Not supported"),
+                    .Many, .C => @compileError(errorMsg),
                     .One => {
-                        argNum += if (comptime isArgType(ptr.child))
+                        argNum += if (comptime traits.isArgType(ptr.child))
                             T.Redis.ArgParse.numArgs(val.*)
                         else
                             1;
                     },
                     .Slice => {
+                        if (arr.child != u8) @compileError(errorMsg);
                         argNum += 1;
                     },
                 },
@@ -62,12 +65,6 @@ pub const ArgSerializer = struct {
             comptime var T = @typeOf(val);
             switch (@typeInfo(T)) {
                 else => try writeVal(msg, val),
-                .Optional => |opt| {
-                    if (val) |unwrapped_val| {
-                        try writeVal(msg, unwrapped_val);
-                    }
-                    // We do nothing otherwise.
-                },
                 .Pointer => |ptr| switch (ptr.size) {
                     .Many, .C => @compileError("Not supported"),
                     .One => {
@@ -81,15 +78,9 @@ pub const ArgSerializer = struct {
         }
     }
 
-    inline fn isArgType(comptime T: type) bool {
-        const tid = @typeId(T);
-        return (tid == .Struct or tid == .Enum or tid == .Union) and
-            @hasDecl(T, "Redis") and @hasDecl(T.Redis, "ArgSerializer");
-    }
-
     pub inline fn writeVal(msg: var, val: var) !void {
         const T = @typeOf(val);
-        if (comptime isArgType(T)) {
+        if (comptime traits.isArgType(T)) {
             try T.Redis.ArgSerializer.serialize(msg, val);
             return;
         }
