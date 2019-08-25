@@ -47,7 +47,7 @@ pub const ArgSerializer = struct {
                             1;
                     },
                     .Slice => {
-                        if (arr.child != u8) @compileError(errorMsg);
+                        if (ptr.child != u8) @compileError(errorMsg);
                         argNum += 1;
                     },
                 },
@@ -109,5 +109,5 @@ test "some strings" {
     var buf: [1000]u8 = undefined;
     var out = std.io.SliceOutStream.init(buf[0..]);
     try ArgSerializer.serialize(&out.stream, "SET", "key"[0..], "42");
-    std.debug.warn("--> {}\n", out.getWritten());
+    // std.debug.warn("--> {}\n", out.getWritten());
 }

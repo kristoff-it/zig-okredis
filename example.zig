@@ -1,5 +1,6 @@
 const std = @import("std");
-const Client = @import("./src/client.zig").Client;
+const heyredis = @import("./src/heyredis.zig");
+const Client = heyredis.Client;
 
 pub fn main() !void {
     // Connect
@@ -37,7 +38,7 @@ pub fn main() !void {
     // FixBuf is just an array + length, so it allows decoding
     // strings up to its length. If the buffer is not big enough,
     // an error is returned.
-    const FixBuf = @import("./src/types/fixbuf.zig").FixBuf;
+    const FixBuf = heyredis.FixBuf;
 
     try client.send(void, "SET", "stringkey", "Hello World!");
     var stringkey = try client.send(FixBuf(30), "GET", "stringkey");
@@ -47,7 +48,7 @@ pub fn main() !void {
     // OrErr also has a .Nil case, so you don't need to make your return type
     // optional in this case. In general, wrapping all response types with
     // OrErr() is a good idea.
-    const OrErr = @import("./src/types/error.zig").OrErr;
+    const OrErr = heyredis.OrErr;
 
     switch (try client.send(OrErr(i64), "INCR", "stringkey")) {
         .Ok, .Nil => unreachable,
@@ -92,7 +93,7 @@ pub fn main() !void {
     // When using sendAlloc, you can use OrFullErr to parse not just the error code
     // but also the full error message. The error message is allocated with `allocator`
     // so it will need to be freed. (the next example will free it)
-    const OrFullErr = @import("./src/types/error.zig").OrFullErr;
+    const OrFullErr = heyredis.OrFullErr;
     var incrErr = try client.sendAlloc(OrFullErr(i64), allocator, "INCR", "divine");
     switch (incrErr) {
         .Ok, .Nil => unreachable,
@@ -101,7 +102,7 @@ pub fn main() !void {
 
     // To help deallocating resources allocated by `sendAlloc`, you can use `freeReply`.
     // `freeReply` knows how to deallocate values created by `sendAlloc`.
-    const freeReply = @import("./src/parser.zig").freeReply;
+    const freeReply = heyredis.freeReply;
 
     // For example, instead of freeing directly incrErr.Err.message.?, you can do this:
     defer freeReply(incrErr, allocator);
@@ -140,7 +141,7 @@ pub fn main() !void {
     // the shape of the reply, one might also be in a situation where the
     // reply is unknown or dynamic. To help with that, supredis includes
     // `DynamicReply`, which can decode any possible Redis reply.
-    const DynamicReply = @import("./src/types/reply.zig").DynamicReply;
+    const DynamicReply = heyredis.DynamicReply;
     const dynReply = try client.sendAlloc(DynamicReply, allocator, "HGETALL", "myhash");
     defer freeReply(dynReply, allocator);
 
@@ -172,7 +173,7 @@ pub fn main() !void {
     }
 
     // KV can also be used outside of DynamicReply.
-    const KV = @import("./src/types/kv.zig").KV;
+    const KV = heyredis.KV;
 
     // In the previous example we saw how a Redis hashmap can become
     // a sequence of KV values. The same applies to lists containing

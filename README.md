@@ -14,7 +14,8 @@ The client has two functions to send commands: `parse` and `parseAlloc`. Followi
 
 ```zig
 const std = @import("std");
-const Client = @import("./src/client.zig").Client;
+const heyredis = @import("./src/heyredis.zig");
+const Client = heyredis.Client;
 
 pub fn main() !void {
     var client = try Client.initIp4("127.0.0.1", 6379);
@@ -65,7 +66,7 @@ if (maybe) |val| {
 To decode strings without allocating, use a `FixBuf` type. `FixBuf` is just an array + length, so it allows decoding strings up to its length. If the buffer is not big enough, an error is returned.
 
 ```zig
-const FixBuf = @import("./src/types/fixbuf.zig").FixBuf;
+const FixBuf = heyredis.FixBuf;
 
 try client.send(void, "SET", "stringkey", "Hello World!");
 var stringkey = try client.send(FixBuf(30), "GET", "stringkey");
@@ -77,7 +78,7 @@ std.debug.warn("stringkey = {}\n", stringkey.toSlice());
 Sending a command that causes an error will produce a Zig error, but in that case you won't be able to inspect the actual error code. Use `OrErr` to parse  Redis errors as values. `OrErr` also has a `.Nil` case, so you don't need to wrap the inner type with an optional. In general it's a good idea to wrap most reply types with `OrErr`. 
 
 ```zig
-const OrErr = @import("./src/types/error.zig").OrErr;
+const OrErr = heyredis.OrErr;
 
 switch (try client.send(OrErr(i64), "INCR", "stringkey")) {
     .Ok, .Nil => unreachable,
@@ -154,7 +155,7 @@ defer allocator.destroy(allocatedNum);
 The previous examples produced types that are easy to free. Later we will see more complex examples where it becomes tedious to free everything by hand. For this reason heyredis includes `freeReply`, which frees recursively a value produced by `sendAlloc`. The following examples will showcase how to use it.
 
 ```zig
-const freeReply = @import("./src/parser.zig").freeReply;
+const freeReply = heyredis.freeReply;
 ```
 
 ### Allocating Redis Error messages
@@ -162,7 +163,7 @@ const freeReply = @import("./src/parser.zig").freeReply;
 When using `OrErr`, we were only decoding the error code and throwing away the message. Using `OrFullErr` you will also be able to inspect the full error message. The error code doesn't need to be freed (it's written to a FixBuf), but the error message will need to be freed.
 
 ```zig
-const OrFullErr = @import("./src/types/error.zig").OrFullErr;
+const OrFullErr = heyredis.OrFullErr;
 
 var incrErr = try client.sendAlloc(OrFullErr(i64), allocator, "INCR", "divine");
 defer freeReply(incErr, allocator);
@@ -217,7 +218,7 @@ MyDynHash{ .banana = yes please, .price = 9.98999977e+00 }
 While most programs will use simple Redis commands and will know the shape of the reply, one might also be in a situation where the reply is unknown or dynamic. To help with that, heyredis includes `DynamicReply`, which can decode any possible Redis reply.
 
 ```zig
-const DynamicReply = @import("./src/types/reply.zig").DynamicReply;
+const DynamicReply = heyredis.DynamicReply;
 
 const dynReply = try client.sendAlloc(DynamicReply, allocator, "HGETALL", "myhash");
 defer freeReply(dynReply, allocator);
@@ -294,7 +295,7 @@ TODO
 - Add all RESP3 types
 - Design Zig errors
 - Add safety checks when the command is comptime known (e.g. SET takes only 2 arguments)
-- More support for stdlib types (buffer, hashmap, ...)
+- More support for stdlib types (buffer, hashmap, bignum, ...)
 - Better connection handling (buffering, ...)
 - Support for async/await
 - Pub/Sub

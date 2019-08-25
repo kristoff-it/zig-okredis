@@ -14,10 +14,6 @@ const ListParser = @import("./parser/t_list.zig").ListParser;
 const MapParser = @import("./parser/t_map.zig").MapParser;
 const traits = @import("./traits.zig");
 
-/// Function that recursively frees a value
-/// created by `sendAlloc`.
-pub const freeReply = RESP3Parser.freeReply;
-
 /// This is the RESP3 parser. It reads an OutStream and returns redis replies.
 /// The user is required to specify how they want to decode each reply.
 ///
@@ -280,6 +276,16 @@ fn Make1Float() std.io.SliceInStream {
 
 fn Make2Float() std.io.SliceInStream {
     return std.io.SliceInStream.init("*2\r\n,1.1\r\n,2.2\r\n"[0..]);
+}
+
+test "parser" {
+    _ = @import("./parser/t_number.zig");
+    _ = @import("./parser/t_bool.zig");
+    _ = @import("./parser/t_string_blob.zig");
+    _ = @import("./parser/t_string_simple.zig");
+    _ = @import("./parser/t_double.zig");
+    _ = @import("./parser/t_list.zig");
+    _ = @import("./parser/t_map.zig");
 }
 
 test "optional" {
