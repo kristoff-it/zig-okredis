@@ -7,19 +7,20 @@ pub fn KV(comptime K: type, comptime V: type) type {
         key: K,
         value: V,
 
+        const Self = @This();
         pub const Redis = struct {
             pub const ArgSerializer = struct {
-                pub fn numArgs(self: KV) usize {
+                pub fn numArgs(self: Self) usize {
                     return 2;
                 }
 
-                pub fn serialize(self: KV, rootSerializer: type, msg: var) void {}
+                pub fn serialize(self: Self, rootSerializer: type, msg: var) void {}
             };
 
             // KV can parse itself as a list of
             // two elements or as a KV tuple from a Map.
             pub const Parser = struct {
-                pub fn parse(tag: u8, comptime rootParser: type, msg: var) !KV {
+                pub fn parse(tag: u8, comptime rootParser: type, msg: var) !Self {
                     switch (tag) {
                         else => return error.DecodeError,
                         '*' => {
@@ -42,7 +43,7 @@ pub fn KV(comptime K: type, comptime V: type) type {
                                 return error.DecodeError;
                             }
 
-                            return KV{
+                            return Self{
                                 .key = try rootParser.parse(K, msg),
                                 .value = try rootParser.parse(V, msg),
                             };
@@ -65,7 +66,7 @@ pub fn KV(comptime K: type, comptime V: type) type {
                     }
                 }
 
-                pub fn parseAlloc(tag: u8, comptime rootParser: type, allocator: *Allocator, msg: var) !KV {
+                pub fn parseAlloc(tag: u8, comptime rootParser: type, allocator: *Allocator, msg: var) !Self {
                     switch (tag) {
                         else => return error.DecodeError,
                         '*' => {
@@ -88,7 +89,7 @@ pub fn KV(comptime K: type, comptime V: type) type {
                                 return error.DecodeError;
                             }
 
-                            return KV{
+                            return Self{
                                 .key = try rootParser.parseAlloc(K, allocator, msg),
                                 .value = try rootParser.parseAlloc(V, allocator, msg),
                             };
@@ -97,14 +98,14 @@ pub fn KV(comptime K: type, comptime V: type) type {
                 }
 
                 pub const TokensPerFragment = 2;
-                pub fn parseFragment(comptime rootParser: type, msg: var) !KV {
-                    return KV{
+                pub fn parseFragment(comptime rootParser: type, msg: var) !Self {
+                    return Self{
                         .key = try rootParser.parse(K, msg),
                         .value = try rootParser.parse(V, msg),
                     };
                 }
-                pub fn parseFragmentAlloc(comptime rootParser: type, allocator: *Allocator, msg: var) !KV {
-                    return KV{
+                pub fn parseFragmentAlloc(comptime rootParser: type, allocator: *Allocator, msg: var) !Self {
+                    return Self{
                         .key = try rootParser.parseAlloc(K, allocator, msg),
                         .value = try rootParser.parseAlloc(V, allocator, msg),
                     };

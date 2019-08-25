@@ -117,7 +117,7 @@ The code above prints:
 MyHash{ .banana = src.types.fixbuf.FixBuf(11){ .buf = yes please�, .len = 10 }, .price = 9.98999977e+00 }
 ```
 
-This feature is implemented via perfect hashing, leaving full string comparison (field_name == map_key) only for safety checking after a case match. Currently the code for this feature is just a PoC and breaks for big structs.
+This feature is implemented via perfect hashing, leaving full string comparison (field_name == map_key) only for safety checking in debug builds. Currently the code for this feature is just a PoC and breaks for big structs.
 
 ## Allocating memory
 
@@ -292,9 +292,13 @@ TODO
 
 ## TODOS
 - Add all RESP3 types
+- Design Zig errors
+- Add safety checks when the command is comptime known (e.g. SET takes only 2 arguments)
 - More support for stdlib types (buffer, hashmap, ...)
 - Better connection handling (buffering, ...)
 - Support for async/await
+- Pub/Sub
+- Attributes
 - Cluster client
 - Sentinel client
 - Refine the Redis traits

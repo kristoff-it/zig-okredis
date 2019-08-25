@@ -39,7 +39,10 @@ pub const Client = struct {
         new.bufout = OutBuff.init(&new.out.stream);
 
         try new.out.stream.write("*2\r\n$5\r\nHELLO\r\n$1\r\n3\r\n");
-        try RESP3.parse(void, &new.in.stream);
+        RESP3.parse(void, &new.in.stream) catch |err| switch (err) {
+            else => return err,
+            error.GotErrorReply => @panic("Sorry, heyredis is RESP3 only and requires a Redis server built from the unstable branch."),
+        };
 
         return new;
     }
