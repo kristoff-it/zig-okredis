@@ -86,7 +86,7 @@ switch (try client.send(OrErr(i64), "INCR", "stringkey")) {
 ```
 
 ### Redis OK replies
-`OrErr(void)` is a good way of decoding `OK` replies from Redis, so much that the `OK` type is an alias to it.
+`OrErr(void)` is a good way of decoding `OK` replies from Redis in case you want to inspect error codes. If you don't care about error codes, a simple `void` will do, but in that case you will have to handle `error.GotErrorReply`.
 
 
 ### Structs
