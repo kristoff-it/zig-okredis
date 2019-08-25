@@ -2,8 +2,14 @@ const builtin = @import("builtin");
 const std = @import("std");
 const testing = std.testing;
 const fmt = std.fmt;
-const FixBuf = @import("./types/fixbuf.zig").FixBuf;
-const perfectHash = @import("./lib/perfect_hash.zig").perfectHash;
+const FixBuf = @import("../types/fixbuf.zig").FixBuf;
+const perfectHash = @import("../lib/perfect_hash.zig").perfectHash;
+
+inline fn isFragmentType(comptime T: type) bool {
+    const tid = @typeId(T);
+    return (tid == .Struct or tid == .Enum or tid == .Union) and
+        @hasDecl(T, "Redis") and @hasDecl(T.Redis, "Parser") and @hasDecl(T.Redis.Parser, "TokensPerFragment");
+}
 
 /// Parses RedisMap values.
 /// Uses RESP3Parser to delegate parsing of the list contents recursively.
@@ -34,12 +40,31 @@ pub const MapParser = struct {
         const size = try fmt.parseInt(usize, buf[0..end], 10);
 
         switch (@typeInfo(T)) {
+            else => @compileError("Unhandled Conversion"),
             .Void => {
                 var i: usize = 0;
                 while (i < size) : (i += 1) {
                     try rootParser.parse(void, msg);
                     try rootParser.parse(void, msg);
                 }
+            },
+            .Array => |arr| {
+                if (!comptime isFragmentType(arr.child)) {
+                    return error.DecodeError;
+                }
+
+                const fragNum = try std.math.divExact(usize, size, arr.child.Redis.Parser.TokensPerFragment);
+
+                if (arr.len != fragNum) {
+                    return error.LengthMismatch;
+                }
+                var res: T = undefined;
+
+                for (res) |*elem| {
+                    elem.* = try arr.child.Redis.Parser.parseFragment(rootParser, msg);
+                }
+
+                return res;
             },
             .Struct => |stc| {
                 comptime var max_len = 0;
@@ -74,7 +99,6 @@ pub const MapParser = struct {
                 }
                 return res;
             },
-            else => @compileError("Unhandled Conversion"),
         }
     }
 
@@ -90,12 +114,25 @@ pub const MapParser = struct {
 
     pub fn isSupportedAlloc(comptime T: type) bool {
         return switch (@typeInfo(T)) {
-            .Struct, .Void => true,
+            .Array, .Struct, .Void => true,
+            .Pointer => |ptr| isFragmentType(ptr.child) or (ptr.size == .One and @typeId(ptr.child) == .Struct),
             else => false,
         };
     }
 
     pub fn parseAlloc(comptime T: type, comptime rootParser: type, allocator: *std.mem.Allocator, msg: var) !T {
+        switch (@typeInfo(T)) {
+            else => {},
+            .Pointer => |ptr| {
+                // If pointer to only one element,
+                // allocate it and recur.
+                if (ptr.size == .One) {
+                    var res = try allocator.create(ptr.child);
+                    res.* = try rootParser.parseAllocFromTag(ptr.child, '%', allocator, msg);
+                    return res;
+                }
+            },
+        }
         // TODO: write real implementation
         var buf: [100]u8 = undefined;
         var end: usize = 0;
@@ -111,7 +148,7 @@ pub const MapParser = struct {
         const size = try fmt.parseInt(usize, buf[0..end], 10);
 
         // HASHMAP
-        if (@hasDecl(T, "KV")) {
+        if (@typeId(T) == .Struct and @hasDecl(T, "KV")) {
             var hmap = T.init(allocator);
             var i: usize = 0;
             while (i < size) : (i += 1) {
@@ -130,6 +167,40 @@ pub const MapParser = struct {
                     try rootParser.parse(void, msg);
                     try rootParser.parse(void, msg);
                 }
+            },
+            .Array => |arr| {
+                if (!comptime isFragmentType(arr.child)) {
+                    return error.DecodeError;
+                }
+
+                const fragNum = try std.math.divExact(usize, size * 2, arr.child.Redis.Parser.TokensPerFragment);
+
+                if (arr.len != fragNum) {
+                    return error.LengthMismatch;
+                }
+                var res: T = undefined;
+
+                for (res) |*elem| {
+                    elem.* = try arr.child.Redis.Parser.parseFragmentAlloc(rootParser, allocator, msg);
+                }
+
+                return res;
+            },
+            .Pointer => |ptr| {
+                if (!comptime isFragmentType(ptr.child)) {
+                    return error.DecodeError;
+                }
+
+                const fragNum = try std.math.divExact(usize, size * 2, ptr.child.Redis.Parser.TokensPerFragment);
+
+                var res = try allocator.alloc(ptr.child, fragNum);
+                errdefer allocator.free(res);
+
+                for (res) |*elem| {
+                    elem.* = try ptr.child.Redis.Parser.parseFragmentAlloc(rootParser, allocator, msg);
+                }
+
+                return res;
             },
             .Struct => |stc| {
                 comptime var max_len = 0;

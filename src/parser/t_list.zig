@@ -35,13 +35,14 @@ pub const ListParser = struct {
                     try rootParser.parse(void, msg);
                 }
             },
-            .Array => |array| {
-                if (array.len != size) {
+            // TODO: deduplicate the work done for array in parse and parsealloc
+            .Array => |arr| {
+                if (arr.len != size) {
                     return error.LengthMismatch;
                 }
                 var result: T = undefined;
                 for (result) |*elem| {
-                    elem.* = try rootParser.parse(array.child, msg);
+                    elem.* = try rootParser.parse(arr.child, msg);
                 }
                 return result;
             },
@@ -88,13 +89,13 @@ pub const ListParser = struct {
                     .C => @ptrCast(T, res.ptr),
                 };
             },
-            .Array => |array| {
-                if (array.len != size) {
+            .Array => |arr| {
+                if (arr.len != size) {
                     return error.LengthMismatch;
                 }
                 var result: T = undefined;
                 for (result) |*elem| {
-                    elem.* = try rootParser.parseAlloc(array.child, allocator, msg);
+                    elem.* = try rootParser.parseAlloc(arr.child, allocator, msg);
                 }
                 return result;
             },

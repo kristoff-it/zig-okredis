@@ -3,6 +3,22 @@ const fmt = std.fmt;
 const testing = std.testing;
 const Allocator = std.mem.Allocator;
 
+pub const Error = struct {
+    // TODO: Size based on @sizeOf(T). If we have to
+    //       allocate more space anyway, let's use it.
+    // TODO: How hard would it be to make different
+    //       Ts based on `parse` vs `parseAlloc`?
+    //       To remove `message` from the struct.
+    buf: [32]u8,
+    end: usize,
+    message: ?[]u8,
+
+    const Inner = @This();
+    pub fn getCode(self: Inner) []u8 {
+        return self.buf[0..self.end];
+    }
+};
+
 /// Creates a union over T that is capable of optionally parsing
 /// Redis Errors. It's the only way to successfully decode a
 /// server error, in order to ensure that error replies don't
@@ -12,205 +28,196 @@ pub fn OrErr(comptime T: type) type {
     return union(enum) {
         Ok: T,
         Nil: void,
-        Err: struct {
-            // TODO: Size based on @sizeOf(T). If we have to
-            //       allocate more space anyway, let's use it.
-            // TODO: How hard would it be to make different
-            //       Ts based on `parse` vs `parseAlloc`?
-            //       To remove `message` from the struct.
-            buf: [32]u8,
-            end: usize,
-            message: ?[]u8,
-
-            const Inner = @This();
-            pub fn getCode(self: Inner) []u8 {
-                return self.buf[0..self.end];
-            }
-        },
+        Err: Error,
 
         const Self = @This();
-        pub fn freeErrorMessage(self: Self, allocator: *Allocator) void {
-            switch (self) {
-                .Err => |err| if (err.message) |msg| allocator.free(msg),
-                else => {},
-            }
-        }
-
         pub const Redis = struct {
-            pub fn parse(tag: u8, comptime rootParser: type, msg: var) !Self {
-                switch (tag) {
-                    else => return Self{ .Ok = try rootParser.parseFromTag(T, tag, msg) },
-                    '_' => {
-                        try msg.skipBytes(2);
-                        return Self{ .Nil = {} };
-                    },
-                    '!' => {
-                        // TODO: write real implementation
-                        var buf: [100]u8 = undefined;
-                        var end: usize = 0;
-                        for (buf) |*elem, i| {
-                            const ch = try msg.readByte();
-                            elem.* = ch;
-                            if (ch == '\r') {
-                                end = i;
-                                break;
-                            }
-                        }
-
-                        try msg.skipBytes(1);
-                        var size = try fmt.parseInt(usize, buf[0..end], 10);
-                        var res = Self{ .Err = undefined };
-                        res.Err.message = null;
-
-                        // Parse the Code part
-                        var ch = try msg.readByte();
-                        for (res.Err.buf) |*elem, i| {
-                            if (i == size) {
+            pub const Parser = struct {
+                pub fn parse(tag: u8, comptime rootParser: type, msg: var) !Self {
+                    switch (tag) {
+                        else => return Self{ .Ok = try rootParser.parseFromTag(T, tag, msg) },
+                        '_' => {
+                            try msg.skipBytes(2);
+                            return Self{ .Nil = {} };
+                        },
+                        '!' => {
+                            // TODO: write real implementation
+                            var buf: [100]u8 = undefined;
+                            var end: usize = 0;
+                            for (buf) |*elem, i| {
+                                const ch = try msg.readByte();
                                 elem.* = ch;
-                                res.Err.end = i;
-                                try msg.skipBytes(2);
-                                return res;
-                            }
-                            switch (ch) {
-                                ' ' => {
-                                    res.Err.end = i;
+                                if (ch == '\r') {
+                                    end = i;
                                     break;
-                                },
-                                else => {
+                                }
+                            }
+
+                            try msg.skipBytes(1);
+                            var size = try fmt.parseInt(usize, buf[0..end], 10);
+                            var res = Self{ .Err = undefined };
+                            res.Err.message = null;
+
+                            // Parse the Code part
+                            var ch = try msg.readByte();
+                            for (res.Err.buf) |*elem, i| {
+                                if (i == size) {
                                     elem.* = ch;
-                                    ch = try msg.readByte();
-                                },
-                            }
-                        }
-
-                        if (ch != ' ') return error.ErrorCodeBufTooSmall;
-                        const remainder = size - res.Err.end + 2; // +2 because of `\r\n`
-                        if (remainder > 0) try msg.skipBytes(remainder);
-                        return res;
-                    },
-                    '-' => {
-                        var res = Self{ .Err = undefined };
-                        res.Err.message = null;
-
-                        // Parse the Code part
-                        var ch = try msg.readByte();
-                        for (res.Err.buf) |*elem, i| {
-                            switch (ch) {
-                                ' ' => {
                                     res.Err.end = i;
-                                    break;
-                                },
-                                '\r' => {
-                                    res.Err.end = i;
-                                    try msg.skipBytes(1);
+                                    try msg.skipBytes(2);
                                     return res;
-                                },
-                                else => {
-                                    elem.* = ch;
-                                    ch = try msg.readByte();
-                                },
+                                }
+                                switch (ch) {
+                                    ' ' => {
+                                        res.Err.end = i;
+                                        break;
+                                    },
+                                    else => {
+                                        elem.* = ch;
+                                        ch = try msg.readByte();
+                                    },
+                                }
                             }
-                        }
-                        if (ch != ' ') return error.ErrorCodeBufTooSmall;
 
-                        // Seek through the rest of the message,
-                        // discarding it.
-                        // TODO: add a max limit maybe?
-                        while (ch != '\n') ch = try msg.readByte();
-                        return res;
-                    },
+                            if (ch != ' ') return error.ErrorCodeBufTooSmall;
+                            const remainder = size - res.Err.end + 2; // +2 because of `\r\n`
+                            if (remainder > 0) try msg.skipBytes(remainder);
+                            return res;
+                        },
+                        '-' => {
+                            var res = Self{ .Err = undefined };
+                            res.Err.message = null;
+
+                            // Parse the Code part
+                            var ch = try msg.readByte();
+                            for (res.Err.buf) |*elem, i| {
+                                switch (ch) {
+                                    ' ' => {
+                                        res.Err.end = i;
+                                        break;
+                                    },
+                                    '\r' => {
+                                        res.Err.end = i;
+                                        try msg.skipBytes(1);
+                                        return res;
+                                    },
+                                    else => {
+                                        elem.* = ch;
+                                        ch = try msg.readByte();
+                                    },
+                                }
+                            }
+                            if (ch != ' ') return error.ErrorCodeBufTooSmall;
+
+                            // Seek through the rest of the message,
+                            // discarding it.
+                            // TODO: add a max limit maybe?
+                            while (ch != '\n') ch = try msg.readByte();
+                            return res;
+                        },
+                    }
                 }
-            }
 
-            pub fn parseAlloc(tag: u8, comptime rootParser: type, allocator: *Allocator, msg: var) !Self {
-                switch (tag) {
-                    else => return Self{ .Ok = try rootParser.parseAllocFromTag(T, tag, allocator, msg) },
-                    '_' => {
-                        try msg.skipBytes(2);
-                        return Self{ .Nil = {} };
-                    },
-                    '!' => {
-                        // TODO: write real implementation
-                        var buf: [100]u8 = undefined;
-                        var end: usize = 0;
-                        for (buf) |*elem, i| {
-                            const ch = try msg.readByte();
-                            elem.* = ch;
-                            if (ch == '\r') {
-                                end = i;
-                                break;
-                            }
-                        }
+                pub inline fn destroy(self: Self, comptime rootParser: type, allocator: *Allocator) void {
+                    switch (self) {
+                        .Ok => |ok| rootParser.freeReply(ok, allocator),
+                        .Err => |err| if (err.message) |msg| allocator.free(msg),
+                        .Nil => {},
+                    }
+                }
 
-                        try msg.skipBytes(1);
-                        var size = try fmt.parseInt(usize, buf[0..end], 10);
-                        var res = Self{ .Err = undefined };
-                        res.Err.message = null;
-
-                        // Parse the Code part
-                        var ch = try msg.readByte();
-                        for (res.Err.buf) |*elem, i| {
-                            if (i == size) {
+                pub fn parseAlloc(tag: u8, comptime rootParser: type, allocator: *Allocator, msg: var) !Self {
+                    switch (tag) {
+                        else => return Self{ .Ok = try rootParser.parseAllocFromTag(T, tag, allocator, msg) },
+                        '_' => {
+                            try msg.skipBytes(2);
+                            return Self{ .Nil = {} };
+                        },
+                        '!' => {
+                            // TODO: write real implementation
+                            var buf: [100]u8 = undefined;
+                            var end: usize = 0;
+                            for (buf) |*elem, i| {
+                                const ch = try msg.readByte();
                                 elem.* = ch;
-                                res.Err.end = i;
-                                try msg.skipBytes(2);
-                                return res;
-                            }
-                            switch (ch) {
-                                ' ' => {
-                                    res.Err.end = i;
+                                if (ch == '\r') {
+                                    end = i;
                                     break;
-                                },
-                                else => {
+                                }
+                            }
+
+                            try msg.skipBytes(1);
+                            var size = try fmt.parseInt(usize, buf[0..end], 10);
+                            var res = Self{ .Err = undefined };
+                            res.Err.message = null;
+
+                            // Parse the Code part
+                            var ch = try msg.readByte();
+                            for (res.Err.buf) |*elem, i| {
+                                if (i == size) {
                                     elem.* = ch;
-                                    ch = try msg.readByte();
-                                },
-                            }
-                        }
-
-                        if (ch != ' ') return error.ErrorCodeBufTooSmall;
-                        // Alloc difference:
-                        const remainder = size - res.Err.end; // +2 because of `\r\n`
-                        if (remainder == 0) return res;
-                        var slice = try allocator.alloc(u8, remainder);
-                        try msg.readNoEof(slice);
-                        res.Err.message = slice;
-                        try msg.skipBytes(2);
-                        return res;
-                    },
-                    '-' => {
-                        var res = Self{ .Err = undefined };
-                        res.Err.message = null;
-
-                        // Parse the Code part
-                        var ch = try msg.readByte();
-                        for (res.Err.buf) |*elem, i| {
-                            switch (ch) {
-                                ' ' => {
                                     res.Err.end = i;
-                                    break;
-                                },
-                                '\r' => {
-                                    res.Err.end = i;
-                                    try msg.skipBytes(1);
+                                    try msg.skipBytes(2);
                                     return res;
-                                },
-                                else => {
-                                    elem.* = ch;
-                                    ch = try msg.readByte();
-                                },
+                                }
+                                switch (ch) {
+                                    ' ' => {
+                                        res.Err.end = i;
+                                        break;
+                                    },
+                                    else => {
+                                        elem.* = ch;
+                                        ch = try msg.readByte();
+                                    },
+                                }
                             }
-                        }
-                        if (ch != ' ') return error.ErrorCodeBufTooSmall;
 
-                        // Seek through the rest of the message,
-                        // discarding it.
-                        res.Err.message = try msg.readUntilDelimiterAlloc(allocator, '\r', 4096);
-                        try msg.skipBytes(1);
-                        return res;
-                    },
+                            if (ch != ' ') return error.ErrorCodeBufTooSmall;
+                            // Alloc difference:
+                            const remainder = size - res.Err.end; // +2 because of `\r\n`
+                            if (remainder == 0) return res;
+                            var slice = try allocator.alloc(u8, remainder);
+                            errdefer allocator.free(slice);
+
+                            try msg.readNoEof(slice);
+                            res.Err.message = slice;
+                            try msg.skipBytes(2);
+                            return res;
+                        },
+                        '-' => {
+                            var res = Self{ .Err = undefined };
+                            res.Err.message = null;
+
+                            // Parse the Code part
+                            var ch = try msg.readByte();
+                            for (res.Err.buf) |*elem, i| {
+                                switch (ch) {
+                                    ' ' => {
+                                        res.Err.end = i;
+                                        break;
+                                    },
+                                    '\r' => {
+                                        res.Err.end = i;
+                                        try msg.skipBytes(1);
+                                        return res;
+                                    },
+                                    else => {
+                                        elem.* = ch;
+                                        ch = try msg.readByte();
+                                    },
+                                }
+                            }
+                            if (ch != ' ') return error.ErrorCodeBufTooSmall;
+
+                            // Seek through the rest of the message,
+                            // discarding it.
+                            res.Err.message = try msg.readUntilDelimiterAlloc(allocator, '\r', 4096);
+                            try msg.skipBytes(1);
+                            return res;
+                        },
+                    }
                 }
-            }
+            };
         };
     };
 }
@@ -266,6 +273,7 @@ const fakeParser = struct {
         return error.Errror;
     }
 };
+
 fn MakeErroji() std.io.SliceInStream {
     return std.io.SliceInStream.init("😈 your Redis belongs to us\r\n"[0..]);
 }

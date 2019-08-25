@@ -2,6 +2,7 @@ const std = @import("std");
 const os = std.os;
 const Allocator = std.mem.Allocator;
 const RESP3 = @import("./parser.zig").RESP3Parser;
+const ArgSerializer = @import("./serializer.zig").ArgSerializer;
 
 pub const Client = struct {
     broken: bool = false,
@@ -14,15 +15,11 @@ pub const Client = struct {
         const sockfd = try os.socket(os.AF_INET, os.SOCK_STREAM, 0);
         errdefer os.close(sockfd);
 
-        var sock_addr = os.sockaddr{
-            .in = os.sockaddr_in{
-                .len = 0,
-                .family = os.AF_INET,
-                .port = std.mem.nativeToBig(u16, port),
-                .addr = try std.net.parseIp4(addr),
-                .zero = [_]u8{0} ** 8,
-            },
-        };
+        var sock_addr = os.sockaddr{ .in = undefined };
+        sock_addr.in.family = os.AF_INET;
+        sock_addr.in.port = std.mem.nativeToBig(u16, port);
+        sock_addr.in.addr = try std.net.parseIp4(addr);
+        sock_addr.in.zero = [_]u8{0} ** 8;
 
         try os.connect(sockfd, &sock_addr, @sizeOf(os.sockaddr_in));
         var sock = std.fs.File.openHandle(sockfd);
@@ -33,7 +30,7 @@ pub const Client = struct {
             .out = sock.outStream(),
         };
 
-        try new.out.stream.write("HELLO 3\r\n");
+        try new.out.stream.write("*2\r\n$5\r\nHELLO\r\n$1\r\n3\r\n");
         try RESP3.parse(void, &new.in.stream);
 
         return new;
@@ -43,25 +40,19 @@ pub const Client = struct {
         os.close(self.fd);
     }
 
-    pub fn send(self: *Self, comptime T: type, command: []const u8) !T {
+    pub fn send(self: *Self, comptime T: type, args: ...) !T {
         if (self.broken) return error.BrokenConnection;
-        errdefer {
-            // Parsing errors leave the connection in a broken state.
-            self.broken = true;
-        }
-        try self.out.stream.write(command);
-        try self.out.stream.write("\r\n");
+        errdefer self.broken = true;
+
+        try ArgSerializer.serialize(&self.out.stream, args);
         return RESP3.parse(T, &self.in.stream);
     }
 
-    pub fn sendAlloc(self: *Self, comptime T: type, allocator: *Allocator, command: []const u8) !T {
+    pub fn sendAlloc(self: *Self, comptime T: type, allocator: *Allocator, args: ...) !T {
         if (self.broken) return error.BrokenConnection;
-        errdefer {
-            // Parsing errors leave the connection in a broken state.
-            self.broken = true;
-        }
-        try self.out.stream.write(command);
-        try self.out.stream.write("\r\n");
+        errdefer self.broken = true;
+
+        try ArgSerializer.serialize(&self.out.stream, args);
         return RESP3.parseAlloc(T, allocator, &self.in.stream);
     }
 };

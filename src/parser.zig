@@ -5,18 +5,28 @@ const testing = std.testing;
 const InStream = std.io.InStream;
 const Allocator = std.mem.Allocator;
 
-const NumberParser = @import("./t_number.zig").NumberParser;
-const BoolParser = @import("./t_bool.zig").BoolParser;
-const BlobStringParser = @import("./t_string_blob.zig").BlobStringParser;
-const SimpleStringParser = @import("./t_string_simple.zig").SimpleStringParser;
-const DoubleParser = @import("./t_double.zig").DoubleParser;
-const ListParser = @import("./t_list.zig").ListParser;
-const MapParser = @import("./t_map.zig").MapParser;
+const NumberParser = @import("./parser/t_number.zig").NumberParser;
+const BoolParser = @import("./parser/t_bool.zig").BoolParser;
+const BlobStringParser = @import("./parser/t_string_blob.zig").BlobStringParser;
+const SimpleStringParser = @import("./parser/t_string_simple.zig").SimpleStringParser;
+const DoubleParser = @import("./parser/t_double.zig").DoubleParser;
+const ListParser = @import("./parser/t_list.zig").ListParser;
+const MapParser = @import("./parser/t_map.zig").MapParser;
+
+inline fn isParserType(comptime T: type) bool {
+    const tid = @typeId(T);
+    return (tid == .Struct or tid == .Enum or tid == .Union) and
+        @hasDecl(T, "Redis") and @hasDecl(T.Redis, "Parser");
+}
+
+/// Function that recursively frees a value
+/// created by `sendAlloc`.
+pub const freeReply = RESP3Parser.freeReply;
 
 /// This is the RESP3 parser. It reads an OutStream and returns redis replies.
-/// The user is required to specify how they want to decode the reply.
+/// The user is required to specify how they want to decode each reply.
 ///
-/// The parser supports all 1:1 translations (e.g. RedisNumber -> Int) and
+/// The parser supports all 1:1 translations (e.g. RESPNumber -> Int) and
 /// a couple quality-of-life custom ones:
 ///     - RedisStrings can be parsed to numbers (the parser will use fmt.parse{Int,Float})
 ///     - RedisHashes can be parsed into HashMaps and Structs
@@ -69,10 +79,16 @@ pub const RESP3Parser = struct {
             else => {},
         }
 
-        if ((@typeId(RealType) == .Struct or @typeId(RealType) == .Enum or @typeId(RealType) == .Union) and
-            @hasDecl(RealType, "Redis"))
-            return RealType.Redis.parse(tag, rootParser, msg);
+        // Here we check for the `Redis` trait, in order to delegate the parsing job.
+        // A {struct, enum, union} that contains a `Redis` declaration
+        // will presumably know how to parse itself.
+        // TODO: we should probably inspect a bit better if it
+        // contains the appropriate functions.
+        if (comptime isParserType(RealType)) {
+            return RealType.Redis.Parser.parse(tag, rootParser, msg);
+        }
 
+        // Call the right parser based on the tag we just read from the stream.
         return switch (tag) {
             ':' => try ifSupported(NumberParser, RealType, msg),
             ',' => try ifSupported(DoubleParser, RealType, msg),
@@ -134,12 +150,10 @@ pub const RESP3Parser = struct {
             else => {},
         }
 
-        var res: T = if ((@typeId(RealType) == .Struct or
-            @typeId(RealType) == .Enum or
-            @typeId(RealType) == .Union) and
-            @hasDecl(RealType, "Redis"))
-            try RealType.Redis.parseAlloc(tag, rootParser, allocator, msg)
-        else switch (tag) {
+        if (comptime isParserType(RealType))
+            return RealType.Redis.Parser.parseAlloc(tag, rootParser, allocator, msg);
+
+        return switch (tag) {
             ':' => try ifSupportedAlloc(NumberParser, RealType, allocator, msg),
             ',' => try ifSupportedAlloc(DoubleParser, RealType, allocator, msg),
             '#' => try ifSupportedAlloc(BoolParser, RealType, allocator, msg),
@@ -151,7 +165,6 @@ pub const RESP3Parser = struct {
             // '_' => error.NilButNoOptional, // TODO: consider supporting it only for CRedisReply types!
             else => @panic("Encountered grave protocol error"),
         };
-        return res;
     }
 
     inline fn ifSupportedAlloc(comptime parser: type, comptime T: type, allocator: *Allocator, msg: var) !T {
@@ -160,14 +173,93 @@ pub const RESP3Parser = struct {
         else
             error.UnsupportedConversion;
     }
-};
 
-fn inArray(comptime T: type, slice: []const T, x: T) bool {
-    for (slice) |elem| {
-        if (elem == x) return true;
+    // Frees values created by `sendAlloc`.
+    // If the top value is a pointer, it frees that too.
+    pub fn freeReply(val: var, allocator: *Allocator) void {
+        const T = @typeOf(val);
+        switch (@typeInfo(T)) {
+            else => return,
+            .Optional => if (val) |v| freeReply(val),
+            .Array => |arr| {
+                switch (arr.child) {
+                    else => {},
+                    .Enum,
+                    .Union,
+                    .Struct,
+                    .Pointer,
+                    .Optional,
+                    => {
+                        for (val) |elem| {
+                            freeReply(elem, allocator);
+                        }
+                    },
+                }
+                allocator.free(val);
+            },
+            .Pointer => |ptr| switch (ptr.size) {
+                .Many => @compileError("sendAlloc is incapable of generating [*] pointers. " ++
+                    "You are passing the wrong value!"),
+                .C => allocator.free(val),
+                .Slice => {
+                    switch (@typeInfo(ptr.child)) {
+                        else => {},
+                        .Enum,
+                        .Union,
+                        .Struct,
+                        .Pointer,
+                        .Optional,
+                        => {
+                            for (val) |elem| {
+                                freeReply(elem, allocator);
+                            }
+                        },
+                    }
+                    allocator.free(val);
+                },
+                .One => {
+                    switch (@typeInfo(ptr.child)) {
+                        else => {},
+                        .Enum,
+                        .Union,
+                        .Struct,
+                        .Pointer,
+                        .Optional,
+                        => {
+                            freeReply(val.*, allocator);
+                        },
+                    }
+                    allocator.destroy(val);
+                },
+            },
+            .Union => |unn| if (comptime isParserType(T)) {
+                T.Redis.Parser.destroy(val, rootParser, allocator);
+            } else {
+                @compileError("sendAlloc cannot return Unions or Enums that don't implement " ++
+                    "custom parsing logic. You are passing the wrong value!");
+            },
+            .Struct => |stc| {
+                if (comptime isParserType(T)) {
+                    T.Redis.Parser.destroy(val, rootParser, allocator);
+                } else {
+                    inline for (stc.fields) |f| {
+                        switch (@typeInfo(f.field_type)) {
+                            else => {},
+                            .Enum,
+                            .Union,
+                            .Struct,
+                            .Pointer,
+                            .Optional,
+                            => {
+                                freeReply(@field(val, f.name), allocator);
+                            },
+                        }
+                    }
+                }
+            },
+        }
     }
-    return false;
-}
+};
 
 test "float" {
 
@@ -243,11 +335,11 @@ fn MakeSimpleString() std.io.SliceInStream {
 }
 
 test "map2struct" {
-    const RSB = @import("./types/string_buffer.zig").RedisStringBuffer;
+    const FixBuf = @import("./types/fixbuf.zig").FixBuf;
     const MyStruct = struct {
         first: f32,
         second: bool,
-        third: RSB(11),
+        third: FixBuf(11),
     };
 
     const res = try RESP3Parser.parse(MyStruct, &MakeMap().stream);
