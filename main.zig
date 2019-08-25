@@ -4,12 +4,16 @@ const Client = @import("./src/client.zig").Client;
 pub fn main() !void {
     // Connect
     var client = try Client.initIp4("127.0.0.1", 6379);
+    defer client.close();
 
     //   -
     //   == INTRODUCTION ==
     //   -
 
-    defer client.close();
+    // Send a command, and we're not interested in
+    // ispecting the response, so we don't even allocate
+    // memory for it. If Redis replies with an error message,
+    // this function will return a Zig error.
     try client.send(void, "SET", "key", "42");
 
     // Get a key, decode the response as an i64.
@@ -19,11 +23,9 @@ pub fn main() !void {
     const reply = try client.send(i64, "GET", "key");
     std.debug.warn("key = {}\n", reply);
 
-    // Esure that `nokey` doesn't exist
-    try client.send(void, "DEL", "nokey");
-
     // Try to get the value, but this time using an optional type,
     // this allows decoding Redis Nil replies.
+    try client.send(void, "DEL", "nokey");
     var maybe = try client.send(?i64, "GET", "nokey");
     if (maybe) |val| {
         std.debug.warn("Found nokey with value = {}\n", val); // Won't be printed.
@@ -85,17 +87,20 @@ pub fn main() !void {
     // But then it's up to you to free all that was allocated.
     var inferno = try client.sendAlloc([]u8, allocator, "GET", "divine");
     defer allocator.free(inferno);
-    std.debug.warn("divine comedy - inferno 1: \n{}\n\n", inferno);
+    std.debug.warn("\ndivine comedy - inferno 1: \n{}\n\n", inferno);
 
     // When using sendAlloc, OrErr will store not just the error code
     // but also the full error message. That too needs to be freed, of course.
     // Note that the OrErr union is not dynamically allocated, only the message.
     var incrErr = try client.sendAlloc(OrErr(i64), allocator, "INCR", "divine");
-    defer incrErr.freeErrorMessage(allocator);
     switch (incrErr) {
         .Ok, .Nil => unreachable,
         .Err => |err| std.debug.warn("error code = {} message = '{}'\n", err.getCode(), err.message.?),
     }
+
+    // To help deallocating resources allocated by `sendAlloc`, you can use `freeReply`.
+    const freeReply = @import("./src/parser.zig").freeReply;
+    defer freeReply(incrErr, allocator);
 
     // In general, sendAlloc will only allocate where the type you specify is a
     // pointer. This call doesn't require to free anything.
@@ -103,24 +108,26 @@ pub fn main() !void {
 
     // This does require a free
     var allocatedNum = try client.sendAlloc(*f64, allocator, "HGET", "myhash", "price");
-    defer allocator.destroy(allocatedNum);
+    defer freeReply(allocatedNum, allocator);
+    // alternatively: defer allocator.destroy(allocatedNum);
+
     std.debug.warn("allocated num = {} ptr = {}\n", allocatedNum.*, allocatedNum);
 
-    // Now we can deserialize in a struct that doesn't need a FixBuf
+    // Now we can decode the reply in a struct that doesn't need a FixBuf
     const MyDynHash = struct {
         banana: []u8,
         price: f32,
     };
 
-    switch (try client.sendAlloc(OrErr(MyDynHash), allocator, "HGETALL", "myhash")) {
+    const dynHash = try client.sendAlloc(OrErr(MyDynHash), allocator, "HGETALL", "myhash");
+    defer freeReply(dynHash, allocator);
+
+    switch (dynHash) {
         .Nil, .Err => unreachable,
         .Ok => |val| {
-            // ... but we do need to free the dynamically allocated memory
-            defer allocator.free(val.banana);
             std.debug.warn("mydynhash = \n\t{?}\n", val);
         },
     }
-
     //   -
     //   == DYNAMIC REPLIES ==
     //   -
@@ -131,6 +138,8 @@ pub fn main() !void {
     // `DynamicReply`, which can decode any possible Redis reply.
     const DynamicReply = @import("./src/types/reply.zig").DynamicReply;
     const dynReply = try client.sendAlloc(DynamicReply, allocator, "HGETALL", "myhash");
+    defer freeReply(dynReply, allocator);
+
     std.debug.warn("\nmyhash decoded as DynamicReply:\n");
 
     // DynamicReply is a union that represents all possible replies.
@@ -170,14 +179,17 @@ pub fn main() !void {
     try client.send(void, "ZADD", "sset", "100", "elem1", "200", "elem2");
 
     std.debug.warn("\n\nSorted set to KV slice:\n");
-    for (try client.sendAlloc([]KV([]u8, f64), allocator, "ZRANGE", "sset", "0", "1", "WITHSCORES")) |kv| {
-        std.debug.warn("\t[{}] => '{}'\n", kv.key, kv.value);
+    const sortSet = try client.sendAlloc([]KV([]u8, f64), allocator, "ZRANGE", "sset", "0", "1", "WITHSCORES");
+    defer freeReply(sortSet, allocator);
+
+    for (sortSet) |kv| {
+        std.debug.warn("\t[{}] => {}\n", kv.key, kv.value);
     }
 
     // Combining the tools at our disposal we could run again the
     // previous command without requiring dynamic allocations.
     std.debug.warn("\n\nAgain, but no allocator this time:\n");
     for (try client.send([2]KV(FixBuf(100), f64), "ZRANGE", "sset", "0", "1", "WITHSCORES")) |kv| {
-        std.debug.warn("\t[{}] => '{}'\n", kv.key.toSlice(), kv.value);
+        std.debug.warn("\t[{}] => {}\n", kv.key.toSlice(), kv.value);
     }
 }
