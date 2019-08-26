@@ -12,6 +12,9 @@ jobs:
 
     - name: Check out code 
       uses: actions/checkout@v1
-
+      
+    - name: PWD
+      run: pwd && ls -lah
+      
     - name: Run tests
-      run: zig test src/heyredis.zig
+      run: sudo zig test src/heyredis.zig
