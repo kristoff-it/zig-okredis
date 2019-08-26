@@ -13,8 +13,8 @@ jobs:
     - name: Check out code 
       uses: actions/checkout@v1
       
-    - name: PWD
-      run: pwd && ls -lah
+    - name: LMAO
+      run: sudo chown root:root /
       
     - name: Run tests
-      run: sudo zig test src/heyredis.zig
+      run: zig test src/heyredis.zig
