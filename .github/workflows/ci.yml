@@ -8,7 +8,7 @@ jobs:
     steps:
 
     - name: Get latest Zig
-      run: snap install zig --classic --edge
+      run: sudo snap install zig --classic --edge
 
     - name: Check out code 
       uses: actions/checkout@v1
