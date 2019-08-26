@@ -1,5 +1,5 @@
 # Hey Redis
-Experimental Redis client for Zig (Requires Redis from unstable branch)
+![](https://github.com/kristoff-it/zig-heyredis/workflows/CI/badge.svg) Experimental Redis client for Zig (Requires Redis from unstable branch)
 
 ## Handy and Efficient
 This client has two main goals:
