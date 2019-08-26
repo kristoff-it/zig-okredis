@@ -7,7 +7,7 @@ const InStream = std.io.InStream;
 pub const DoubleParser = struct {
     pub fn isSupported(comptime T: type) bool {
         return switch (@typeId(T)) {
-            .Void, .Float => true,
+            .Float => true,
             else => false,
         };
     }
@@ -26,7 +26,6 @@ pub const DoubleParser = struct {
         }
         try msg.skipBytes(1);
         return switch (@typeInfo(T)) {
-            .Void => {},
             .Float => try fmt.parseFloat(T, buf[0..end]),
             else => @compileError("Unhandled Conversion"),
         };

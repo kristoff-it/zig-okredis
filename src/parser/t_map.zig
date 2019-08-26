@@ -19,12 +19,12 @@ pub const MapParser = struct {
     // TODO: add support for [_][2]T
     pub fn isSupported(comptime T: type) bool {
         return switch (@typeId(T)) {
-            .Void, .Struct => true,
+            .Struct => true,
             else => false,
         };
     }
 
-    pub fn parse(comptime T: type, comptime rootParser: type, msg: var) anyerror!T {
+    pub fn parse(comptime T: type, comptime rootParser: type, msg: var) !T {
         // TODO: write real implementation
         var buf: [100]u8 = undefined;
         var end: usize = 0;
@@ -41,13 +41,6 @@ pub const MapParser = struct {
 
         switch (@typeInfo(T)) {
             else => @compileError("Unhandled Conversion"),
-            .Void => {
-                var i: usize = 0;
-                while (i < size) : (i += 1) {
-                    try rootParser.parse(void, msg);
-                    try rootParser.parse(void, msg);
-                }
-            },
             .Array => |arr| {
                 if (!comptime isFragmentType(arr.child)) {
                     return error.DecodeError;
@@ -114,7 +107,7 @@ pub const MapParser = struct {
 
     pub fn isSupportedAlloc(comptime T: type) bool {
         return switch (@typeInfo(T)) {
-            .Array, .Struct, .Void => true,
+            .Array, .Struct => true,
             .Pointer => |ptr| isFragmentType(ptr.child) or (ptr.size == .One and @typeId(ptr.child) == .Struct),
             else => false,
         };
@@ -161,13 +154,6 @@ pub const MapParser = struct {
         // OTHER TYPES
         switch (@typeInfo(T)) {
             else => @compileError("Unsupported Conversion"),
-            .Void => {
-                var i: usize = 0;
-                while (i < size) : (i += 1) {
-                    try rootParser.parse(void, msg);
-                    try rootParser.parse(void, msg);
-                }
-            },
             .Array => |arr| {
                 if (!comptime isFragmentType(arr.child)) {
                     return error.DecodeError;

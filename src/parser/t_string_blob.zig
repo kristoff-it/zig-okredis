@@ -7,7 +7,7 @@ const testing = std.testing;
 pub const BlobStringParser = struct {
     pub fn isSupported(comptime T: type) bool {
         return switch (@typeInfo(T)) {
-            .Void, .Int, .Float, .Array => true,
+            .Int, .Float, .Array => true,
             else => false,
         };
     }
@@ -28,9 +28,6 @@ pub const BlobStringParser = struct {
         const size = try fmt.parseInt(usize, buf[0..end], 10);
 
         switch (@typeInfo(T)) {
-            .Void => {
-                try msg.skipBytes(size + 2);
-            },
             .Int => {
                 // Try to parse an int from the string.
                 // TODO: write real implementation

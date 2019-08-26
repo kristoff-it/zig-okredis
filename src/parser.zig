@@ -5,6 +5,7 @@ const testing = std.testing;
 const InStream = std.io.InStream;
 const Allocator = std.mem.Allocator;
 
+const VoidParser = @import("./parser/void.zig").VoidParser;
 const NumberParser = @import("./parser/t_number.zig").NumberParser;
 const BoolParser = @import("./parser/t_bool.zig").BoolParser;
 const BlobStringParser = @import("./parser/t_string_blob.zig").BlobStringParser;
@@ -56,6 +57,8 @@ pub const RESP3Parser = struct {
     /// parser. It's used for example by OrErr to continue parsing in the event
     /// that the reply is not a Redis error.
     pub fn parseFromTag(comptime T: type, tag: u8, msg: var) !T {
+        if (T == void) return VoidParser.parseVoid(tag, msg);
+
         comptime var RealType = T;
         switch (@typeInfo(T)) {
             .Pointer => @compileError("`parse` can't perform allocations so it can't handle pointers, use `parseAlloc` instead."),
@@ -108,6 +111,8 @@ pub const RESP3Parser = struct {
     }
 
     pub fn parseAllocFromTag(comptime T: type, tag: u8, allocator: *Allocator, msg: var) !T {
+        if (T == void) return VoidParser.parseVoid(tag, msg);
+
         comptime var RealType = T;
         switch (@typeInfo(T)) {
             .Optional => |opt| {
@@ -279,6 +284,7 @@ fn Make2Float() std.io.SliceInStream {
 }
 
 test "parser" {
+    _ = @import("./parser/void.zig");
     _ = @import("./parser/t_number.zig");
     _ = @import("./parser/t_bool.zig");
     _ = @import("./parser/t_string_blob.zig");

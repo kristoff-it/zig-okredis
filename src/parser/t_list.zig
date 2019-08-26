@@ -8,12 +8,12 @@ pub const ListParser = struct {
     // TODO: prevent users from unmarshaling structs out of strings
     pub fn isSupported(comptime T: type) bool {
         return switch (@typeId(T)) {
-            .Void, .Array => true,
+            .Array => true,
             else => false,
         };
     }
 
-    pub fn parse(comptime T: type, comptime rootParser: type, msg: var) anyerror!T {
+    pub fn parse(comptime T: type, comptime rootParser: type, msg: var) !T {
         // TODO: write real implementation
         var buf: [100]u8 = undefined;
         var end: usize = 0;
@@ -29,12 +29,6 @@ pub const ListParser = struct {
         const size = try fmt.parseInt(usize, buf[0..end], 10);
 
         switch (@typeInfo(T)) {
-            .Void => {
-                var i: usize = 0;
-                while (i < size) : (i += 1) {
-                    try rootParser.parse(void, msg);
-                }
-            },
             // TODO: deduplicate the work done for array in parse and parsealloc
             .Array => |arr| {
                 if (arr.len != size) {

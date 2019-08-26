@@ -7,7 +7,7 @@ const testing = std.testing;
 pub const BoolParser = struct {
     pub fn isSupported(comptime T: type) bool {
         return switch (@typeId(T)) {
-            .Void, .Bool, .Int, .Float => true,
+            .Bool, .Int, .Float => true,
             else => false,
         };
     }
@@ -16,7 +16,6 @@ pub const BoolParser = struct {
         const ch = try msg.readByte();
         try msg.skipBytes(2);
         return switch (@typeId(T)) {
-            .Void => {},
             .Bool => check_bool(ch),
             .Int, .Float => if (check_bool(ch)) T(1) else T(0),
             else => @compileError("Unhandled Conversion"),
@@ -67,7 +66,6 @@ test "parses bools" {
     testing.expect(0 == try BoolParser.parse(u32, struct {}, &FalseMSG().stream));
     testing.expect(1.0 == try BoolParser.parse(f32, struct {}, &TrueMSG().stream));
     testing.expect(0.0 == try BoolParser.parse(f64, struct {}, &FalseMSG().stream));
-    try BoolParser.parse(void, struct {}, &FalseMSG().stream);
 }
 
 fn TrueMSG() std.io.SliceInStream {
