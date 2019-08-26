@@ -10,6 +10,8 @@ This client has two main goals:
 
 The client has two functions to send commands: `parse` and `parseAlloc`. Following Zig's mantra of making dynamic allocations explicit, only `parseAlloc` can allocate dynamic memory, and only does so by using a user-provided allocator. 
 
+This library makes heavy use of Zig's comptile-time facilities, I wrote a blog post about the subject: https://kristoff.it/blog/what-is-zig-comptime.
+
 ## Quickstart
 
 ```zig
@@ -87,7 +89,7 @@ switch (try client.send(OrErr(i64), "INCR", "stringkey")) {
 ```
 
 ### Redis OK replies
-`OrErr(void)` is a good way of decoding `OK` replies from Redis in case you want to inspect error codes. If you don't care about error codes, a simple `void` will do, but in that case you will have to handle `error.GotErrorReply`.
+`OrErr(void)` is a good way of decoding `OK` replies from Redis in case you want to inspect error codes. If you don't care about error codes, a simple `void` will do, but in that case an error reply will produce `error.GotErrorReply`, which, if not explicitly checked, will cause the calling function to return with an error.
 
 
 ### Structs
