@@ -1,0 +1,17 @@
+name: CI
+on: [push]
+jobs:
+
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    steps:
+
+    - name: Get latest Zig
+      run: snap install zig --classic --edge
+
+    - name: Check out code 
+      uses: actions/checkout@v1
+
+    - name: Run tests
+      run: zig test src/heyredis.zig
