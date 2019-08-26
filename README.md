@@ -1,5 +1,5 @@
 # Hey Redis
-![](https://github.com/kristoff-it/zig-heyredis/workflows/CI/badge.svg) Experimental Redis client for Zig (Requires Redis from unstable branch)
+Experimental Redis client for Zig (Requires Redis from unstable branch)
 
 ## Handy and Efficient
 This client has two main goals:
@@ -280,9 +280,9 @@ The code above will print:
 ## Decoding rules
 You saw a few different ways of decoding Redis replies. The parser can decode simple types in a straightforward way. In case of numbers, if the reply is a string, the parser tries to use `fmt.parseInt` or `fmt.parseFloat`, depending on the type requested.
 
-Arrays can decode sequences (RESP lists or strings) as long as the length matches exactly.
-Slices can decode sequences without restrictions in terms of length, but they require an allocator.
-Structs can decode Map types as long as the fields match perfectly.
+- Arrays can decode sequences (RESP lists or strings) as long as the length matches exactly.
+- Slices can decode sequences without restrictions in terms of length, but they require an allocator.
+- Structs can decode Map types as long as the fields match perfectly.
 
 Types like `FixBuf(N)`, `DynamicReply`, `OrErr(T)`/`OrFullErr(T)` and `KV(K, V)` can decode themselves using custom logic because they implement the `Redis.Parser` trait.
 
