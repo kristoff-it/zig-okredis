@@ -3,6 +3,8 @@ const Allocator = std.mem.Allocator;
 const KV = @import("./kv.zig").KV;
 const testing = std.testing;
 
+pub const E = error.DynamicReplyError;
+
 /// DynamicReply is a tagged union that lets you
 /// parse Redis replies without having to
 /// to know their shape beforehand.
@@ -42,17 +44,17 @@ pub const DynamicReply = union(enum) {
                 }
             }
 
-            pub fn parseAlloc(tag: u8, comptime rootParser: type, allocator: *Allocator, msg: var) anyerror!DynamicReply {
+            pub fn parseAlloc(tag: u8, comptime rootParser: type, allocator: *Allocator, msg: var) error{DynamicReplyError}!DynamicReply {
                 return switch (tag) {
-                    else => return error.ProtocolError,
+                    else => return E,
                     '_' => DynamicReply{ .Nil = {} },
-                    '#' => DynamicReply{ .Bool = try rootParser.parseFromTag(bool, '#', msg) },
-                    ':' => DynamicReply{ .Number = try rootParser.parseFromTag(i64, ':', msg) },
-                    ',' => DynamicReply{ .Double = try rootParser.parseFromTag(f64, ',', msg) },
-                    '$' => DynamicReply{ .String = try rootParser.parseAllocFromTag([]u8, '$', allocator, msg) },
-                    '+' => DynamicReply{ .String = try rootParser.parseAllocFromTag([]u8, '+', allocator, msg) },
-                    '%' => DynamicReply{ .Map = try rootParser.parseAllocFromTag([]KV(DynamicReply, DynamicReply), '%', allocator, msg) },
-                    '*' => DynamicReply{ .List = try rootParser.parseAllocFromTag([]DynamicReply, '*', allocator, msg) },
+                    '#' => DynamicReply{ .Bool = rootParser.parseFromTag(bool, '#', msg) catch return E },
+                    ':' => DynamicReply{ .Number = rootParser.parseFromTag(i64, ':', msg) catch return E },
+                    ',' => DynamicReply{ .Double = rootParser.parseFromTag(f64, ',', msg) catch return E },
+                    '$' => DynamicReply{ .String = rootParser.parseAllocFromTag([]u8, '$', allocator, msg) catch return E },
+                    '+' => DynamicReply{ .String = rootParser.parseAllocFromTag([]u8, '+', allocator, msg) catch return E },
+                    '%' => DynamicReply{ .Map = rootParser.parseAllocFromTag([]KV(DynamicReply, DynamicReply), '%', allocator, msg) catch return E },
+                    '*' => DynamicReply{ .List = rootParser.parseAllocFromTag([]DynamicReply, '*', allocator, msg) catch return E },
                 };
             }
         };

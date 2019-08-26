@@ -24,7 +24,7 @@ const traits = @import("./traits.zig");
 ///     - RedisHashes can be parsed into HashMaps and Structs
 ///
 /// Additionally, the parser can be extented. If the type requested declares
-/// a `Redis` member, then their .parse/.parseAlloc will be called.
+/// a `Redis.Parser` member, then their .parse/.parseAlloc will be called.
 ///
 /// There are two included types that implement the `Redis` trait
 ///     - OrErr(T) is a union over a user type that parses Redis errors
@@ -89,7 +89,7 @@ pub const RESP3Parser = struct {
             '*' => try ifSupported(ListParser, RealType, msg),
             '%' => try ifSupported(MapParser, RealType, msg),
             // '_' => error.UnexpectedNilReply, // TODO: consider supporting it only for CRedisReply types!
-            else => @panic("Encountered grave protocol error"),
+            else => return error.ProtocolError,
         };
     }
     // TODO: if no parser supports the type conversion, @compileError!
