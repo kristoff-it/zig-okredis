@@ -20,7 +20,8 @@ pub const VoidParser = struct {
             switch (itemTag) {
                 else => return error.ProtocolError,
                 '-', '!' => return error.GotErrorReply,
-                '#' => try msg.skipBytes(3), // Bool, e.g. `#t\r\n`
+                '_' => try msg.skipBytes(3), // `_\r\n`
+                '#' => try msg.skipBytes(3), // `#t\r\n`, `#t\r\n`
                 '$' => {
                     // Lenght-prefixed string
                     // TODO: write real implementation
