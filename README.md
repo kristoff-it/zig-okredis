@@ -8,7 +8,7 @@ This client has two main goals:
 
 ## Zero dynamic allocations, unless explicitly wanted
 
-The client has two functions to send commands: `parse` and `parseAlloc`. Following Zig's mantra of making dynamic allocations explicit, only `parseAlloc` can allocate dynamic memory, and only does so by using a user-provided allocator. 
+The client has two functions to send commands: `send` and `sendAlloc`. Following Zig's mantra of making dynamic allocations explicit, only `sendAlloc` can allocate dynamic memory, and only does so by using a user-provided allocator. 
 
 This library makes heavy use of Zig's comptile-time facilities, I wrote a blog post about the subject: https://kristoff.it/blog/what-is-zig-comptime.
 
@@ -128,7 +128,7 @@ The perfect hashing feature is currently just a PoC and breaks for big structs.
 
 ## Allocating memory
 
-The examples above perform zero allocations but consequently make it awkward to work with strings. Using `parseAlloc`, you can allocate dynamic memory every time the reply type is a pointer or a slice.
+The examples above perform zero allocations but consequently make it awkward to work with strings. Using `sendAlloc`, you can allocate dynamic memory every time the reply type is a pointer or a slice.
 
 ### Allocating Strings
 
