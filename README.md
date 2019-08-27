@@ -120,7 +120,11 @@ The code above prints:
 MyHash{ .banana = src.types.fixbuf.FixBuf(11){ .buf = yes please�, .len = 10 }, .price = 9.98999977e+00 }
 ```
 
-This feature is implemented via perfect hashing, leaving full string comparison (field_name == map_key) only for safety checking in debug builds. Currently the code for this feature is just a PoC and breaks for big structs.
+This feature has two implementations: 
+- Slower but safe: store each field name and string compare with each map field.
+- Fast but unsafe: use perfect hashing to match map field and struct field in O(1).
+
+The perfect hashing feature is currently just a PoC and breaks for big structs.
 
 ## Allocating memory
 
