@@ -1,16 +1,26 @@
-# Hey Redis
-Experimental Redis client for Zig (Requires Redis from unstable branch)
+
+<h1 align="center">Hey Redis</h1>
+<p align="center">
+    <a href="LICENSE"><img src="https://badgen.net/github/license/kristoff-it/zig-heyredis" /></a>
+    <a href="https://twitter.com/croloris"><img src="https://badgen.net/badge/twitter/@croloris/1DA1F2?icon&label" /></a>
+</p>
+
+<p align="center">
+    Zero-allocation client for Redis (RESP3 Only)
+</p>
 
 ## Handy and Efficient
-This client has two main goals:
-1. Offer an interface with great ergonomics
-2. Don't be wasteful for the sake of ease of use
+This client aims to offer an interface with great ergonomics without compromising on performance.
+
 
 ## Zero dynamic allocations, unless explicitly wanted
 
-The client has two functions to send commands: `send` and `sendAlloc`. Following Zig's mantra of making dynamic allocations explicit, only `sendAlloc` can allocate dynamic memory, and only does so by using a user-provided allocator. 
+The client has two main interfaces to send commands: `send` and `sendAlloc`. Following Zig's mantra of making dynamic allocations explicit, only `sendAlloc` can allocate dynamic memory, and only does so by using a user-provided allocator. 
 
-This library makes heavy use of Zig's comptile-time facilities, I wrote a blog post about the subject: https://kristoff.it/blog/what-is-zig-comptime.
+The way this is achieved is by making good use of RESP3's typed responses and Zig's metaprogramming facilities.
+In particular, the library uses compile-time reflection to specialize down to the parsing level, allowing heyredis -- whenever possible -- to decode a reply directly into static memory inside a function frame, **without any intermediate dynamic allocation**. If you want more information about Zig's comptime, I wrote a blog post about it: https://kristoff.it/blog/what-is-zig-comptime.
+
+By using `sendAlloc` you can decode replies with arbrirary shape at the cost of performing dynamic allocations. The interface takes an allocator as input, so the user can setup custom allocation schemes such as [Arenas](https://en.wikipedia.org/wiki/Region-based_memory_management).
 
 ## Quickstart
 
@@ -24,18 +34,18 @@ pub fn main() !void {
     defer client.close();
 
     try client.send(void, "SET", "key", "42");
-
     const reply = try client.send(i64, "GET", "key");
+    if (reply != 42) unreachable;
 }
 ```
 
 ## Simple and efficient reply decoding
 
-The first argument to the `send` / `sendAlloc` function is a type which defines how to decode the reply from Redis.
+The first argument to `send` / `sendAlloc` is a type which defines how to decode the reply from Redis.
 
 ### Void
 
-By using `void`, we indicate that we're not interested in inspecting the response, so we don't even allocate memory in the function's frame for it. If Redis replies with an error message, this  function will return a Zig error.
+By using `void`, we indicate that we're not interested in inspecting the reply, so we don't even reserve memory in the function's frame for it. This will discard any reply Redis might send, **except for error replies**. If an error reply is recevied, the function will return `error.GotErrorReply`. Later we will see how to decode Redis error replies as values.
 
 ```zig
 try client.send(void, "SET", "key", "42");
@@ -43,7 +53,7 @@ try client.send(void, "SET", "key", "42");
 
 ### Numbers
 
-Get a key, decode the response as an i64. `GET` actually returns a string response, so the parser tries to use `fmt.parse{Int,Float}`.
+Numeric replies can be decoded directly to Integer or Float types. If Redis replies with a string, the parser will try to parse a number out of it using  `fmt.parse{Int,Float}` (this is what happens with `GET`).
 
 ```zig
 const reply = try client.send(i64, "GET", "key");
@@ -51,7 +61,7 @@ const reply = try client.send(i64, "GET", "key");
 
 ### Optionals
 
-Optional types let you decode `nil` replies from Redis.
+Optional types let you decode `nil` replies from Redis. When the expected type is not an optional, and Redis replies with a `nil`, then `error.GotNilReply` is returned instead. This is equivalent to how error replies are decoded: if the expected type doesn't account for the possibility, a Zig error is returned.
 
 ```zig
 try client.send(void, "DEL", "nokey");
@@ -65,19 +75,47 @@ if (maybe) |val| {
 
 ### Strings
 
-To decode strings without allocating, use a `FixBuf` type. `FixBuf` is just an array + length, so it allows decoding strings up to its length. If the buffer is not big enough, an error is returned.
+Decoding strings without allocating is a bit trickier. It's possible to decode a string inside an array, but the two lengths must match, as there is no way to otherwise indicate the point up to which the array was filled.
+
+For your convenience the library bundles a generic type called `FixBuf(N)`. A `FixBuf(N)` just an array of size `N` + a length, so it allows decoding strings shorter than `N` by using the length to mark where the string ends. If the buffer is not big enough, an error is returned. We will later see how types like `FixBuf(N)` can implement custom decoding logic.
 
 ```zig
 const FixBuf = heyredis.FixBuf;
 
-try client.send(void, "SET", "stringkey", "Hello World!");
-var stringkey = try client.send(FixBuf(30), "GET", "stringkey");
-std.debug.warn("stringkey = {}\n", stringkey.toSlice());
+try client.send(void, "SET", "hellokey", "Hello World!");
+const hello = try client.send(FixBuf(30), "GET", "hellokey");
+
+// .toSlice() lets you address the string inside FixBuf
+if(std.mem.eql(u8, "Hello World!", hello.toSlice())) { 
+    // Yep, the string was decoded
+} else {
+    unreachable;
+}
+
+// Alternatively, if the string has a known fixed length
+const helloArray = try client.send([12]u8, "GET", "hellokey");
+if(std.mem.eql(u8, "Hello World!", helloArray[0..])) { 
+    // Yep, the string was decoded
+} else {
+    unreachable;
+}
 ```
 
 ### Redis Errors
 
-Sending a command that causes an error will produce a Zig error, but in that case you won't be able to inspect the actual error code. Use `OrErr` to parse  Redis errors as values. `OrErr` also has a `.Nil` case, so you don't need to wrap the inner type with an optional. In general it's a good idea to wrap most reply types with `OrErr`. 
+We saw before that receiving an error reply from Redis causes a Zig error: `error.GotErrorReply`. This is because the types we tried to decode the reply into did not account for the possiblity of an error reply. Error replies are just strings with a `<ERROR CODE> <error message>` structure (e.g. "ERR unknown command"), but are tagged as errors in the underlying RESP protocol. While it would be possible to decode them as normal strings, the parser doesn't support that possibility for two reasons:
+
+1. Silently decoding errors as strings would make error-checking *mistake*-prone.
+2. Errors should be programmatically inspected only by looking at the code.
+
+To decode error replies heyredis bundles `OrErr(T)`, a generic type that wraps your expected return type inside a union. The union has three cases:
+
+- `.Ok` for when the command succeeds, contains `T`
+- `.Err` for when the reply is an error, contains the error code
+- `.Nil` for when the reply is `nil`
+
+The last case is there just for convenience, as it's basically equivalent to making the expected return type an optional.
+In general it's a good idea to wrap most reply types with `OrErr`. 
 
 ```zig
 const OrErr = heyredis.OrErr;
@@ -89,8 +127,8 @@ switch (try client.send(OrErr(i64), "INCR", "stringkey")) {
 ```
 
 ### Redis OK replies
-`OrErr(void)` is a good way of decoding `OK` replies from Redis in case you want to inspect error codes. If you don't care about error codes, a simple `void` will do, but in that case an error reply will produce `error.GotErrorReply`, which, if not explicitly checked, will cause the calling function to return with an error.
 
+`OrErr(void)` is a good way of decoding `OK` replies from Redis in case you want to inspect error codes. If you don't care about error codes, a simple `void` will do, but in that case an error reply will produce `error.GotErrorReply`.
 
 ### Structs
 
@@ -125,6 +163,7 @@ This feature has two implementations:
 - Fast but unsafe: use perfect hashing to match map field and struct field in O(1).
 
 The perfect hashing feature is currently just a PoC and breaks for big structs.
+Perfect hashing is a razor-sharp option for advanced users that know **for sure** that the data in Redis matches expectations -- or that are willing to live with the potential consequences of a mismatch.
 
 ## Allocating memory
 
@@ -221,7 +260,7 @@ MyDynHash{ .banana = yes please, .price = 9.98999977e+00 }
 
 ## Dynamic Replies
 
-While most programs will use simple Redis commands and will know the shape of the reply, one might also be in a situation where the reply is unknown or dynamic. To help with that, heyredis includes `DynamicReply`, which can decode any possible Redis reply.
+While most programs will use simple Redis commands and will know the shape of the reply, one might also be in a situation where the reply is unknown or dynamic, like when writing an interactive CLI, for example. To help with that, heyredis includes `DynamicReply`, a type that can decode any possible Redis reply.
 
 ```zig
 const DynamicReply = heyredis.DynamicReply;
@@ -229,11 +268,11 @@ const DynamicReply = heyredis.DynamicReply;
 const dynReply = try client.sendAlloc(DynamicReply, allocator, "HGETALL", "myhash");
 defer freeReply(dynReply, allocator);
 
-switch (dynReply) {
+switch (dynReply.data) {
     .Nil, .Bool, .Number, .Double, .String, .List => {},
     .Map => |kvs| {
         for (kvs) |kv| {
-            std.debug.warn("[{}] => '{}'\n", kv.key.String, kv.value.String);
+            std.debug.warn("[{}] => '{}'\n", kv.key.data.String, kv.value.data.String);
         }
     },
 }
@@ -246,17 +285,27 @@ The code above will print:
 [price] => '9.99'
 ```
 
-`DynamicReply` is a union. These are the possible cases:
+This is the layout of `DynamicReply`:
 
 ```zig
-// Nil: void
-// Bool: bool
-// Number: i64
-// Double: f64
-// String: []u8
-// Map: []KV(DynamicReply, DynamicReply)
-// List: []DynamicReply
+pub const DynamicReply = struct {
+    attribs: []KV(DynamicReply, DynamicReply),
+    data: Data,
+
+    const Data = union(enum) {
+        Nil: void,
+        Bool: bool,
+        Number: i64,
+        Double: f64,
+        String: []u8,
+        Verbatim: Verbatim,
+        Map: []KV(DynamicReply, DynamicReply),
+        List: []DynamicReply,
+    };
+};
 ```
+- `.attribs` contains any potential RESP attribute (more on that later)
+- `.data` contains a union representing all possible replies.
 
 `KV` is a simple Key-Value struct. It can also be used independently of `DynamicReply`
 
@@ -297,6 +346,11 @@ TODO
 ## Decoding types from the standard library
 TODO
 
+
+## RESP attributes
+TODO
+
+
 ## TODOS
 - Add all RESP3 types
 - Design Zig errors
@@ -305,7 +359,6 @@ TODO
 - Better connection handling (buffering, ...)
 - Support for async/await
 - Pub/Sub
-- Attributes
 - Cluster client
 - Sentinel client
 - Refine the Redis traits
