@@ -77,6 +77,7 @@ pub const SimpleStringParser = struct {
         switch (@typeInfo(T)) {
             .Pointer => |ptr| {
                 switch (ptr.size) {
+                    .One, .Many => @compileError("Only Slices and C pointers should reach sub-parsers"),
                     .Slice => {
                         const bytes = try msg.readUntilDelimiterAlloc(allocator, '\r', 4096);
                         _ = std.math.divExact(usize, bytes.len, @sizeOf(ptr.child)) catch return error.LengthMismatch;
@@ -90,7 +91,6 @@ pub const SimpleStringParser = struct {
                         // TODO implement this
                         return error.Unimplemented;
                     },
-                    else => @compileError("Unsupported Conversion"),
                 }
             },
             else => return parse(T, struct {}, msg),

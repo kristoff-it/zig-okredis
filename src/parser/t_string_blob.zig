@@ -98,6 +98,7 @@ pub const BlobStringParser = struct {
 
                 try msg.skipBytes(1);
                 var size = try fmt.parseInt(usize, buf[0..end], 10);
+
                 if (ptr.size == .C) size += @sizeOf(ptr.child);
 
                 const elemSize = std.math.divExact(usize, size, @sizeOf(ptr.child)) catch return error.LengthMismatch;
@@ -117,8 +118,7 @@ pub const BlobStringParser = struct {
                 try msg.skipBytes(2);
 
                 return switch (ptr.size) {
-                    .One => @compileError("Single pointer is not supported for Redis strings."),
-                    .Many => @compileError("Pointer to many is not supported."),
+                    .One, .Many => @compileError("Only Slices and C pointers should reach sub-parsers"),
                     .Slice => res,
                     .C => @ptrCast(T, res.ptr),
                 };

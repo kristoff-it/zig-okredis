@@ -61,8 +61,8 @@ pub fn FixBuf(comptime size: usize) type {
                     }
                 }
 
-                pub inline fn destroy(self: Self, comptime rootParser: type, allocator: *Allocator) void {}
-                pub inline fn parseAlloc(tag: u8, comptime _: type, msg: var) !Self {
+                pub fn destroy(self: Self, comptime rootParser: type, allocator: *Allocator) void {}
+                pub fn parseAlloc(tag: u8, comptime _: type, msg: var) !Self {
                     return parse(tag, _, msg);
                 }
             };

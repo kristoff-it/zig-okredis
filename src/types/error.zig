@@ -52,7 +52,7 @@ pub fn OrErr(comptime T: type) type {
                     };
                 }
 
-                pub inline fn destroy(self: Self, comptime rootParser: type, allocator: *Allocator) void {
+                pub fn destroy(self: Self, comptime rootParser: type, allocator: *Allocator) void {
                     switch (self) {
                         .Ok => |ok| rootParser.freeReply(ok, allocator),
                         else => {},
@@ -169,7 +169,7 @@ pub fn OrFullErr(comptime T: type) type {
                     @compileError("OrFullErr requires an allocator, use `OrErr` to parse just the error code without the need of an allocator.");
                 }
 
-                pub inline fn destroy(self: Self, comptime rootParser: type, allocator: *Allocator) void {
+                pub fn destroy(self: Self, comptime rootParser: type, allocator: *Allocator) void {
                     switch (self) {
                         .Ok => |ok| rootParser.freeReply(ok, allocator),
                         .Err => |err| if (err.message) |msg| allocator.free(msg),

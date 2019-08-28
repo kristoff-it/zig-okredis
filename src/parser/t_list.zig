@@ -77,8 +77,7 @@ pub const ListParser = struct {
                 }
 
                 return switch (ptr.size) {
-                    .One => &res[0],
-                    .Many => res.ptr,
+                    .One, .Many => @compileError("Only Slices and C pointers should reach sub-parsers"),
                     .Slice => res,
                     .C => @ptrCast(T, res.ptr),
                 };

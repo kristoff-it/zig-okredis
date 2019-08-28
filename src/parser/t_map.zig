@@ -108,24 +108,13 @@ pub const MapParser = struct {
     pub fn isSupportedAlloc(comptime T: type) bool {
         return switch (@typeInfo(T)) {
             .Array, .Struct => true,
-            .Pointer => |ptr| isFragmentType(ptr.child) or (ptr.size == .One and @typeId(ptr.child) == .Struct),
+            .Pointer => |ptr| isFragmentType(ptr.child),
             else => false,
         };
     }
 
     pub fn parseAlloc(comptime T: type, comptime rootParser: type, allocator: *std.mem.Allocator, msg: var) !T {
-        switch (@typeInfo(T)) {
-            else => {},
-            .Pointer => |ptr| {
-                // If pointer to only one element,
-                // allocate it and recur.
-                if (ptr.size == .One) {
-                    var res = try allocator.create(ptr.child);
-                    res.* = try rootParser.parseAllocFromTag(ptr.child, '%', allocator, msg);
-                    return res;
-                }
-            },
-        }
+
         // TODO: write real implementation
         var buf: [100]u8 = undefined;
         var end: usize = 0;

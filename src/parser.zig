@@ -18,85 +18,104 @@ const traits = @import("./traits.zig");
 /// This is the RESP3 parser. It reads an OutStream and returns redis replies.
 /// The user is required to specify how they want to decode each reply.
 ///
-/// The parser supports all 1:1 translations (e.g. RESPNumber -> Int) and
+/// The parser supports all 1:1 translations (e.g. RESP Number -> Int) and
 /// a couple quality-of-life custom ones:
-///     - RedisStrings can be parsed to numbers (the parser will use fmt.parse{Int,Float})
-///     - RedisHashes can be parsed into HashMaps and Structs
+///     - RESP Strings can be parsed to numbers (the parser will use fmt.parse{Int,Float})
+///     - RESP Maps can be parsed into std.HashMaps and Structs
 ///
 /// Additionally, the parser can be extented. If the type requested declares
 /// a `Redis.Parser` member, then their .parse/.parseAlloc will be called.
 ///
-/// There are two included types that implement the `Redis` trait
+/// There are two included types that implement the `Redis.Parser` trait
 ///     - OrErr(T) is a union over a user type that parses Redis errors
 ///     - FixBuf(N) is a fixed-length buffer used to decode strings
 ///       without dynamic allocations.
 ///
-/// Redis Errors are treated as special values, so there is no way
-/// to parse them other than wrapping the expected result type with OrErr().
-/// Asking for an incompatible return type will return a Zig error and
+/// Redis Errors are treated as special values, so they won't decode to
+/// strings ([]u8) or other generic types. Same with `void`: it will discard
+/// any reply *EXCEPT* for Redis errors. When the reply contains an error, the
+/// Zig `error.GorErrorReply` error will be returned. This makes it impossible
+/// to erroneusly ignore error replies, but discards the error message that
+/// Redis sent. To decode a Redis error reply as a value, in order to inspect
+/// the error code for example, one must wrap the expected type with OrErr or a
+/// similar type. Asking for an incompatible type will return a Zig error and
 /// will leave the connection in a corrupted state.
-/// (this constraint might be relaxed in the future)
 ///
-/// If the return value of a command is not needed, it's also possible to
-/// use the `void` type. This will succesfully decode any type of response
-/// to a command _except_ for RedisErrors. Use OrErr(void) to ensure a command
+/// If the return value of a command is not needed, it's also possible to use
+/// the `void` type. This will succesfully decode any type of response to a
+/// command _except_ for RedisErrors. Use OrErr(void) to ensure a command
 /// decode step never fails.
 pub const RESP3Parser = struct {
     const rootParser = @This();
 
     /// This is the parsing interface that doesn't requre an allocator.
-    /// As such it doesn't support pointers, but it can still use objects
-    /// That implement the `Redis` trait. The easiest way to decode strings
+    /// As such it doesn't support pointers, but it can still use types
+    /// that implement the `Redis.Parser` trait. The easiest way to decode strings
     /// using this function is to use a FixBuf wherever a string is expected.
     pub inline fn parse(comptime T: type, msg: var) !T {
         const tag = try msg.readByte();
         return parseFromTag(T, tag, msg);
     }
 
-    /// Used by the sub-parsers and `Redis` types to delegate parsing to another
+    /// Used by the sub-parsers and `Redis.Parser` types to delegate parsing to another
     /// parser. It's used for example by OrErr to continue parsing in the event
-    /// that the reply is not a Redis error.
+    /// that the reply is not a Redis error (i.e. the tag is not '!' nor '-').
     pub fn parseFromTag(comptime T: type, tag: u8, msg: var) !T {
-        if (T == void) return VoidParser.parseVoid(tag, msg);
+        if (T == void) return VoidParser.discardOne(tag, msg);
 
-        comptime var RealType = T;
+        comptime var UnwrappedType = T;
         switch (@typeInfo(T)) {
             .Pointer => @compileError("`parse` can't perform allocations so it can't handle pointers, use `parseAlloc` instead."),
-            .Optional => |opt| {
-                RealType = opt.child;
-                // Null micro-parser:
-                if (tag == '_') {
-                    try msg.skipBytes(2);
-                    return null;
-                }
-            },
+            .Optional => |opt| UnwrappedType = opt.child,
             else => {},
         }
 
+        // At this point there might be an attribute in the stream. We default
+        // to discarding attributes, but some types might want access to them,
+        // like Attribute() for example. If there is an attribute AND the type
+        // doesn't want it, we discard it and try againt consuming a nil reply
+        // if the type is an optional.
+        if (tag == '|') {
+            if (comptime traits.handlesAttributes(UnwrappedType)) {
+                return UnwrappedType.Redis.Parser.parse(tag, rootParser, msg);
+            }
+            try VoidParser.discardAttributes(msg);
+        }
+
+        // Try to decode a null if T was an optional.
+        if (@typeId(T) == .Optional) {
+            // Null micro-parser:
+            if (tag == '_') {
+                try msg.skipBytes(2);
+                return null;
+            }
+        }
+
         // Here we check for the `Redis.Parser` trait, in order to delegate the parsing job.
-        if (comptime traits.isParserType(RealType)) {
-            return RealType.Redis.Parser.parse(tag, rootParser, msg);
+        if (comptime traits.isParserType(UnwrappedType)) {
+            return UnwrappedType.Redis.Parser.parse(tag, rootParser, msg);
         }
 
         // Call the right parser based on the tag we just read from the stream.
         return switch (tag) {
-            ':' => try ifSupported(NumberParser, RealType, msg),
-            ',' => try ifSupported(DoubleParser, RealType, msg),
-            '#' => try ifSupported(BoolParser, RealType, msg),
-            '$' => try ifSupported(BlobStringParser, RealType, msg),
-            '+' => try ifSupported(SimpleStringParser, RealType, msg),
+            else => std.debug.panic("Found `{}` in the main parser's switch." ++
+                " Probably a bug in a type that implements `Redis.Parser`.", tag),
+            '_' => return error.GotNilReply,
             '-', '!' => return error.GotErrorReply,
-            '*' => try ifSupported(ListParser, RealType, msg),
-            '%' => try ifSupported(MapParser, RealType, msg),
-            // '_' => error.UnexpectedNilReply, // TODO: consider supporting it only for CRedisReply types!
-            else => return error.ProtocolError,
+            ':' => try ifSupported(NumberParser, UnwrappedType, msg),
+            ',' => try ifSupported(DoubleParser, UnwrappedType, msg),
+            '#' => try ifSupported(BoolParser, UnwrappedType, msg),
+            '$', '=' => try ifSupported(BlobStringParser, UnwrappedType, msg),
+            '+' => try ifSupported(SimpleStringParser, UnwrappedType, msg),
+            '*' => try ifSupported(ListParser, UnwrappedType, msg),
+            '%' => try ifSupported(MapParser, UnwrappedType, msg),
         };
     }
+
     // TODO: if no parser supports the type conversion, @compileError!
-    // The whole job of this function is to cut away calls to sub-parsers
-    // if we know that the Zig type is not supported.
-    // It's a good way to report a comptime error if no parser supports a
-    // given type.
+    // The whole job of this function is to cut away calls to sub-parsers if we
+    // know that the Zig type is not supported.  It's a good way to report a
+    // comptime error if no parser supports a given type.
     inline fn ifSupported(comptime parser: type, comptime T: type, msg: var) !T {
         return if (comptime parser.isSupported(T))
             parser.parse(T, rootParser, msg)
@@ -111,48 +130,131 @@ pub const RESP3Parser = struct {
     }
 
     pub fn parseAllocFromTag(comptime T: type, tag: u8, allocator: *Allocator, msg: var) !T {
-        if (T == void) return VoidParser.parseVoid(tag, msg);
+        if (T == void) return VoidParser.discardOne(tag, msg);
 
-        comptime var RealType = T;
+        comptime var UnwrappedType = T;
         switch (@typeInfo(T)) {
-            .Optional => |opt| {
-                RealType = opt.child;
-                // Null micro-parser:
-                if (tag == '_') {
-                    try msg.skipBytes(2);
-                    return null;
-                }
+            .Optional => |opt| UnwrappedType = opt.child,
+            else => {},
+        }
+
+        // We now are in one of three main situations:
+        // - The type is not a pointer.
+        // - The type is a pointer to many items (slice).
+        // - The type is a pointer to a single item.
+        //
+        // The first case is trivial, we just pass it around all works just
+        // like with `parse`, with the only difference being that we are
+        // passing around an allocator, to let all sub-parsers allocate memory
+        // as they see fit.
+        //
+        // The second case is slightly more complex: A slice might mean a
+        // string or a sequence of more complex elements ([]u8 vs []u32 vs
+        // []KV([]u8, f32)).  The main parser doesn't really care which case it
+        // is because the actual resolution will be handled by `t_list`,
+        // `t_set`, `t_map`, or `t_string_*`.
+        //
+        // The last case is similar to the first, but since the type is a
+        // pointer, we must allocate it dynamically. In this case we hide to
+        // sub-parsers the fact that the type requested is a pointer and not a
+        // "concrete" type, by just writing the result of their invocation into
+        // dyn memory allocated by us. It was a bit confusing in the beginning
+        // to decide what should sub-parsers know or not, but this seems a good
+        // balance. There are small implications with how certain types get
+        // interpreted, but it's mostly corner-cases with little pratical
+        // utility, and each has an escape hatch. An example of ambiguity is
+        // that asking for a *u8 will be interpreted as a request for a
+        // dynamically allocated numeric value and not for a single-chararacter
+        // string.  This is better discussed inside the string-related
+        // sub-parsers.
+        comptime var InnerType = UnwrappedType;
+        switch (@typeInfo(UnwrappedType)) {
+            .Pointer => |ptr| switch (ptr.size) {
+                .Many => @compileError("Pointers to unknown size of elements " ++
+                    "are not supported, use a slice or, for C-compatible strings, a c-pointer."),
+                // We only "hide" the pointer indirection
+                // only for pointers to single items.
+                .One => InnerType = ptr.child,
+                else => {},
             },
             else => {},
         }
 
-        comptime var InnerType = RealType;
-
-        switch (@typeInfo(RealType)) {
-            .Pointer => |ptr| {
-                if (ptr.size == .Many) {
-                    @compileError("Pointers to unknown size of elements " ++
-                        "are not supported, use a slice or, for C-compatible strings, a c-pointer.");
+        // Same as with `parseFromTag`, we might have an attribute in the
+        // stream. We need to decide wether to discard it or let the underlying
+        // type decode it. Recursion is necessary to let the nil parser try
+        // again to decode a nil value, as it would have been obscured by the
+        // interleaved attribute. Read the corresponding comment in
+        // `parseFromTag` for more information.
+        if (tag == '|') {
+            if (comptime traits.handlesAttributes(InnerType)) {
+                // If the type is a single-item ptr, allocate.  If it's a
+                // pointer to a slice, the check to `handlesAttributes` would
+                // have failed because it would see the pointer type and not
+                // the underlying child type, so the else branch must happen
+                // only with non-pointer types, requiring no allocation from
+                // us.
+                if (InnerType != UnwrappedType) {
+                    var res = try allocator.create(InnerType);
+                    errdefer allocator.destroy(res);
+                    res.* = try InnerType.Redis.Parser.parseAlloc(tag, rootParser, allocator, msg);
+                    return res;
                 }
-                InnerType = ptr.child;
-            },
-            else => {},
+
+                return InnerType.Redis.Parser.parseAlloc(tag, rootParser, allocator, msg);
+            }
+            try VoidParser.discardAttributes(msg);
         }
 
-        if (comptime traits.isParserType(RealType))
-            return RealType.Redis.Parser.parseAlloc(tag, rootParser, allocator, msg);
+        // Try to decode a null if T was an optional.
+        if (@typeId(T) == .Optional) {
+            // Null micro-parser:
+            if (tag == '_') {
+                try msg.skipBytes(2);
+                return null;
+            }
+        }
 
+        if (comptime traits.isParserType(InnerType)) {
+            // Same as a few lines before, we allocate in case of a single item
+            // pointer. Read the previus comment for more information.
+            if (InnerType != UnwrappedType) {
+                var res: UnwrappedType = try allocator.create(InnerType);
+                errdefer allocator.destroy(res);
+                res.* = try InnerType.Redis.Parser.parseAlloc(tag, rootParser, allocator, msg);
+                return res;
+            }
+
+            return InnerType.Redis.Parser.parseAlloc(tag, rootParser, allocator, msg);
+        }
+
+        if (InnerType != UnwrappedType) {
+            var res = try allocator.create(InnerType);
+            errdefer allocator.destroy(res);
+            res.* = try doParseAlloc(tag, InnerType, allocator, msg);
+            return res;
+        }
+
+        return doParseAlloc(tag, UnwrappedType, allocator, msg);
+    }
+
+    // The last step of parseAllocFromTag is in a separate function to reduce
+    // the amount of duplicated code caused by the fact that for single item
+    // pointers we are allocating the memory here, in the root parser. This
+    // causes code duplication because of branching.
+    inline fn doParseAlloc(tag: u8, comptime T: type, allocator: *Allocator, msg: var) !T {
         return switch (tag) {
-            ':' => try ifSupportedAlloc(NumberParser, RealType, allocator, msg),
-            ',' => try ifSupportedAlloc(DoubleParser, RealType, allocator, msg),
-            '#' => try ifSupportedAlloc(BoolParser, RealType, allocator, msg),
-            '$' => try ifSupportedAlloc(BlobStringParser, RealType, allocator, msg),
-            '+' => try ifSupportedAlloc(SimpleStringParser, RealType, allocator, msg),
-            '-', '!' => return error.UnexpectedErrorReply,
-            '*' => try ifSupportedAlloc(ListParser, RealType, allocator, msg),
-            '%' => try ifSupportedAlloc(MapParser, RealType, allocator, msg),
-            // '_' => error.NilButNoOptional, // TODO: consider supporting it only for CRedisReply types!
-            else => @panic("Encountered grave protocol error"),
+            else => std.debug.panic("Found `{c}` in the main parser's switch." ++
+                " Probably a bug in a type that implements `Redis.Parser`.", tag),
+            '_' => return error.GotNilReply,
+            '-', '!' => return error.GotErrorReply,
+            ':' => try ifSupportedAlloc(NumberParser, T, allocator, msg),
+            ',' => try ifSupportedAlloc(DoubleParser, T, allocator, msg),
+            '#' => try ifSupportedAlloc(BoolParser, T, allocator, msg),
+            '$', '=' => try ifSupportedAlloc(BlobStringParser, T, allocator, msg),
+            '+' => try ifSupportedAlloc(SimpleStringParser, T, allocator, msg),
+            '*' => try ifSupportedAlloc(ListParser, T, allocator, msg),
+            '%' => try ifSupportedAlloc(MapParser, T, allocator, msg),
         };
     }
 

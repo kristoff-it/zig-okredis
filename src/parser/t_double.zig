@@ -45,8 +45,7 @@ pub const DoubleParser = struct {
                 errdefer allocator.free(res);
                 res[0] = try parse(ptr.child, struct {}, msg);
                 return switch (ptr.size) {
-                    .One => &res[0],
-                    .Many => res.ptr,
+                    .One, .Many => @compileError("Only Slices and C pointers should reach sub-parsers"),
                     .Slice => res,
                     .C => @ptrCast(T, res.ptr),
                 };
