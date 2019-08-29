@@ -333,20 +333,20 @@ const fakeParser = struct {
 };
 
 fn MakeErroji() std.io.SliceInStream {
-    return std.io.SliceInStream.init("😈 your Redis belongs to us\r\n"[0..]);
+    return std.io.SliceInStream.init("-😈 your Redis belongs to us\r\n"[1..]);
 }
 fn MakeErr() std.io.SliceInStream {
-    return std.io.SliceInStream.init("ERRNOGOODFOOD redis could not find any good food\r\n"[0..]);
+    return std.io.SliceInStream.init("-ERRNOGOODFOOD redis could not find any good food\r\n"[1..]);
 }
 fn MakeBadErr() std.io.SliceInStream {
-    return std.io.SliceInStream.init("ARIARIARIARIARIARIARIARIARIARRIVEDERCI *golden wind music starts*\r\n"[0..]);
+    return std.io.SliceInStream.init("-ARIARIARIARIARIARIARIARIARIARRIVEDERCI *golden wind music starts*\r\n"[1..]);
 }
 fn MakeShortErr() std.io.SliceInStream {
-    return std.io.SliceInStream.init("ABC\r\n"[0..]);
+    return std.io.SliceInStream.init("-ABC\r\n"[1..]);
 }
 fn MakeBlobErr() std.io.SliceInStream {
-    return std.io.SliceInStream.init("55\r\nERRN\r\nOGOODFOOD redis \r\n\r\ncould not find any\r\n good food\r\n"[0..]);
+    return std.io.SliceInStream.init("!55\r\nERRN\r\nOGOODFOOD redis \r\n\r\ncould not find any\r\n good food\r\n"[1..]);
 }
 fn MakeNil() std.io.SliceInStream {
-    return std.io.SliceInStream.init("\r\n"[0..]);
+    return std.io.SliceInStream.init("_\r\n"[1..]);
 }

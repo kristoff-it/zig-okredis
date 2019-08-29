@@ -37,7 +37,7 @@ pub fn isParserType(comptime T: type) bool {
         if (!@hasDecl(T.Redis.Parser, "destroy"))
             @compileError(
                 \\`Redis.Parser` trait requires implementing:
-                \\    fn destroy(self: Self, comptime rootParser: type, allocator: *Allocator) void
+                \\    fn destroy(self: *Self, comptime rootParser: type, allocator: *Allocator) void
                 \\
             );
 

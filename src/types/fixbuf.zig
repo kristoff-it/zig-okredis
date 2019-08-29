@@ -18,7 +18,7 @@ pub fn FixBuf(comptime size: usize) type {
                 pub fn parse(tag: u8, comptime _: type, msg: var) !Self {
                     switch (tag) {
                         else => return error.UnsupportedConversion,
-                        '+' => {
+                        '+', '(' => {
                             var res: Self = undefined;
                             var ch = try msg.readByte();
                             for (res.buf) |*elem, i| {

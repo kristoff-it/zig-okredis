@@ -142,7 +142,7 @@ pub fn main() !void {
     // reply is unknown or dynamic. To help with that, supredis includes
     // `DynamicReply`, which can decode any possible Redis reply.
     const DynamicReply = heyredis.DynamicReply;
-    const dynReply = try client.sendAlloc(DynamicReply, allocator, "HGETALL", "myhash");
+    var dynReply = try client.sendAlloc(DynamicReply, allocator, "HGETALL", "myhash");
     defer freeReply(dynReply, allocator);
 
     // DynamicReply is a union that represents all possible replies.
@@ -165,7 +165,7 @@ pub fn main() !void {
     // }
     std.debug.warn("\nmyhash decoded as DynamicReply:\n");
     switch (dynReply.data) {
-        .Nil, .Bool, .Number, .Double, .String, .List, .Verbatim => {},
+        .Nil, .Bool, .Number, .Double, .Bignum, .String, .List, .Verbatim => {},
         .Map => |kvs| {
             for (kvs) |kv| {
                 std.debug.warn("\t[{}] => '{}'\n", kv.key.data.String, kv.value.data.String);

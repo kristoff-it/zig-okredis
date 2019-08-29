@@ -18,7 +18,7 @@ This client aims to offer an interface with great ergonomics without compromisin
 The client has two main interfaces to send commands: `send` and `sendAlloc`. Following Zig's mantra of making dynamic allocations explicit, only `sendAlloc` can allocate dynamic memory, and only does so by using a user-provided allocator. 
 
 The way this is achieved is by making good use of RESP3's typed responses and Zig's metaprogramming facilities.
-In particular, the library uses compile-time reflection to specialize down to the parsing level, allowing heyredis -- whenever possible -- to decode a reply directly into static memory inside a function frame, **without any intermediate dynamic allocation**. If you want more information about Zig's comptime, I wrote a blog post about it: https://kristoff.it/blog/what-is-zig-comptime.
+The library uses compile-time reflection to specialize down to the parsing level, allowing heyredis to decode whenever possible a reply directly into a function frame, **without any intermediate dynamic allocation**. If you want more information about Zig's comptime, I wrote a blog post: https://kristoff.it/blog/what-is-zig-comptime.
 
 By using `sendAlloc` you can decode replies with arbrirary shape at the cost of performing dynamic allocations. The interface takes an allocator as input, so the user can setup custom allocation schemes such as [Arenas](https://en.wikipedia.org/wiki/Region-based_memory_management).
 
@@ -297,6 +297,7 @@ pub const DynamicReply = struct {
         Bool: bool,
         Number: i64,
         Double: f64,
+        Bignum: std.math.big.Int,
         String: []u8,
         Verbatim: Verbatim,
         Map: []KV(DynamicReply, DynamicReply),

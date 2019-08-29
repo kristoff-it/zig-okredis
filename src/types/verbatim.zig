@@ -134,17 +134,17 @@ test "verbatim" {
 }
 
 fn MakeSimpleString() std.io.SliceInStream {
-    return std.io.SliceInStream.init("Yayyyy I'm a string!\r\n"[0..]);
+    return std.io.SliceInStream.init("+Yayyyy I'm a string!\r\n"[1..]);
 }
 fn MakeBlobString() std.io.SliceInStream {
-    return std.io.SliceInStream.init("12\r\nHello World!\r\n"[0..]);
+    return std.io.SliceInStream.init("$12\r\nHello World!\r\n"[1..]);
 }
 fn MakeVerbatimString() std.io.SliceInStream {
-    return std.io.SliceInStream.init("19\r\ntxt:Oh hello there!\r\n"[0..]);
+    return std.io.SliceInStream.init("=19\r\ntxt:Oh hello there!\r\n"[1..]);
 }
 fn MakeBadVerbatimString() std.io.SliceInStream {
-    return std.io.SliceInStream.init("1\r\nt\r\n"[0..]);
+    return std.io.SliceInStream.init("=1\r\nt\r\n"[1..]);
 }
 fn MakeBadVerbatimString2() std.io.SliceInStream {
-    return std.io.SliceInStream.init("4\r\nmkd:\r\n"[0..]);
+    return std.io.SliceInStream.init("=4\r\nmkd:\r\n"[1..]);
 }

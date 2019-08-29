@@ -5,6 +5,7 @@ const testing = std.testing;
 const InStream = std.io.InStream;
 const Allocator = std.mem.Allocator;
 
+const BigNumParser = @import("./parser/t_bignum.zig").BigNumParser;
 const VoidParser = @import("./parser/void.zig").VoidParser;
 const NumberParser = @import("./parser/t_number.zig").NumberParser;
 const BoolParser = @import("./parser/t_bool.zig").BoolParser;
@@ -72,8 +73,8 @@ pub const RESP3Parser = struct {
 
         // At this point there might be an attribute in the stream. We default
         // to discarding attributes, but some types might want access to them,
-        // like Attribute() for example. If there is an attribute AND the type
-        // doesn't want it, we discard it and try againt consuming a nil reply
+        // like WithAttribs() for example. If there is an attribute and the type
+        // doesn't want it, we discard it and try consuming again a nil reply
         // if the type is an optional.
         if (tag == '|') {
             if (comptime traits.handlesAttributes(UnwrappedType)) {
@@ -109,6 +110,9 @@ pub const RESP3Parser = struct {
             '+' => try ifSupported(SimpleStringParser, UnwrappedType, msg),
             '*' => try ifSupported(ListParser, UnwrappedType, msg),
             '%' => try ifSupported(MapParser, UnwrappedType, msg),
+            // The bignum parser needs an allocator so it will refuse
+            // all types when calling .isSupported() on it.
+            '(' => try ifSupported(BigNumParser, UnwrappedType, msg),
         };
     }
 
@@ -143,7 +147,7 @@ pub const RESP3Parser = struct {
         // - The type is a pointer to many items (slice).
         // - The type is a pointer to a single item.
         //
-        // The first case is trivial, we just pass it around all works just
+        // The first case is trivial, we just pass it around and all works just
         // like with `parse`, with the only difference being that we are
         // passing around an allocator, to let all sub-parsers allocate memory
         // as they see fit.
@@ -165,7 +169,7 @@ pub const RESP3Parser = struct {
         // utility, and each has an escape hatch. An example of ambiguity is
         // that asking for a *u8 will be interpreted as a request for a
         // dynamically allocated numeric value and not for a single-chararacter
-        // string.  This is better discussed inside the string-related
+        // string. This is better discussed inside the string-related
         // sub-parsers.
         comptime var InnerType = UnwrappedType;
         switch (@typeInfo(UnwrappedType)) {
@@ -255,6 +259,7 @@ pub const RESP3Parser = struct {
             '+' => try ifSupportedAlloc(SimpleStringParser, T, allocator, msg),
             '*' => try ifSupportedAlloc(ListParser, T, allocator, msg),
             '%' => try ifSupportedAlloc(MapParser, T, allocator, msg),
+            '(' => try ifSupportedAlloc(BigNumParser, T, allocator, msg),
         };
     }
 
@@ -267,6 +272,7 @@ pub const RESP3Parser = struct {
 
     // Frees values created by `sendAlloc`.
     // If the top value is a pointer, it frees that too.
+    // TODO: free stdlib types!
     pub fn freeReply(val: var, allocator: *Allocator) void {
         const T = @typeOf(val);
         switch (@typeInfo(T)) {
@@ -386,7 +392,7 @@ fn Make2Float() std.io.SliceInStream {
 }
 
 test "parser" {
-    _ = @import("./parser/void.zig");
+    _ = @import("./parser/t_bignum.zig");
     _ = @import("./parser/t_number.zig");
     _ = @import("./parser/t_bool.zig");
     _ = @import("./parser/t_string_blob.zig");
@@ -394,6 +400,7 @@ test "parser" {
     _ = @import("./parser/t_double.zig");
     _ = @import("./parser/t_list.zig");
     _ = @import("./parser/t_map.zig");
+    _ = @import("./parser/void.zig");
 }
 
 test "optional" {

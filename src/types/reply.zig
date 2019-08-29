@@ -19,6 +19,7 @@ pub const DynamicReply = struct {
         Bool: bool,
         Number: i64,
         Double: f64,
+        Bignum: std.math.big.Int,
         String: []u8,
         Verbatim: Verbatim,
         Map: []KV(DynamicReply, DynamicReply),
@@ -30,13 +31,19 @@ pub const DynamicReply = struct {
         pub const Parser = struct {
             pub const HandlesAttributes = true;
             pub fn parse(tag: u8, comptime _: type, msg: var) !DynamicReply {
-                @compileError("DynamicReply require an allocator. Use `sendAlloc`!");
+                @compileError("DynamicReply requires an allocator. Use `sendAlloc`!");
             }
 
             pub fn destroy(self: DynamicReply, comptime rootParser: type, allocator: *Allocator) void {
                 rootParser.freeReply(self.attribs, allocator);
                 switch (self.data) {
                     .Nil, .Bool, .Number, .Double => {},
+                    .Bignum => {
+                        // `std.math.bit.Init` wants the parameter to be writable
+                        // so we have to copy it inside a `var` variable.
+                        var x = self;
+                        x.data.Bignum.deinit();
+                    },
                     .String => |str| allocator.free(str),
                     .Verbatim => |ver| rootParser.freeReply(ver, allocator),
                     .List => |lst| {
@@ -74,6 +81,7 @@ pub const DynamicReply = struct {
                     '+' => Data{ .String = rootParser.parseAllocFromTag([]u8, '+', allocator, msg) catch return E },
                     '%' => Data{ .Map = rootParser.parseAllocFromTag([]KV(DynamicReply, DynamicReply), '%', allocator, msg) catch return E },
                     '*' => Data{ .List = rootParser.parseAllocFromTag([]DynamicReply, '*', allocator, msg) catch return E },
+                    '(' => Data{ .Bignum = rootParser.parseAllocFromTag(std.math.big.Int, '(', allocator, msg) catch return E },
                 };
 
                 return res;
@@ -132,22 +140,25 @@ test "dynamic replies" {
         testing.expectEqualSlices(u8, "Banana", reply.data.List[2].data.List[0].attribs[0].key.data.String);
         testing.expectEqual(true, reply.data.List[2].data.List[0].attribs[0].value.data.Bool);
 
-        testing.expectEqual(f64(12.34), reply.data.List[2].data.List[1].data.Double);
+        testing.expectEqual(i64(424242), try reply.data.List[2].data.List[1].data.Bignum.to(i64));
         testing.expectEqual(usize(0), reply.data.List[2].data.List[1].attribs.len);
+
+        testing.expectEqual(f64(12.34), reply.data.List[2].data.List[2].data.Double);
+        testing.expectEqual(usize(0), reply.data.List[2].data.List[2].attribs.len);
     }
 }
 
 fn MakeSimpleString() std.io.SliceInStream {
-    return std.io.SliceInStream.init("Yayyyy I'm a string!\r\n"[0..]);
+    return std.io.SliceInStream.init("+Yayyyy I'm a string!\r\n"[1..]);
 }
 fn MakeComplexList() std.io.SliceInStream {
-    return std.io.SliceInStream.init("3\r\n+Hello\r\n#t\r\n*2\r\n:123\r\n,12.34\r\n"[0..]);
+    return std.io.SliceInStream.init("*3\r\n+Hello\r\n#t\r\n*2\r\n:123\r\n,12.34\r\n"[1..]);
 }
 
 //zig fmt: off
 fn MakeComplexListWithAttributes() std.io.SliceInStream {
     return std.io.SliceInStream.init(
-        "2\r\n" ++
+        ("|2\r\n" ++
             "+Ciao\r\n" ++
             "+World\r\n" ++
             "+Peach\r\n" ++
@@ -158,12 +169,13 @@ fn MakeComplexListWithAttributes() std.io.SliceInStream {
                 "+ttl\r\n" ++
                 ":100\r\n" ++ 
             "#t\r\n" ++
-            "*2\r\n" ++
+            "*3\r\n" ++
                 "|1\r\n" ++
                     "+Banana\r\n" ++
                     "#t\r\n" ++ 
                 ":123\r\n" ++
-                ",12.34\r\n"
-    [0..]);
+                "(424242\r\n" ++
+                ",12.34\r\n")
+    [1..]);
 }
 //zig fmt: on

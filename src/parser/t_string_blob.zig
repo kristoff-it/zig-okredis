@@ -173,14 +173,14 @@ test "string" {
     }
 }
 fn MakeEmoji2() std.io.SliceInStream {
-    return std.io.SliceInStream.init("8\r\n😈👿\r\n"[0..]);
+    return std.io.SliceInStream.init("$8\r\n😈👿\r\n"[1..]);
 }
 fn MakeString() std.io.SliceInStream {
-    return std.io.SliceInStream.init("12\r\nHello World!\r\n"[0..]);
+    return std.io.SliceInStream.init("$12\r\nHello World!\r\n"[1..]);
 }
 fn MakeInt() std.io.SliceInStream {
-    return std.io.SliceInStream.init("4\r\n1337\r\n"[0..]);
+    return std.io.SliceInStream.init("$4\r\n1337\r\n"[1..]);
 }
 fn MakeFloat() std.io.SliceInStream {
-    return std.io.SliceInStream.init("5\r\n12.34\r\n"[0..]);
+    return std.io.SliceInStream.init("$5\r\n12.34\r\n"[1..]);
 }
