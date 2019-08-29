@@ -80,7 +80,9 @@ pub const RESP3Parser = struct {
             if (comptime traits.handlesAttributes(UnwrappedType)) {
                 return UnwrappedType.Redis.Parser.parse(tag, rootParser, msg);
             }
-            try VoidParser.discardAttributes(msg);
+
+            // Here we lie to the void parser and claim we want to discard one Map element.
+            try VoidParser.discardOne('%', msg);
         }
 
         // Try to decode a null if T was an optional.
@@ -207,7 +209,9 @@ pub const RESP3Parser = struct {
 
                 return InnerType.Redis.Parser.parseAlloc(tag, rootParser, allocator, msg);
             }
-            try VoidParser.discardAttributes(msg);
+
+            // Here we lie to the void parser and claim we want to discard one Map element.
+            try VoidParser.discardOne('%', msg);
         }
 
         // Try to decode a null if T was an optional.

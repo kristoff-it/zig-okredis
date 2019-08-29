@@ -3,35 +3,10 @@ const fmt = std.fmt;
 
 /// A parser that consumes one full reply and discards it. It's written as a
 /// dedicated parser because it doesn't require recursion to consume the right
-/// amount of input. Originally this was implemented as a type case inside
-/// each t_TYPE parser, but it caused errorset inference to break.
-/// Additionally, the compiler probably would not know that it can the
-/// recursive version can become a loop. Error replies don't get consumed and
-/// cause error.GotErrorReply. This parser has different method names and is
-/// the only one that doesn't recur through the root parser.
+/// amount of input. It's also possible to use it to consume just one attribute
+/// element by claiming to have found a map instead. This trick is used by the
+/// root parser in the initial setup of both `parse` and `parseAlloc`.
 pub const VoidParser = struct {
-    pub fn discardAttributes(msg: var) !void {
-        // TODO: write real implementation
-        var buf: [100]u8 = undefined;
-        var end: usize = 0;
-        for (buf) |*elem, i| {
-            const ch = try msg.readByte();
-            elem.* = ch;
-            if (ch == '\r') {
-                end = i;
-                break;
-            }
-        }
-        try msg.skipBytes(1);
-        var size = try fmt.parseInt(usize, buf[0..end], 10);
-        size *= 2;
-
-        var i: usize = 0;
-        while (i < size) : (i += 1) {
-            try discardOne(try msg.readByte(), msg);
-        }
-    }
-
     pub fn discardOne(tag: u8, msg: var) !void {
         // When we start, we have one item to consume.
         // As we inspect it we might discover that it's a container and have to
