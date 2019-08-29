@@ -50,22 +50,22 @@ test "WithAttribs" {
 
     const res = try parser.parseAlloc(WithAttribs([2]WithAttribs([]WithAttribs(i64))), allocator, &MakeComplexListWithAttributes().stream);
     testing.expectEqual(usize(2), res.attribs.len);
-    testing.expectEqualSlices(u8, "Ciao", res.attribs[0].key.data.String);
-    testing.expectEqualSlices(u8, "World", res.attribs[0].value.data.String);
-    testing.expectEqualSlices(u8, "Peach", res.attribs[1].key.data.String);
+    testing.expectEqualSlices(u8, "Ciao", res.attribs[0].key.data.String.string);
+    testing.expectEqualSlices(u8, "World", res.attribs[0].value.data.String.string);
+    testing.expectEqualSlices(u8, "Peach", res.attribs[1].key.data.String.string);
     testing.expectEqual(f64(9.99), res.attribs[1].value.data.Double);
 
     testing.expectEqual(usize(0), res.data[0].data[0].attribs.len);
     testing.expectEqual(i64(20), res.data[0].data[0].data);
 
     testing.expectEqual(usize(1), res.data[0].data[1].attribs.len);
-    testing.expectEqualSlices(u8, "ttl", res.data[0].data[1].attribs[0].key.data.String);
+    testing.expectEqualSlices(u8, "ttl", res.data[0].data[1].attribs[0].key.data.String.string);
     testing.expectEqual(i64(128), res.data[0].data[1].attribs[0].value.data.Number);
     testing.expectEqual(i64(100), res.data[0].data[1].data);
 
     testing.expectEqual(usize(0), res.data[1].attribs.len);
     testing.expectEqual(usize(1), res.data[1].data[0].attribs.len);
-    testing.expectEqualSlices(u8, "Banana", res.data[1].data[0].attribs[0].key.data.String);
+    testing.expectEqualSlices(u8, "Banana", res.data[1].data[0].attribs[0].key.data.String.string);
     testing.expectEqual(true, res.data[1].data[0].attribs[0].value.data.Bool);
     testing.expectEqual(i64(123), res.data[1].data[0].data);
 

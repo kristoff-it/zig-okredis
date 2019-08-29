@@ -61,7 +61,7 @@ pub const RESP3Parser = struct {
     /// Used by the sub-parsers and `Redis.Parser` types to delegate parsing to another
     /// parser. It's used for example by OrErr to continue parsing in the event
     /// that the reply is not a Redis error (i.e. the tag is not '!' nor '-').
-    pub fn parseFromTag(comptime T: type, tag: u8, msg: var) !T {
+    pub inline fn parseFromTag(comptime T: type, tag: u8, msg: var) !T {
         if (T == void) return VoidParser.discardOne(tag, msg);
 
         comptime var UnwrappedType = T;
@@ -73,9 +73,9 @@ pub const RESP3Parser = struct {
 
         // At this point there might be an attribute in the stream. We default
         // to discarding attributes, but some types might want access to them,
-        // like WithAttribs() for example. If there is an attribute and the type
-        // doesn't want it, we discard it and try consuming again a nil reply
-        // if the type is an optional.
+        // like WithAttribs() for example. If there is an attribute and the
+        // type doesn't want it, we discard it and try consuming again a nil
+        // reply if the type is an optional.
         if (tag == '|') {
             if (comptime traits.handlesAttributes(UnwrappedType)) {
                 return UnwrappedType.Redis.Parser.parse(tag, rootParser, msg);
@@ -135,12 +135,22 @@ pub const RESP3Parser = struct {
         return parseAllocFromTag(T, tag, allocator, msg);
     }
 
-    pub fn parseAllocFromTag(comptime T: type, tag: u8, allocator: *Allocator, msg: var) !T {
+    pub inline fn parseAllocFromTag(comptime T: type, tag: u8, allocator: *Allocator, msg: var) !T {
         if (T == void) return VoidParser.discardOne(tag, msg);
 
         comptime var UnwrappedType = T;
         switch (@typeInfo(T)) {
-            .Optional => |opt| UnwrappedType = opt.child,
+            .Optional => |opt| {
+                if (@typeId(opt.child) == .Optional) {
+                    @compileLog("heyredis doesn't support double optionals: `" ++ @typeName(T) ++ "`.");
+                }
+                UnwrappedType = opt.child;
+                // Null micro-parser:
+                if (tag == '_') {
+                    try msg.skipBytes(2);
+                    return null;
+                }
+            },
             else => {},
         }
 
@@ -173,14 +183,91 @@ pub const RESP3Parser = struct {
         // dynamically allocated numeric value and not for a single-chararacter
         // string. This is better discussed inside the string-related
         // sub-parsers.
-        comptime var InnerType = UnwrappedType;
         switch (@typeInfo(UnwrappedType)) {
             .Pointer => |ptr| switch (ptr.size) {
                 .Many => @compileError("Pointers to unknown size of elements " ++
                     "are not supported, use a slice or, for C-compatible strings, a c-pointer."),
                 // We only "hide" the pointer indirection
                 // only for pointers to single items.
-                .One => InnerType = ptr.child,
+                .One => {
+                    // It's a bit convoluted what's happening here...
+                    // There are two problems that need to be addressed:
+                    // [1] We might have pointers-to-pointers-to-pointers
+                    // [2] We might have an optional at the top-level
+                    //     (i.e T is Optional)
+                    //
+                    // The first point forces us to do recursion. It's not a
+                    // big deal because it's a bounded recursion: every step we
+                    // peel away an indirection layer, so we are able to
+                    // resolve the whole chain at comptime, resulting in the
+                    // expected static allocation stuff.  I originally tried to
+                    // turn that pointer-chasing in a for loop, but cleaning up
+                    // in case of errors, while feasible, is much more error
+                    // prone and ugly than this solution.
+                    //
+                    // What makes this more complicated is the interaction with
+                    // [2].  If we have an optional at the top level, we cannot
+                    // lose knowledge that a `null` reply is possible once we
+                    // go down a level. One might think then that trying to
+                    // find a RESP3 nil reply should be done BEFORE recurring,
+                    // and not after, and we do indeed check for it at the
+                    // beginning of the function.
+                    //
+                    // Unfortunately, this doesn't cover the case when the nil
+                    // message is preceded by an attribute. If the tag we
+                    // currently see is a '|', then we are forced to query the
+                    // topmost non-pointer non-optional type to check if they
+                    // are interested in attributes or not. We could quickly
+                    // look down the type chain using a for loop (i.e. without
+                    // recursion), and we would be able to know that
+                    // information. Unfortunately, again, this doesn't solve
+                    // all possible situations because after the attribute
+                    // there might be a nil!
+                    //
+                    // If the type declares to want attributes, to make that
+                    // decoding happen, we are forced to commit to return that
+                    // type, which would fail if then we discover that after
+                    // the attributes lies a nil.  (note: we cannot rely on
+                    // trying and catching an eventual error.GotNilReply
+                    // because parser types are not required to consume the
+                    // right amount of stream then they encounter an error)
+                    //
+                    // In light of that, the best solution is to peel away
+                    // indirections while preserving optionality (if T was an
+                    // optional to begin with).
+                    //
+                    // (going down)
+                    //     ?***WithAttribs(i64)
+                    //      ?**WithAttribs(i64)
+                    //       ?*WithAttribs(i64)
+                    //        ?WithAttribs(i64)
+                    //
+                    // When coming back up we then check if the value was
+                    // indeed nil, in which case we free all intermediate
+                    // pointer "links" (thus making cleanup very clear) and let
+                    // `null` bubble up to the top, where the original optional
+                    // type awaits the final verdict.
+                    if (@typeId(T) == .Optional) {
+                        var res = try allocator.create(ptr.child);
+                        errdefer allocator.destroy(res);
+
+                        if (try parseAllocFromTag(?ptr.child, tag, allocator, msg)) |val| {
+                            res.* = val;
+                        } else {
+                            // We found a nil, the whole gig is up, clean up and let
+                            // null bubble up.
+                            allocator.destroy(res);
+                            return null;
+                        }
+
+                        return res;
+                    } else {
+                        var res = try allocator.create(ptr.child);
+                        errdefer allocator.destroy(res);
+                        res.* = try parseAllocFromTag(ptr.child, tag, allocator, msg);
+                        return res;
+                    }
+                },
                 else => {},
             },
             else => {},
@@ -192,78 +279,43 @@ pub const RESP3Parser = struct {
         // again to decode a nil value, as it would have been obscured by the
         // interleaved attribute. Read the corresponding comment in
         // `parseFromTag` for more information.
+        var itemTag = tag;
         if (tag == '|') {
-            if (comptime traits.handlesAttributes(InnerType)) {
-                // If the type is a single-item ptr, allocate.  If it's a
-                // pointer to a slice, the check to `handlesAttributes` would
-                // have failed because it would see the pointer type and not
-                // the underlying child type, so the else branch must happen
-                // only with non-pointer types, requiring no allocation from
-                // us.
-                if (InnerType != UnwrappedType) {
-                    var res = try allocator.create(InnerType);
-                    errdefer allocator.destroy(res);
-                    res.* = try InnerType.Redis.Parser.parseAlloc(tag, rootParser, allocator, msg);
-                    return res;
-                }
-
-                return InnerType.Redis.Parser.parseAlloc(tag, rootParser, allocator, msg);
+            if (comptime traits.handlesAttributes(UnwrappedType)) {
+                return UnwrappedType.Redis.Parser.parseAlloc(tag, rootParser, allocator, msg);
             }
 
             // Here we lie to the void parser and claim we want to discard one Map element.
             try VoidParser.discardOne('%', msg);
+            itemTag = try msg.readByte();
         }
 
         // Try to decode a null if T was an optional.
         if (@typeId(T) == .Optional) {
             // Null micro-parser:
-            if (tag == '_') {
+            if (itemTag == '_') {
                 try msg.skipBytes(2);
                 return null;
             }
         }
 
-        if (comptime traits.isParserType(InnerType)) {
-            // Same as a few lines before, we allocate in case of a single item
-            // pointer. Read the previus comment for more information.
-            if (InnerType != UnwrappedType) {
-                var res: UnwrappedType = try allocator.create(InnerType);
-                errdefer allocator.destroy(res);
-                res.* = try InnerType.Redis.Parser.parseAlloc(tag, rootParser, allocator, msg);
-                return res;
-            }
-
-            return InnerType.Redis.Parser.parseAlloc(tag, rootParser, allocator, msg);
+        if (comptime traits.isParserType(UnwrappedType)) {
+            return UnwrappedType.Redis.Parser.parseAlloc(itemTag, rootParser, allocator, msg);
         }
 
-        if (InnerType != UnwrappedType) {
-            var res = try allocator.create(InnerType);
-            errdefer allocator.destroy(res);
-            res.* = try doParseAlloc(tag, InnerType, allocator, msg);
-            return res;
-        }
-
-        return doParseAlloc(tag, UnwrappedType, allocator, msg);
-    }
-
-    // The last step of parseAllocFromTag is in a separate function to reduce
-    // the amount of duplicated code caused by the fact that for single item
-    // pointers we are allocating the memory here, in the root parser. This
-    // causes code duplication because of branching.
-    inline fn doParseAlloc(tag: u8, comptime T: type, allocator: *Allocator, msg: var) !T {
-        return switch (tag) {
+        return switch (itemTag) {
             else => std.debug.panic("Found `{c}` in the main parser's switch." ++
-                " Probably a bug in a type that implements `Redis.Parser`.", tag),
+                " Probably a bug in a type that implements `Redis.Parser`.", itemTag),
             '_' => return error.GotNilReply,
             '-', '!' => return error.GotErrorReply,
-            ':' => try ifSupportedAlloc(NumberParser, T, allocator, msg),
-            ',' => try ifSupportedAlloc(DoubleParser, T, allocator, msg),
-            '#' => try ifSupportedAlloc(BoolParser, T, allocator, msg),
-            '$', '=' => try ifSupportedAlloc(BlobStringParser, T, allocator, msg),
-            '+' => try ifSupportedAlloc(SimpleStringParser, T, allocator, msg),
-            '*' => try ifSupportedAlloc(ListParser, T, allocator, msg),
-            '%' => try ifSupportedAlloc(MapParser, T, allocator, msg),
-            '(' => try ifSupportedAlloc(BigNumParser, T, allocator, msg),
+            ':' => try ifSupportedAlloc(NumberParser, UnwrappedType, allocator, msg),
+            ',' => try ifSupportedAlloc(DoubleParser, UnwrappedType, allocator, msg),
+            '#' => try ifSupportedAlloc(BoolParser, UnwrappedType, allocator, msg),
+            '$', '=' => try ifSupportedAlloc(BlobStringParser, UnwrappedType, allocator, msg),
+            '+' => try ifSupportedAlloc(SimpleStringParser, UnwrappedType, allocator, msg),
+            '*' => try ifSupportedAlloc(ListParser, UnwrappedType, allocator, msg),
+            '%' => try ifSupportedAlloc(MapParser, UnwrappedType, allocator, msg),
+            '(' => try ifSupportedAlloc(BigNumParser, UnwrappedType, allocator, msg),
         };
     }
 
@@ -281,7 +333,7 @@ pub const RESP3Parser = struct {
         const T = @typeOf(val);
         switch (@typeInfo(T)) {
             else => return,
-            .Optional => if (val) |v| freeReply(val),
+            .Optional => if (val) |v| freeReply(val, allocator),
             .Array => |arr| {
                 switch (arr.child) {
                     else => {},
@@ -361,6 +413,61 @@ pub const RESP3Parser = struct {
         }
     }
 };
+
+test "evil" {
+    const WithAttribs = @import("./types/attributes.zig").WithAttribs;
+    const allocator = std.heap.direct_allocator;
+
+    {
+        const yes = try RESP3Parser.parseAlloc(?***f32, allocator, &MakeEvilFloat().stream);
+        // defer RESP3Parser.freeReply(yes, allocator);
+
+        if (yes) |v| {
+            testing.expectEqual(f32(123.45), v.*.*.*);
+        } else {
+            unreachable;
+        }
+    }
+
+    {
+        const no = try RESP3Parser.parseAlloc(?***f32, allocator, &MakeEvilNil().stream);
+        if (no) |v| unreachable;
+    }
+
+    // {
+    //     const yes = try RESP3Parser.parseAlloc(?***WithAttribs(f32), allocator, &MakeEvilFloat().stream);
+    //     // defer RESP3Parser.freeReply(yes, allocator);
+
+    //     if (yes) |v| {
+    //         testing.expectEqual(f32(123.45), v.*.*.*.data);
+    //     } else {
+    //         unreachable;
+    //     }
+    // }
+}
+//zig fmt: off
+fn MakeEvilFloat() std.io.SliceInStream {
+    return std.io.SliceInStream.init(
+        ("|2\r\n" ++
+            "+Ciao\r\n" ++
+            "+World\r\n" ++
+            "+Peach\r\n" ++
+            ",9.99\r\n" ++
+        ",123.45\r\n")
+    [0..]);
+}
+
+fn MakeEvilNil() std.io.SliceInStream {
+    return std.io.SliceInStream.init(
+        ("|2\r\n" ++
+            "+Ciao\r\n" ++
+            "+World\r\n" ++
+            "+Peach\r\n" ++
+            ",9.99\r\n" ++
+        "_\r\n")
+    [0..]);
+}
+//zig fmt: on
 
 test "float" {
 
