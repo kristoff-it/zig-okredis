@@ -269,7 +269,7 @@ const dynReply = try client.sendAlloc(DynamicReply, allocator, "HGETALL", "myhas
 defer freeReply(dynReply, allocator);
 
 switch (dynReply.data) {
-    .Nil, .Bool, .Number, .Double, .String, .List => {},
+    .Nil, .Bool, .Number, .Double, .Bignum, .String, .List => {},
     .Map => |kvs| {
         for (kvs) |kv| {
             std.debug.warn("[{}] => '{}'\n", kv.key.data.String, kv.value.data.String);
@@ -298,8 +298,7 @@ pub const DynamicReply = struct {
         Number: i64,
         Double: f64,
         Bignum: std.math.big.Int,
-        String: []u8,
-        Verbatim: Verbatim,
+        String: Verbatim,
         Map: []KV(DynamicReply, DynamicReply),
         List: []DynamicReply,
     };

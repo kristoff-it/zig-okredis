@@ -152,8 +152,7 @@ pub fn main() !void {
     //    Bool: bool
     //    Number: i64
     //    Double: f64
-    //    String: []u8
-    //    Verbatim: Verbatim
+    //    String: Verbatim
     //    Map: []KV(DynamicReply, DynamicReply)
     //    List: []DynamicReply
     //
@@ -165,10 +164,10 @@ pub fn main() !void {
     // }
     std.debug.warn("\nmyhash decoded as DynamicReply:\n");
     switch (dynReply.data) {
-        .Nil, .Bool, .Number, .Double, .Bignum, .String, .List, .Verbatim => {},
+        .Nil, .Bool, .Number, .Double, .Bignum, .String, .List => {},
         .Map => |kvs| {
             for (kvs) |kv| {
-                std.debug.warn("\t[{}] => '{}'\n", kv.key.data.String, kv.value.data.String);
+                std.debug.warn("\t[{}] => '{}'\n", kv.key.data.String.string, kv.value.data.String);
             }
         },
     }
