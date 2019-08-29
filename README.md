@@ -217,9 +217,9 @@ switch (incrErr) {
     .Ok, .Nil => unreachable,
     .Err => |err| {
         // Alternative manual deallocation: 
-        // defer allocator.free(err.message.?)
+        // defer allocator.free(err.message)
         std.debug.warn("error code = '{}'\n", err.getCode());
-        std.debug.warn("error message = '{}'\n", err.message.?);
+        std.debug.warn("error message = '{}'\n", err.message);
     },
 }
 ```

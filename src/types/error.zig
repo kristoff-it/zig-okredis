@@ -23,7 +23,7 @@ pub const FullError = struct {
     //       To remove `message` from the struct.
     _buf: [32]u8,
     end: usize,
-    message: ?[]u8,
+    message: []u8,
 
     const Self = @This();
     pub fn getCode(self: Self) []u8 {
@@ -172,7 +172,7 @@ pub fn OrFullErr(comptime T: type) type {
                 pub fn destroy(self: Self, comptime rootParser: type, allocator: *Allocator) void {
                     switch (self) {
                         .Ok => |ok| rootParser.freeReply(ok, allocator),
-                        .Err => |err| if (err.message) |msg| allocator.free(msg),
+                        .Err => |err| allocator.free(err.message),
                         .Nil => {},
                     }
                 }
@@ -200,7 +200,7 @@ pub fn OrFullErr(comptime T: type) type {
                             try msg.skipBytes(1);
                             var size = try fmt.parseInt(usize, buf[0..end], 10);
                             var res = Self{ .Err = undefined };
-                            res.Err.message = null;
+                            res.Err.message = [0]u8{};
 
                             // Parse the Code part
                             var ch = try msg.readByte();
@@ -240,7 +240,7 @@ pub fn OrFullErr(comptime T: type) type {
                         },
                         '-' => {
                             var res = Self{ .Err = undefined };
-                            res.Err.message = null;
+                            res.Err.message = [0]u8{};
 
                             // Parse the Code part
                             var ch = try msg.readByte();
@@ -309,14 +309,14 @@ test "parse simple errors" {
         .Ok, .Nil => unreachable,
         .Err => |err| {
             testing.expectEqualSlices(u8, "😈", err.getCode());
-            testing.expectEqualSlices(u8, "your Redis belongs to us", err.message.?);
+            testing.expectEqualSlices(u8, "your Redis belongs to us", err.message);
         },
     }
     switch (try OrFullErr(u8).Redis.Parser.parseAlloc('!', fakeParser, allocator, &MakeBlobErr().stream)) {
         .Ok, .Nil => unreachable,
         .Err => |err| {
             testing.expectEqualSlices(u8, "ERRN\r\nOGOODFOOD", err.getCode());
-            testing.expectEqualSlices(u8, "redis \r\n\r\ncould not find any\r\n good food", err.message.?);
+            testing.expectEqualSlices(u8, "redis \r\n\r\ncould not find any\r\n good food", err.message);
         },
     }
 }

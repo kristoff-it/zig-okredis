@@ -97,14 +97,14 @@ pub fn main() !void {
     var incrErr = try client.sendAlloc(OrFullErr(i64), allocator, "INCR", "divine");
     switch (incrErr) {
         .Ok, .Nil => unreachable,
-        .Err => |err| std.debug.warn("error code = {} message = '{}'\n", err.getCode(), err.message.?),
+        .Err => |err| std.debug.warn("error code = {} message = '{}'\n", err.getCode(), err.message),
     }
 
     // To help deallocating resources allocated by `sendAlloc`, you can use `freeReply`.
     // `freeReply` knows how to deallocate values created by `sendAlloc`.
     const freeReply = heyredis.freeReply;
 
-    // For example, instead of freeing directly incrErr.Err.message.?, you can do this:
+    // For example, instead of freeing directly incrErr.Err.message, you can do this:
     defer freeReply(incrErr, allocator);
 
     // In general, sendAlloc will only allocate where the type you specify is a
