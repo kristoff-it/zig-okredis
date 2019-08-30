@@ -24,8 +24,8 @@ const traits = @import("./traits.zig");
 ///     - RESP Strings can be parsed to numbers (the parser will use fmt.parse{Int,Float})
 ///     - RESP Maps can be parsed into std.HashMaps and Structs
 ///
-/// Additionally, the parser can be extented. If the type requested declares
-/// a `Redis.Parser` member, then their .parse/.parseAlloc will be called.
+/// Additionally, the parser can be extented. If the type requested has a
+/// `Redis.Parser` declaration, then their .parse/.parseAlloc will be called.
 ///
 /// There are two included types that implement the `Redis.Parser` trait
 ///     - OrErr(T) is a union over a user type that parses Redis errors
@@ -122,6 +122,9 @@ pub const RESP3Parser = struct {
     // The whole job of this function is to cut away calls to sub-parsers if we
     // know that the Zig type is not supported.  It's a good way to report a
     // comptime error if no parser supports a given type.
+    // We can't hard-code @compileErrors directly into each parser without
+    // `isSupported` because the various parsing switches depend on `tag` which
+    // is a runtime value, so we can't just keep the branches we are happy with.
     inline fn ifSupported(comptime parser: type, comptime T: type, msg: var) !T {
         return if (comptime parser.isSupported(T))
             parser.parse(T, rootParser, msg)
@@ -176,37 +179,32 @@ pub const RESP3Parser = struct {
         // "concrete" type, by just writing the result of their invocation into
         // dyn memory allocated by us. It was a bit confusing in the beginning
         // to decide what should sub-parsers know or not, but this seems a good
-        // balance. There are small implications with how certain types get
-        // interpreted, but it's mostly corner-cases with little pratical
-        // utility, and each has an escape hatch. An example of ambiguity is
-        // that asking for a *u8 will be interpreted as a request for a
-        // dynamically allocated numeric value and not for a single-chararacter
-        // string. This is better discussed inside the string-related
-        // sub-parsers.
+        // balance.
         switch (@typeInfo(UnwrappedType)) {
             .Pointer => |ptr| switch (ptr.size) {
                 .Many => @compileError("Pointers to unknown size of elements " ++
                     "are not supported, use a slice or, for C-compatible strings, a c-pointer."),
-                // We only "hide" the pointer indirection
-                // only for pointers to single items.
                 .One => {
-                    // It's a bit convoluted what's happening here...
+                    // We are hiding the pointer indirection to sub-parsers,
+                    // like stated in the previous comment, but this part
+                    // is non-trivial.
+                    //
                     // There are two problems that need to be addressed:
-                    // [1] We might have pointers-to-pointers-to-pointers
+                    // [1] We might have pointers-to-pointers-to-pointers-etc
                     // [2] We might have an optional at the top-level
                     //     (i.e T is Optional)
                     //
                     // The first point forces us to do recursion. It's not a
-                    // big deal because it's a bounded recursion: every step we
-                    // peel away an indirection layer, so we are able to
+                    // big deal because it's a bounded recursion: in every step
+                    // we peel away an indirection layer, so we are able to
                     // resolve the whole chain at comptime, resulting in the
-                    // expected static allocation stuff.  I originally tried to
-                    // turn that pointer-chasing in a for loop, but cleaning up
+                    // expected static allocation stuff. I originally tried to
+                    // do all the pointer-chasing in a for loop, but cleaning up
                     // in case of errors, while feasible, is much more error
                     // prone and ugly than this solution.
                     //
                     // What makes this more complicated is the interaction with
-                    // [2].  If we have an optional at the top level, we cannot
+                    // [2]. If we have an optional at the top level, we cannot
                     // lose knowledge that a `null` reply is possible once we
                     // go down a level. One might think then that trying to
                     // find a RESP3 nil reply should be done BEFORE recurring,
@@ -227,30 +225,27 @@ pub const RESP3Parser = struct {
                     // If the type declares to want attributes, to make that
                     // decoding happen, we are forced to commit to return that
                     // type, which would fail if then we discover that after
-                    // the attributes lies a nil.  (note: we cannot rely on
-                    // trying and catching an eventual error.GotNilReply
+                    // the attributes lies a nil.  (NOTE: we cannot rely on
+                    // blindly trying and catching an eventual error.GotNilReply
                     // because parser types are not required to consume the
-                    // right amount of stream then they encounter an error)
+                    // right amount of stream when they encounter an error)
                     //
                     // In light of that, the best solution is to peel away
-                    // indirections while preserving optionality (if T was an
-                    // optional to begin with).
+                    // indirections while preserving optionality.
                     //
-                    // (going down)
-                    //     ?***WithAttribs(i64)
-                    //      ?**WithAttribs(i64)
-                    //       ?*WithAttribs(i64)
-                    //        ?WithAttribs(i64)
-                    //
-                    // When coming back up we then check if the value was
+                    // When coming back up, we then check if the value was
                     // indeed nil, in which case we free all intermediate
                     // pointer "links" (thus making cleanup very clear) and let
                     // `null` bubble up to the top, where the original optional
                     // type awaits the final verdict.
+                    //
+                    // Check the "evil indirection" test down below for a concrete example.
                     if (@typeId(T) == .Optional) {
+                        // We allocate the real type...
                         var res = try allocator.create(ptr.child);
                         errdefer allocator.destroy(res);
 
+                        // ...but we ask for an optional when recurring
                         if (try parseAllocFromTag(?ptr.child, tag, allocator, msg)) |val| {
                             res.* = val;
                         } else {
@@ -331,9 +326,10 @@ pub const RESP3Parser = struct {
     // TODO: free stdlib types!
     pub fn freeReply(val: var, allocator: *Allocator) void {
         const T = @typeOf(val);
+
         switch (@typeInfo(T)) {
             else => return,
-            .Optional => if (val) |v| freeReply(val, allocator),
+            .Optional => if (val) |v| freeReply(v, allocator),
             .Array => |arr| {
                 switch (arr.child) {
                     else => {},
@@ -414,13 +410,25 @@ pub const RESP3Parser = struct {
     }
 };
 
-test "evil" {
+test "parser" {
+    _ = @import("./parser/t_bignum.zig");
+    _ = @import("./parser/t_number.zig");
+    _ = @import("./parser/t_bool.zig");
+    _ = @import("./parser/t_string_blob.zig");
+    _ = @import("./parser/t_string_simple.zig");
+    _ = @import("./parser/t_double.zig");
+    _ = @import("./parser/t_list.zig");
+    _ = @import("./parser/t_map.zig");
+    _ = @import("./parser/void.zig");
+}
+
+test "evil indirection" {
     const WithAttribs = @import("./types/attributes.zig").WithAttribs;
     const allocator = std.heap.direct_allocator;
 
     {
         const yes = try RESP3Parser.parseAlloc(?***f32, allocator, &MakeEvilFloat().stream);
-        // defer RESP3Parser.freeReply(yes, allocator);
+        defer RESP3Parser.freeReply(yes, allocator);
 
         if (yes) |v| {
             testing.expectEqual(f32(123.45), v.*.*.*);
@@ -500,18 +508,6 @@ fn Make1Float() std.io.SliceInStream {
 
 fn Make2Float() std.io.SliceInStream {
     return std.io.SliceInStream.init("*2\r\n,1.1\r\n,2.2\r\n"[0..]);
-}
-
-test "parser" {
-    _ = @import("./parser/t_bignum.zig");
-    _ = @import("./parser/t_number.zig");
-    _ = @import("./parser/t_bool.zig");
-    _ = @import("./parser/t_string_blob.zig");
-    _ = @import("./parser/t_string_simple.zig");
-    _ = @import("./parser/t_double.zig");
-    _ = @import("./parser/t_list.zig");
-    _ = @import("./parser/t_map.zig");
-    _ = @import("./parser/void.zig");
 }
 
 test "optional" {

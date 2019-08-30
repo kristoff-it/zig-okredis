@@ -3,20 +3,22 @@ const fmt = std.fmt;
 
 /// A parser that consumes one full reply and discards it. It's written as a
 /// dedicated parser because it doesn't require recursion to consume the right
-/// amount of input. It's also possible to use it to consume just one attribute
-/// element by claiming to have found a map instead. This trick is used by the
-/// root parser in the initial setup of both `parse` and `parseAlloc`.
+/// amount of input and, given the fact that the type doesn't "peel away",
+/// recursion would look unbounded to the type system.
+/// It can also be used to consume just one attribute element by claiming to
+/// have found a map instead. This trick is used by the root parser in the
+/// initial setup of both `parse` and `parseAlloc`.
 pub const VoidParser = struct {
     pub fn discardOne(tag: u8, msg: var) !void {
         // When we start, we have one item to consume.
-        // As we inspect it we might discover that it's a container and have to
-        // increase our items count.
+        // As we inspect it, we might discover that it's a container, requiring
+        // us to increase our items count.
         var itemTag = tag;
         var itemsToConsume: usize = 1;
         while (itemsToConsume > 0) {
             itemsToConsume -= 1;
             switch (itemTag) {
-                else => std.debug.panic("Found `{}` in the *VOID* parser's switch." ++
+                else => std.debug.panic("Found `{c}` in the *VOID* parser's switch." ++
                     " Probably a bug in a type that implements `Redis.Parser`.", itemTag),
                 '-', '!' => return error.GotErrorReply,
                 '_' => try msg.skipBytes(2), // `_\r\n`
