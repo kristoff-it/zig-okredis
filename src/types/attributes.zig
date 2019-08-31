@@ -20,8 +20,8 @@ pub fn WithAttribs(comptime T: type) type {
                 }
 
                 pub fn destroy(self: Self, comptime rootParser: type, allocator: *Allocator) void {
-                    rootParser.freeReply(attribs, allocator);
-                    rootParser.freeReply(data, allocator);
+                    rootParser.freeReply(self.attribs, allocator);
+                    rootParser.freeReply(self.data, allocator);
                 }
 
                 pub fn parseAlloc(tag: u8, comptime rootParser: type, allocator: *Allocator, msg: var) !Self {

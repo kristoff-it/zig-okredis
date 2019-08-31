@@ -45,6 +45,8 @@ pub fn OrErr(comptime T: type) type {
         const Self = @This();
         pub const Redis = struct {
             pub const Parser = struct {
+                pub const NoOptionalWrapper = true;
+
                 pub fn parse(tag: u8, comptime rootParser: type, msg: var) !Self {
                     return switch (tag) {
                         '_', '-', '!' => internalParse(tag, rootParser, msg),
@@ -165,6 +167,8 @@ pub fn OrFullErr(comptime T: type) type {
         const Self = @This();
         pub const Redis = struct {
             pub const Parser = struct {
+                pub const NoOptionalWrapper = true;
+
                 pub fn parse(tag: u8, comptime rootParser: type, msg: var) !Self {
                     @compileError("OrFullErr requires an allocator, use `OrErr` to parse just the error code without the need of an allocator.");
                 }

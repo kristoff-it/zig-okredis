@@ -58,6 +58,22 @@ pub fn handlesAttributes(comptime T: type) bool {
     return false;
 }
 
+/// A type that doesn't want to be wrapped directly in an optional because
+/// it would have ill-formed / unclear semantics. An example of this are
+/// types that read attributes. For those types this trait defaults to `true`
+pub fn noOptionalWrapper(comptime T: type) bool {
+    if (comptime isParserType(T)) {
+        if (@hasDecl(T.Redis.Parser, "NoOptionalWrapper")) {
+            return T.Redis.Parser.NoOptionalWrapper;
+        } else {
+            if (@hasDecl(T.Redis.Parser, "HandlesAttributes")) {
+                return T.Redis.Parser.HandlesAttributes;
+            }
+        }
+    }
+    return false;
+}
+
 /// A type that knows how to serialize itself as one or more arguments to a
 /// Redis command. The RESP3 protocol is used in a asymmetrical way by Redis,
 /// so this is NOT the inverse operation of parsing. As an example, a struct

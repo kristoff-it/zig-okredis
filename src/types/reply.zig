@@ -29,6 +29,7 @@ pub const DynamicReply = struct {
     pub const Redis = struct {
         pub const Parser = struct {
             pub const HandlesAttributes = true;
+
             pub fn parse(tag: u8, comptime _: type, msg: var) !DynamicReply {
                 @compileError("DynamicReply requires an allocator. Use `sendAlloc`!");
             }

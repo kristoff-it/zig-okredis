@@ -53,7 +53,7 @@ pub const RESP3Parser = struct {
     /// As such it doesn't support pointers, but it can still use types
     /// that implement the `Redis.Parser` trait. The easiest way to decode strings
     /// using this function is to use a FixBuf wherever a string is expected.
-    pub inline fn parse(comptime T: type, msg: var) !T {
+    pub fn parse(comptime T: type, msg: var) !T {
         const tag = try msg.readByte();
         return parseFromTag(T, tag, msg);
     }
@@ -61,13 +61,26 @@ pub const RESP3Parser = struct {
     /// Used by the sub-parsers and `Redis.Parser` types to delegate parsing to another
     /// parser. It's used for example by OrErr to continue parsing in the event
     /// that the reply is not a Redis error (i.e. the tag is not '!' nor '-').
-    pub inline fn parseFromTag(comptime T: type, tag: u8, msg: var) !T {
+    pub fn parseFromTag(comptime T: type, tag: u8, msg: var) !T {
         if (T == void) return VoidParser.discardOne(tag, msg);
 
         comptime var UnwrappedType = T;
         switch (@typeInfo(T)) {
             .Pointer => @compileError("`parse` can't perform allocations so it can't handle pointers, use `parseAlloc` instead."),
-            .Optional => |opt| UnwrappedType = opt.child,
+            .Optional => |opt| {
+                UnwrappedType = opt.child;
+
+                if (@typeId(opt.child) == .Optional) {
+                    @compileError("heyredis doesn't support double optionals: `" ++ @typeName(T) ++ "`.");
+                }
+                if (comptime traits.noOptionalWrapper(opt.child)) {
+                    @compileError("The type " ++
+                        @typeName(opt.child) ++
+                        " declares it is wrong to wrap it directly inside an optional. " ++
+                        "Types like `OrErr` and `WithAttribs` should not be optional. " ++
+                        "Make the type they wrap optional instead. For example: ?WithAttribs(i64) -> WithAttribs(?i64)");
+                }
+            },
             else => {},
         }
 
@@ -135,19 +148,27 @@ pub const RESP3Parser = struct {
     /// This is the interface that accepts an allocator.
     pub fn parseAlloc(comptime T: type, allocator: *Allocator, msg: var) !T {
         const tag = try msg.readByte();
-        return parseAllocFromTag(T, tag, allocator, msg);
+        var x: T = try parseAllocFromTag(T, tag, allocator, msg);
+        return x;
     }
 
-    pub inline fn parseAllocFromTag(comptime T: type, tag: u8, allocator: *Allocator, msg: var) !T {
+    pub fn parseAllocFromTag(comptime T: type, tag: u8, allocator: *Allocator, msg: var) !T {
         if (T == void) return VoidParser.discardOne(tag, msg);
 
         comptime var UnwrappedType = T;
         switch (@typeInfo(T)) {
             .Optional => |opt| {
-                if (@typeId(opt.child) == .Optional) {
-                    @compileLog("heyredis doesn't support double optionals: `" ++ @typeName(T) ++ "`.");
-                }
                 UnwrappedType = opt.child;
+                if (@typeId(opt.child) == .Optional) {
+                    @compileError("heyredis doesn't support double optionals: `" ++ @typeName(T) ++ "`.");
+                }
+                if (comptime traits.noOptionalWrapper(opt.child)) {
+                    @compileError("The type `" ++
+                        @typeName(T) ++
+                        "` declares it is wrong to wrap it directly inside an optional. " ++
+                        "Types like `OrErr` and `WithAttribs` should not be optional. " ++
+                        "Make the type they wrap optional instead. For example: ?WithAttribs(i64) -> WithAttribs(?i64)");
+                }
                 // Null micro-parser:
                 if (tag == '_') {
                     try msg.skipBytes(2);
@@ -242,7 +263,7 @@ pub const RESP3Parser = struct {
                     // Check the "evil indirection" test down below for a concrete example.
                     if (@typeId(T) == .Optional) {
                         // We allocate the real type...
-                        var res = try allocator.create(ptr.child);
+                        var res: *ptr.child = try allocator.create(ptr.child);
                         errdefer allocator.destroy(res);
 
                         // ...but we ask for an optional when recurring
@@ -257,7 +278,7 @@ pub const RESP3Parser = struct {
 
                         return res;
                     } else {
-                        var res = try allocator.create(ptr.child);
+                        var res: *ptr.child = try allocator.create(ptr.child);
                         errdefer allocator.destroy(res);
                         res.* = try parseAllocFromTag(ptr.child, tag, allocator, msg);
                         return res;
@@ -277,7 +298,8 @@ pub const RESP3Parser = struct {
         var itemTag = tag;
         if (tag == '|') {
             if (comptime traits.handlesAttributes(UnwrappedType)) {
-                return UnwrappedType.Redis.Parser.parseAlloc(tag, rootParser, allocator, msg);
+                var x: UnwrappedType = try UnwrappedType.Redis.Parser.parseAlloc(tag, rootParser, allocator, msg);
+                return x;
             }
 
             // Here we lie to the void parser and claim we want to discard one Map element.
@@ -295,7 +317,8 @@ pub const RESP3Parser = struct {
         }
 
         if (comptime traits.isParserType(UnwrappedType)) {
-            return UnwrappedType.Redis.Parser.parseAlloc(itemTag, rootParser, allocator, msg);
+            var x: UnwrappedType = try UnwrappedType.Redis.Parser.parseAlloc(itemTag, rootParser, allocator, msg);
+            return x;
         }
 
         return switch (itemTag) {
@@ -442,16 +465,18 @@ test "evil indirection" {
         if (no) |v| unreachable;
     }
 
-    // {
-    //     const yes = try RESP3Parser.parseAlloc(?***WithAttribs(f32), allocator, &MakeEvilFloat().stream);
-    //     // defer RESP3Parser.freeReply(yes, allocator);
+    {
+        // const OrErr = @import("./types/error.zig").OrErr;
+        // const yes = try RESP3Parser.parseAlloc(***WithAttribs(?***f32), allocator, &MakeEvilFloat().stream);
+        // defer RESP3Parser.freeReply(yes, allocator);
+        // std.debug.warn("{?}\n", yes.*.*.*.attribs);
 
-    //     if (yes) |v| {
-    //         testing.expectEqual(f32(123.45), v.*.*.*.data);
-    //     } else {
-    //         unreachable;
-    //     }
-    // }
+        // if (yes.*.*.data) |v| {
+        //     // testing.expectEqual(f32(123.45), v.*.*.*);
+        // } else {
+        //     unreachable;
+        // }
+    }
 }
 //zig fmt: off
 fn MakeEvilFloat() std.io.SliceInStream {
