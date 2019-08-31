@@ -13,6 +13,7 @@ const BlobStringParser = @import("./parser/t_string_blob.zig").BlobStringParser;
 const SimpleStringParser = @import("./parser/t_string_simple.zig").SimpleStringParser;
 const DoubleParser = @import("./parser/t_double.zig").DoubleParser;
 const ListParser = @import("./parser/t_list.zig").ListParser;
+const SetParser = @import("./parser/t_set.zig").SetParser;
 const MapParser = @import("./parser/t_map.zig").MapParser;
 const traits = @import("./traits.zig");
 
@@ -124,6 +125,7 @@ pub const RESP3Parser = struct {
             '$', '=' => try ifSupported(BlobStringParser, UnwrappedType, msg),
             '+' => try ifSupported(SimpleStringParser, UnwrappedType, msg),
             '*' => try ifSupported(ListParser, UnwrappedType, msg),
+            '~' => try ifSupported(SetParser, UnwrappedType, msg),
             '%' => try ifSupported(MapParser, UnwrappedType, msg),
             // The bignum parser needs an allocator so it will refuse
             // all types when calling .isSupported() on it.
@@ -206,61 +208,11 @@ pub const RESP3Parser = struct {
                 .Many => @compileError("Pointers to unknown size of elements " ++
                     "are not supported, use a slice or, for C-compatible strings, a c-pointer."),
                 .One => {
-                    // We are hiding the pointer indirection to sub-parsers,
-                    // like stated in the previous comment, but this part
-                    // is non-trivial.
-                    //
-                    // There are two problems that need to be addressed:
-                    // [1] We might have pointers-to-pointers-to-pointers-etc
-                    // [2] We might have an optional at the top-level
-                    //     (i.e T is Optional)
-                    //
-                    // The first point forces us to do recursion. It's not a
-                    // big deal because it's a bounded recursion: in every step
-                    // we peel away an indirection layer, so we are able to
-                    // resolve the whole chain at comptime, resulting in the
-                    // expected static allocation stuff. I originally tried to
-                    // do all the pointer-chasing in a for loop, but cleaning up
-                    // in case of errors, while feasible, is much more error
-                    // prone and ugly than this solution.
-                    //
-                    // What makes this more complicated is the interaction with
-                    // [2]. If we have an optional at the top level, we cannot
-                    // lose knowledge that a `null` reply is possible once we
-                    // go down a level. One might think then that trying to
-                    // find a RESP3 nil reply should be done BEFORE recurring,
-                    // and not after, and we do indeed check for it at the
-                    // beginning of the function.
-                    //
-                    // Unfortunately, this doesn't cover the case when the nil
-                    // message is preceded by an attribute. If the tag we
-                    // currently see is a '|', then we are forced to query the
-                    // topmost non-pointer non-optional type to check if they
-                    // are interested in attributes or not. We could quickly
-                    // look down the type chain using a for loop (i.e. without
-                    // recursion), and we would be able to know that
-                    // information. Unfortunately, again, this doesn't solve
-                    // all possible situations because after the attribute
-                    // there might be a nil!
-                    //
-                    // If the type declares to want attributes, to make that
-                    // decoding happen, we are forced to commit to return that
-                    // type, which would fail if then we discover that after
-                    // the attributes lies a nil.  (NOTE: we cannot rely on
-                    // blindly trying and catching an eventual error.GotNilReply
-                    // because parser types are not required to consume the
-                    // right amount of stream when they encounter an error)
-                    //
-                    // In light of that, the best solution is to peel away
-                    // indirections while preserving optionality.
-                    //
-                    // When coming back up, we then check if the value was
-                    // indeed nil, in which case we free all intermediate
-                    // pointer "links" (thus making cleanup very clear) and let
-                    // `null` bubble up to the top, where the original optional
-                    // type awaits the final verdict.
-                    //
-                    // Check the "evil indirection" test down below for a concrete example.
+                    // If we have to chase a ptr-to-ptr chain AND the top type
+                    // is an optional, we must carry the optionality down the
+                    // recursive chain. Attributes make it impossible to check
+                    // reliably for nil from the top-level, so we cannot simplify
+                    // this admiteddly weird way of recursing.
                     if (@typeId(T) == .Optional) {
                         // We allocate the real type...
                         var res: *ptr.child = try allocator.create(ptr.child);
@@ -332,6 +284,7 @@ pub const RESP3Parser = struct {
             '$', '=' => try ifSupportedAlloc(BlobStringParser, UnwrappedType, allocator, msg),
             '+' => try ifSupportedAlloc(SimpleStringParser, UnwrappedType, allocator, msg),
             '*' => try ifSupportedAlloc(ListParser, UnwrappedType, allocator, msg),
+            '~' => try ifSupportedAlloc(SetParser, UnwrappedType, allocator, msg),
             '%' => try ifSupportedAlloc(MapParser, UnwrappedType, allocator, msg),
             '(' => try ifSupportedAlloc(BigNumParser, UnwrappedType, allocator, msg),
         };
@@ -441,6 +394,7 @@ test "parser" {
     _ = @import("./parser/t_string_simple.zig");
     _ = @import("./parser/t_double.zig");
     _ = @import("./parser/t_list.zig");
+    _ = @import("./parser/t_set.zig");
     _ = @import("./parser/t_map.zig");
     _ = @import("./parser/void.zig");
 }

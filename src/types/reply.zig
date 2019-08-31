@@ -23,7 +23,7 @@ pub const DynamicReply = struct {
         String: Verbatim,
         Map: []KV(DynamicReply, DynamicReply),
         List: []DynamicReply,
-        // Set: std.AutoHash(Reply, void),
+        Set: []DynamicReply,
     };
 
     pub const Redis = struct {
@@ -45,7 +45,7 @@ pub const DynamicReply = struct {
                         x.data.Bignum.deinit();
                     },
                     .String => |ver| rootParser.freeReply(ver, allocator),
-                    .List => |lst| {
+                    .List, .Set => |lst| {
                         for (lst) |elem| destroy(elem, rootParser, allocator);
                         allocator.free(lst);
                     },
@@ -78,6 +78,7 @@ pub const DynamicReply = struct {
                     '+', '$', '=' => Data{ .String = rootParser.parseAllocFromTag(Verbatim, itemTag, allocator, msg) catch return E },
                     '%' => Data{ .Map = rootParser.parseAllocFromTag([]KV(DynamicReply, DynamicReply), '%', allocator, msg) catch return E },
                     '*' => Data{ .List = rootParser.parseAllocFromTag([]DynamicReply, '*', allocator, msg) catch return E },
+                    '~' => Data{ .Set = rootParser.parseAllocFromTag([]DynamicReply, '~', allocator, msg) catch return E },
                     '(' => Data{ .Bignum = rootParser.parseAllocFromTag(std.math.big.Int, '(', allocator, msg) catch return E },
                 };
 

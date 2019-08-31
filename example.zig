@@ -146,25 +146,9 @@ pub fn main() !void {
     defer freeReply(dynReply, allocator);
 
     // DynamicReply is a union that represents all possible replies.
-    // The basic types are straightforward, container types are recursive and
-    // maps have an intermediaty KV struct:
-    //    Nil: void
-    //    Bool: bool
-    //    Number: i64
-    //    Double: f64
-    //    String: Verbatim
-    //    Map: []KV(DynamicReply, DynamicReply)
-    //    List: []DynamicReply
-    //
-    // pub fn KV(comptime K: type, comptime V: type) type {
-    //     return struct {
-    //         key: K,
-    //         value: V,
-    //     };
-    // }
     std.debug.warn("\nmyhash decoded as DynamicReply:\n");
     switch (dynReply.data) {
-        .Nil, .Bool, .Number, .Double, .Bignum, .String, .List => {},
+        .Nil, .Bool, .Number, .Double, .Bignum, .String, .List, .Set => {},
         .Map => |kvs| {
             for (kvs) |kv| {
                 std.debug.warn("\t[{}] => '{}'\n", kv.key.data.String.string, kv.value.data.String);

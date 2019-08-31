@@ -5,6 +5,7 @@ const fmt = std.fmt;
 const FixBuf = @import("../types/fixbuf.zig").FixBuf;
 const perfectHash = @import("../lib/perfect_hash.zig").perfectHash;
 
+// TODO: decide what tho do with this weird trait.
 inline fn isFragmentType(comptime T: type) bool {
     const tid = @typeId(T);
     return (tid == .Struct or tid == .Enum or tid == .Union) and

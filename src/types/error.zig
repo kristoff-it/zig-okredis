@@ -4,8 +4,6 @@ const testing = std.testing;
 const Allocator = std.mem.Allocator;
 
 pub const Error = struct {
-    // TODO: Size based on @sizeOf(T). If we have to
-    //       allocate more space anyway, let's use it.
     _buf: [32]u8,
     end: usize,
 
@@ -16,11 +14,6 @@ pub const Error = struct {
 };
 
 pub const FullError = struct {
-    // TODO: Size based on @sizeOf(T). If we have to
-    //       allocate more space anyway, let's use it.
-    // TODO: How hard would it be to make different
-    //       Ts based on `parse` vs `parseAlloc`?
-    //       To remove `message` from the struct.
     _buf: [32]u8,
     end: usize,
     message: []u8,
