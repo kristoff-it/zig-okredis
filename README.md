@@ -38,7 +38,7 @@ pub fn main() !void {
 
     try client.send(void, "SET", "key", "42");
     const reply = try client.send(i64, "GET", "key");
-    if (reply != 42) unreachable;
+    if (reply != 42) @panic("out of towels");
 }
 ```
 
