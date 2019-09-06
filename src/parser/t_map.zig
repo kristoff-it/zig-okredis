@@ -69,7 +69,7 @@ pub const MapParser = struct {
                         fieldNames[i] = f.name;
                     }
                 }
-                comptime var h = perfectHash(fieldNames);
+                // comptime var h = perfectHash(fieldNames);
 
                 if (stc.fields.len != size) return error.LengthMismatch;
                 const Buf = FixBuf(max_len);
@@ -77,8 +77,14 @@ pub const MapParser = struct {
                 var i: usize = 0;
                 while (i < size) : (i += 1) {
                     const b = try rootParser.parse(Buf, msg);
-                    const case = h.hash(b.toSlice());
-                    if (!try parseField(stc.fields, h, rootParser, &res, case, msg)) return error.UnexpectedKey;
+                    // const case = h.hash(b.toSlice());
+                    inline for (stc.fields) |f| {
+                        if (std.mem.eql(u8, f.name, b.toSlice())) {
+                            @field(res, f.name) = try rootParser.parse(f.field_type, msg);
+                        }
+                    }
+
+                    // if (!try parseField(stc.fields, h, rootParser, &res, case, msg)) return error.UnexpectedKey;
                     // TODO: remove this workaround
                     // const found = blk: {
                     // inline for (stc.fields) |f| {
@@ -187,7 +193,7 @@ pub const MapParser = struct {
                         fieldNames[i] = f.name;
                     }
                 }
-                comptime var h = perfectHash(fieldNames);
+                // comptime var h = perfectHash(fieldNames);
 
                 if (stc.fields.len != size) return error.LengthMismatch;
                 const Buf = FixBuf(max_len);
@@ -195,8 +201,13 @@ pub const MapParser = struct {
                 var i: usize = 0;
                 while (i < size) : (i += 1) {
                     const b = try rootParser.parse(Buf, msg);
-                    const case = h.hash(b.toSlice());
-                    if (!try parseFieldAlloc(stc.fields, h, rootParser, &res, case, allocator, msg)) return error.UnexpectedKey;
+                    inline for (stc.fields) |f| {
+                        if (std.mem.eql(u8, f.name, b.toSlice())) {
+                            @field(res, f.name) = try rootParser.parseAlloc(f.field_type, allocator, msg);
+                        }
+                    }
+                    // const case = h.hash(b.toSlice());
+                    // if (!try parseFieldAlloc(stc.fields, h, rootParser, &res, case, allocator, msg)) return error.UnexpectedKey;
                     // TODO: remove this workaround
                     // const found = blk: {
                     // inline for (stc.fields) |f| {

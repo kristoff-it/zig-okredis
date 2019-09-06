@@ -18,7 +18,9 @@ This client aims to offer an interface with great ergonomics without compromisin
 The client has two main interfaces to send commands: `send` and `sendAlloc`. Following Zig's mantra of making dynamic allocations explicit, only `sendAlloc` can allocate dynamic memory, and only does so by using a user-provided allocator. 
 
 The way this is achieved is by making good use of RESP3's typed responses and Zig's metaprogramming facilities.
-The library uses compile-time reflection to specialize down to the parsing level, allowing heyredis to decode whenever possible a reply directly into a function frame, **without any intermediate dynamic allocation**. If you want more information about Zig's comptime, I wrote a blog post: https://kristoff.it/blog/what-is-zig-comptime.
+The library uses compile-time reflection to specialize down to the parsing level, allowing heyredis to decode whenever possible a reply directly into a function frame, **without any intermediate dynamic allocation**. If you want more information about Zig's comptime:
+- [Official documentation](https://ziglang.org/documentation/master/#comptime)
+- [What is Zig's Comptime?] https://kristoff.it/blog/what-is-zig-comptime.
 
 By using `sendAlloc` you can decode replies with arbrirary shape at the cost of performing dynamic allocations. The interface takes an allocator as input, so the user can setup custom allocation schemes such as [Arenas](https://en.wikipedia.org/wiki/Region-based_memory_management).
 
@@ -30,7 +32,8 @@ const heyredis = @import("./src/heyredis.zig");
 const Client = heyredis.Client;
 
 pub fn main() !void {
-    var client = try Client.initIp4("127.0.0.1", 6379);
+    var client: Client = undefined;
+    try client.initIp4("127.0.0.1", 6379);
     defer client.close();
 
     try client.send(void, "SET", "key", "42");
@@ -353,10 +356,8 @@ TODO
 
 
 ## TODOS
-- Add all RESP3 types
 - Design Zig errors
 - Add safety checks when the command is comptime known (e.g. SET takes only 2 arguments)
-- More support for stdlib types (buffer, hashmap, bignum, ...)
 - Better connection handling (buffering, ...)
 - Support for async/await
 - Pub/Sub

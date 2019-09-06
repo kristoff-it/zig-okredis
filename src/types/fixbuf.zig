@@ -9,7 +9,7 @@ pub fn FixBuf(comptime size: usize) type {
         len: usize,
 
         const Self = @This();
-        pub fn toSlice(self: *const Self) []u8 {
+        pub fn toSlice(self: *const Self) []const u8 {
             return self.buf[0..self.len];
         }
 

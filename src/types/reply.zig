@@ -21,9 +21,9 @@ pub const DynamicReply = struct {
         Double: f64,
         Bignum: std.math.big.Int,
         String: Verbatim,
-        Map: []KV(DynamicReply, DynamicReply),
         List: []DynamicReply,
         Set: []DynamicReply,
+        Map: []KV(DynamicReply, DynamicReply),
     };
 
     pub const Redis = struct {

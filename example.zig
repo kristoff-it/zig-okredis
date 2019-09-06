@@ -4,7 +4,8 @@ const Client = heyredis.Client;
 
 pub fn main() !void {
     // Connect
-    var client = try Client.initIp4("127.0.0.1", 6379);
+    var client: Client = undefined;
+    try client.initIp4("127.0.0.1", 6379);
     defer client.close();
 
     //   -
