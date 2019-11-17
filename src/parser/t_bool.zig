@@ -17,7 +17,7 @@ pub const BoolParser = struct {
         try msg.skipBytes(2);
         return switch (@typeId(T)) {
             .Bool => check_bool(ch),
-            .Int, .Float => if (check_bool(ch)) T(1) else T(0),
+            .Int, .Float => if (check_bool(ch)) @as(T, 1) else @as(T, 0),
             else => @compileError("Unhandled Conversion"),
         };
     }

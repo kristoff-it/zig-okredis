@@ -6,7 +6,7 @@
 </p>
 
 <p align="center">
-    Zero-allocation client for Redis (RESP3 Only)
+    Zero-allocation client for Redis 6+ (RESP3 Only)
 </p>
 
 ## Handy and Efficient
@@ -18,11 +18,11 @@ This client aims to offer an interface with great ergonomics without compromisin
 The client has two main interfaces to send commands: `send` and `sendAlloc`. Following Zig's mantra of making dynamic allocations explicit, only `sendAlloc` can allocate dynamic memory, and only does so by using a user-provided allocator. 
 
 The way this is achieved is by making good use of RESP3's typed responses and Zig's metaprogramming facilities.
-The library uses compile-time reflection to specialize down to the parsing level, allowing heyredis to decode whenever possible a reply directly into a function frame, **without any intermediate dynamic allocation**. If you want more information about Zig's comptime:
+The library uses compile-time reflection to specialize down to the parser level, allowing heyredis to decode whenever possible a reply directly into a function frame, **without any intermediate dynamic allocation**. If you want more information about Zig's comptime:
 - [Official documentation](https://ziglang.org/documentation/master/#comptime)
-- [What is Zig's Comptime?](https://kristoff.it/blog/what-is-zig-comptime).
+- [What is Zig's Comptime?](https://kristoff.it/blog/what-is-zig-comptime)
 
-By using `sendAlloc` you can decode replies with arbrirary shape at the cost of performing dynamic allocations. The interface takes an allocator as input, so the user can setup custom allocation schemes such as [Arenas](https://en.wikipedia.org/wiki/Region-based_memory_management).
+By using `sendAlloc` you can decode replies with arbrirary shape at the cost of occasionally performing dynamic allocations. The interface takes an allocator as input, so the user can setup custom allocation schemes such as [arenas](https://en.wikipedia.org/wiki/Region-based_memory_management).
 
 ## Quickstart
 

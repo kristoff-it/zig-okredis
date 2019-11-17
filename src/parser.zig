@@ -114,23 +114,23 @@ pub const RESP3Parser = struct {
         }
 
         // Call the right parser based on the tag we just read from the stream.
-        return switch (tag) {
+        switch (tag) {
             else => std.debug.panic("Found `{}` in the main parser's switch." ++
                 " Probably a bug in a type that implements `Redis.Parser`.", tag),
             '_' => return error.GotNilReply,
             '-', '!' => return error.GotErrorReply,
-            ':' => try ifSupported(NumberParser, UnwrappedType, msg),
-            ',' => try ifSupported(DoubleParser, UnwrappedType, msg),
-            '#' => try ifSupported(BoolParser, UnwrappedType, msg),
-            '$', '=' => try ifSupported(BlobStringParser, UnwrappedType, msg),
-            '+' => try ifSupported(SimpleStringParser, UnwrappedType, msg),
-            '*' => try ifSupported(ListParser, UnwrappedType, msg),
-            '~' => try ifSupported(SetParser, UnwrappedType, msg),
-            '%' => try ifSupported(MapParser, UnwrappedType, msg),
+            ':' => return try ifSupported(NumberParser, UnwrappedType, msg),
+            ',' => return try ifSupported(DoubleParser, UnwrappedType, msg),
+            '#' => return try ifSupported(BoolParser, UnwrappedType, msg),
+            '$', '=' => return try ifSupported(BlobStringParser, UnwrappedType, msg),
+            '+' => return try ifSupported(SimpleStringParser, UnwrappedType, msg),
+            '*' => return try ifSupported(ListParser, UnwrappedType, msg),
+            '~' => return try ifSupported(SetParser, UnwrappedType, msg),
+            '%' => return try ifSupported(MapParser, UnwrappedType, msg),
             // The bignum parser needs an allocator so it will refuse
             // all types when calling .isSupported() on it.
-            '(' => try ifSupported(BigNumParser, UnwrappedType, msg),
-        };
+            '(' => return try ifSupported(BigNumParser, UnwrappedType, msg),
+        }
     }
 
     // TODO: if no parser supports the type conversion, @compileError!
@@ -140,7 +140,7 @@ pub const RESP3Parser = struct {
     // We can't hard-code @compileErrors directly into each parser without
     // `isSupported` because the various parsing switches depend on `tag` which
     // is a runtime value, so we can't just keep the branches we are happy with.
-    inline fn ifSupported(comptime parser: type, comptime T: type, msg: var) !T {
+    fn ifSupported(comptime parser: type, comptime T: type, msg: var) !T {
         return if (comptime parser.isSupported(T))
             parser.parse(T, rootParser, msg)
         else
@@ -273,24 +273,24 @@ pub const RESP3Parser = struct {
             return x;
         }
 
-        return switch (itemTag) {
+        switch (itemTag) {
             else => std.debug.panic("Found `{c}` in the main parser's switch." ++
                 " Probably a bug in a type that implements `Redis.Parser`.", itemTag),
             '_' => return error.GotNilReply,
             '-', '!' => return error.GotErrorReply,
-            ':' => try ifSupportedAlloc(NumberParser, UnwrappedType, allocator, msg),
-            ',' => try ifSupportedAlloc(DoubleParser, UnwrappedType, allocator, msg),
-            '#' => try ifSupportedAlloc(BoolParser, UnwrappedType, allocator, msg),
-            '$', '=' => try ifSupportedAlloc(BlobStringParser, UnwrappedType, allocator, msg),
-            '+' => try ifSupportedAlloc(SimpleStringParser, UnwrappedType, allocator, msg),
-            '*' => try ifSupportedAlloc(ListParser, UnwrappedType, allocator, msg),
-            '~' => try ifSupportedAlloc(SetParser, UnwrappedType, allocator, msg),
-            '%' => try ifSupportedAlloc(MapParser, UnwrappedType, allocator, msg),
-            '(' => try ifSupportedAlloc(BigNumParser, UnwrappedType, allocator, msg),
-        };
+            ':' => return try ifSupportedAlloc(NumberParser, UnwrappedType, allocator, msg),
+            ',' => return try ifSupportedAlloc(DoubleParser, UnwrappedType, allocator, msg),
+            '#' => return try ifSupportedAlloc(BoolParser, UnwrappedType, allocator, msg),
+            '$', '=' => return try ifSupportedAlloc(BlobStringParser, UnwrappedType, allocator, msg),
+            '+' => return try ifSupportedAlloc(SimpleStringParser, UnwrappedType, allocator, msg),
+            '*' => return try ifSupportedAlloc(ListParser, UnwrappedType, allocator, msg),
+            '~' => return try ifSupportedAlloc(SetParser, UnwrappedType, allocator, msg),
+            '%' => return try ifSupportedAlloc(MapParser, UnwrappedType, allocator, msg),
+            '(' => return try ifSupportedAlloc(BigNumParser, UnwrappedType, allocator, msg),
+        }
     }
 
-    inline fn ifSupportedAlloc(comptime parser: type, comptime T: type, allocator: *Allocator, msg: var) !T {
+    fn ifSupportedAlloc(comptime parser: type, comptime T: type, allocator: *Allocator, msg: var) !T {
         return if (comptime parser.isSupportedAlloc(T))
             parser.parseAlloc(T, rootParser, allocator, msg)
         else
@@ -408,7 +408,7 @@ test "evil indirection" {
         defer RESP3Parser.freeReply(yes, allocator);
 
         if (yes) |v| {
-            testing.expectEqual(f32(123.45), v.*.*.*);
+            testing.expectEqual(@as(f32, 123.45), v.*.*.*);
         } else {
             unreachable;
         }

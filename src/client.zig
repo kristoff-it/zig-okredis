@@ -13,6 +13,8 @@ pub const Client = struct {
     out: std.fs.File.OutStream,
     bufin: InBuff,
     bufout: OutBuff,
+    inlock: if (std.io.is_async) std.event.Lock else void,
+    outlock: if (std.io.is_async) std.event.Lock else void,
 
     const Self = @This();
     const InBuff = std.io.BufferedInStream(std.fs.File.InStream.Error);
@@ -22,12 +24,7 @@ pub const Client = struct {
         self.fd = try os.socket(os.AF_INET, os.SOCK_STREAM, 0);
         errdefer os.close(self.fd);
 
-        self.sock_addr = os.sockaddr{ .in = undefined };
-        self.sock_addr.in.family = os.AF_INET;
-        self.sock_addr.in.port = std.mem.nativeToBig(u16, port);
-        self.sock_addr.in.addr = try std.net.parseIp4(addr);
-        self.sock_addr.in.zero = [_]u8{0} ** 8;
-
+        self.sock_addr = (try std.net.Address.parseIp4(addr, port)).any;
         try os.connect(self.fd, &self.sock_addr, @sizeOf(os.sockaddr_in));
 
         self.sock = std.fs.File.openHandle(self.fd);
@@ -36,10 +33,12 @@ pub const Client = struct {
         self.bufin = InBuff.init(&self.in.stream);
         self.bufout = OutBuff.init(&self.out.stream);
 
-        // try self.out.stream.write("*2\r\n$5\r\nHELLO\r\n$1\r\n3\r\n");
-        try self.bufout.stream.write("*2\r\n$5\r\nHELLO\r\n$1\r\n3\r\n");
-        try self.bufout.flush();
-        RESP3.parse(void, &self.bufin.stream) catch |err| switch (err) {
+        if (std.io.is_async) {
+            self.inlock = std.event.Lock.init();
+            self.outlock = std.event.Lock.init();
+        }
+
+        self.send(void, "HELLO", "3") catch |err| switch (err) {
             else => return err,
             error.GotErrorReply => @panic("Sorry, heyredis is RESP3 only and requires a Redis server built from the unstable branch."),
         };
@@ -53,9 +52,42 @@ pub const Client = struct {
         if (self.broken) return error.BrokenConnection;
         errdefer self.broken = true;
 
-        // try ArgSerializer.serialize(&self.out.stream, args);
-        try ArgSerializer.serialize(&self.bufout.stream, args);
-        try self.bufout.flush();
+        var heldIn: std.event.Lock.Held = undefined;
+        var heldOut: std.event.Lock.Held = undefined;
+        var heldOutFrame: @Frame(std.event.Lock.acquire) = undefined;
+
+        // If we're doing async/await we need to first grab the lock
+        // for the input stream. Once we have it, we also need to queue
+        // for the output lock, but we don't have to acquire it fully yet.
+        // For this reason we don't await `self.outlock.acquire()` and in
+        // the meantime we start writing to the input stream.
+        if (std.io.is_async) {
+            heldIn = self.inlock.acquire();
+            heldOutFrame = async self.outlock.acquire();
+        }
+
+        var heldOutFrameNotAwaited = true;
+        defer if (std.io.is_async and heldOutFrameNotAwaited) {
+            heldOut = await heldOutFrame;
+            heldOut.release();
+        };
+
+        {
+            // We add a block to release the input lock before we start
+            // reading from the output stream.
+            defer if (std.io.is_async) heldIn.release();
+
+            // try ArgSerializer.serialize(&self.out.stream, args);
+            try ArgSerializer.serialize(&self.bufout.stream, args);
+            try self.bufout.flush();
+        }
+
+        if (std.io.is_async) {
+            heldOutFrameNotAwaited = false;
+            heldOut = await heldOutFrame;
+        }
+        defer if (std.io.is_async) heldOut.release();
+
         return RESP3.parse(T, &self.bufin.stream);
     }
 
@@ -63,9 +95,42 @@ pub const Client = struct {
         if (self.broken) return error.BrokenConnection;
         errdefer self.broken = true;
 
-        // try ArgSerializer.serialize(&self.out.stream, args);
-        try ArgSerializer.serialize(&self.bufout.stream, args);
-        try self.bufout.flush();
+        var heldIn: std.event.Lock.Held = undefined;
+        var heldOut: std.event.Lock.Held = undefined;
+        var heldOutFrame: @Frame(std.event.Lock.acquire) = undefined;
+
+        // If we're doing async/await we need to first grab the lock
+        // for the input stream. Once we have it, we also need to queue
+        // for the output lock, but we don't have to acquire it fully yet.
+        // For this reason we don't await `self.outlock.acquire()` and in
+        // the meantime we start writing to the input stream.
+        if (std.io.is_async) {
+            heldIn = self.inlock.acquire();
+            heldOutFrame = async self.outlock.acquire();
+        }
+
+        var heldOutFrameNotAwaited = true;
+        defer if (std.io.is_async and heldOutFrameNotAwaited) {
+            heldOut = await heldOutFrame;
+            heldOut.release();
+        };
+
+        {
+            // We add a block to release the input lock before we start
+            // reading from the output stream.
+            defer if (std.io.is_async) heldIn.release();
+
+            // try ArgSerializer.serialize(&self.out.stream, args);
+            try ArgSerializer.serialize(&self.bufout.stream, args);
+            try self.bufout.flush();
+        }
+
+        if (std.io.is_async) {
+            heldOutFrameNotAwaited = false;
+            heldOut = await heldOutFrame;
+        }
+        defer if (std.io.is_async) heldOut.release();
+
         return RESP3.parseAlloc(T, allocator, &self.bufin.stream);
     }
 };

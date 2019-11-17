@@ -13,7 +13,7 @@ pub const ArgSerializer = struct {
         // Redis can reply with arbitrarily complex data structures, client
         // commands must be unstructured. There are common patterns that emerge,
         // like with HMSET, where it makes sense to translate a struct to a
-        // sequence of `field` `value`.
+        // sequence of `field` `value` pairs.
         // Types that implement the `Redis.ArgSerializer` trait must implement
         // a method that returns how many arguments a given value is going to
         // translate to, and then make sure to produce the same amount of args,

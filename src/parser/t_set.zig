@@ -149,7 +149,7 @@ test "set" {
     if (hmap.remove(2)) |_| {} else unreachable;
     if (hmap.remove(3)) |_| {} else unreachable;
 
-    testing.expectEqual(usize(0), hmap.count());
+    testing.expectEqual(@as(usize, 0), hmap.count());
 }
 
 fn MakeSet() std.io.SliceInStream {
