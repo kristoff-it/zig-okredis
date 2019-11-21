@@ -38,7 +38,7 @@ pub const Client = struct {
             self.outlock = std.event.Lock.init();
         }
 
-        self.send(void, "HELLO", "3") catch |err| switch (err) {
+        self.send(void, .{ "HELLO", "3" }) catch |err| switch (err) {
             else => return err,
             error.GotErrorReply => @panic("Sorry, heyredis is RESP3 only and requires a Redis server built from the unstable branch."),
         };
@@ -48,7 +48,7 @@ pub const Client = struct {
         os.close(self.fd);
     }
 
-    pub fn send(self: *Self, comptime T: type, args: ...) !T {
+    pub fn send(self: *Self, comptime T: type, args: var) !T {
         if (self.broken) return error.BrokenConnection;
         errdefer self.broken = true;
 
@@ -78,7 +78,7 @@ pub const Client = struct {
             defer if (std.io.is_async) heldIn.release();
 
             // try ArgSerializer.serialize(&self.out.stream, args);
-            try ArgSerializer.serialize(&self.bufout.stream, args);
+            try ArgSerializer.serializeCommand(&self.bufout.stream, args);
             try self.bufout.flush();
         }
 
@@ -91,7 +91,7 @@ pub const Client = struct {
         return RESP3.parse(T, &self.bufin.stream);
     }
 
-    pub fn sendAlloc(self: *Self, comptime T: type, allocator: *Allocator, args: ...) !T {
+    pub fn sendAlloc(self: *Self, comptime T: type, allocator: *Allocator, args: var) !T {
         if (self.broken) return error.BrokenConnection;
         errdefer self.broken = true;
 
@@ -121,7 +121,7 @@ pub const Client = struct {
             defer if (std.io.is_async) heldIn.release();
 
             // try ArgSerializer.serialize(&self.out.stream, args);
-            try ArgSerializer.serialize(&self.bufout.stream, args);
+            try ArgSerializer.serializeCommand(&self.bufout.stream, args);
             try self.bufout.flush();
         }
 

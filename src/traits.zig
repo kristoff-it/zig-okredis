@@ -81,12 +81,17 @@ pub fn noOptionalWrapper(comptime T: type) bool {
 /// serializing itself would be as a FLAT sequence of field-value pairs, to be
 /// used with XADD or HMSET:
 ///     HMSET mystruct field1 val1 field2 val2 ...
-pub fn isArgType(comptime T: type) bool {
+pub fn isArguments(comptime T: type) bool {
     const tid = @typeId(T);
     return (tid == .Struct or tid == .Enum or tid == .Union) and
-        @hasDecl(T, "Redis") and @hasDecl(T.Redis, "ArgSerializer");
+        @hasDecl(T, "Redis") and @hasDecl(T.Redis, "Arguments");
 }
 
+pub fn isCommand(comptime T: type) bool {
+    const tid = @typeId(T);
+    return (tid == .Struct or tid == .Enum or tid == .Union) and
+        @hasDecl(T, "Redis") and @hasDecl(T.Redis, "Command");
+}
 // test "trait error message" {
 //     const T = struct {
 //         pub const Redis = struct {
