@@ -110,7 +110,7 @@ test "verbatim" {
         testing.expectEqualSlices(u8, "Oh hello there!", reply.string);
         switch (reply.format) {
             else => unreachable,
-            .Verbatim => |format| testing.expectEqualSlices(u8, "txt", format),
+            .Verbatim => |format| testing.expectEqualSlices(u8, "txt", &format),
         }
     }
 
@@ -128,7 +128,7 @@ test "verbatim" {
         testing.expectEqualSlices(u8, "", reply.string);
         switch (reply.format) {
             else => unreachable,
-            .Verbatim => |format| testing.expectEqualSlices(u8, "mkd", format),
+            .Verbatim => |format| testing.expectEqualSlices(u8, "mkd", &format),
         }
     }
 }

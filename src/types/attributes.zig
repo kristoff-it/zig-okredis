@@ -38,7 +38,7 @@ pub fn WithAttribs(comptime T: type) type {
                         );
                         itemTag = try msg.readByte();
                     } else {
-                        res.attribs = [0]KV(DynamicReply, DynamicReply){};
+                        res.attribs = &[0]KV(DynamicReply, DynamicReply){};
                     }
 
                     res.data = try rootParser.parseAllocFromTag(T, itemTag, allocator, msg);

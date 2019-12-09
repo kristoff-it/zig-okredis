@@ -136,11 +136,11 @@ test "set" {
     const allocator = std.heap.direct_allocator;
 
     const arr = try SetParser.parse([3]i32, parser, &MakeSet().stream);
-    testing.expectEqualSlices(i32, [3]i32{ 1, 2, 3 }, arr);
+    testing.expectEqualSlices(i32, &[3]i32{ 1, 2, 3 }, &arr);
 
     const sli = try SetParser.parseAlloc([]i64, parser, allocator, &MakeSet().stream);
     defer allocator.free(sli);
-    testing.expectEqualSlices(i64, [3]i64{ 1, 2, 3 }, sli);
+    testing.expectEqualSlices(i64, &[3]i64{ 1, 2, 3 }, sli);
 
     var hmap = try SetParser.parseAlloc(std.AutoHashMap(i64, void), parser, allocator, &MakeSet().stream);
     defer hmap.deinit();

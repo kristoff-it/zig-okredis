@@ -476,7 +476,7 @@ test "float" {
         {
             const f = try RESP3Parser.parseAlloc([]f32, allocator, &Make2Float().stream);
             defer allocator.free(f);
-            testing.expectEqualSlices(f32, [_]f32{ 1.1, 2.2 }, f);
+            testing.expectEqualSlices(f32, &[_]f32{ 1.1, 2.2 }, f);
         }
     }
 }
@@ -514,7 +514,7 @@ fn MakeArray() std.io.SliceInStream {
 test "string" {
     testing.expectError(error.LengthMismatch, RESP3Parser.parse([5]u8, &MakeString().stream));
     testing.expectError(error.LengthMismatch, RESP3Parser.parse([2]u16, &MakeString().stream));
-    testing.expectEqualSlices(u8, "Hello World!", try RESP3Parser.parse([12]u8, &MakeSimpleString().stream));
+    testing.expectEqualSlices(u8, "Hello World!", &try RESP3Parser.parse([12]u8, &MakeSimpleString().stream));
     testing.expectError(error.LengthMismatch, RESP3Parser.parse([11]u8, &MakeSimpleString().stream));
     testing.expectError(error.LengthMismatch, RESP3Parser.parse([13]u8, &MakeSimpleString().stream));
 
@@ -540,11 +540,11 @@ test "map2struct" {
     const res = try RESP3Parser.parse(MyStruct, &MakeMap().stream);
     testing.expect(res.first == 12.34);
     testing.expect(res.second == true);
-    testing.expectEqualSlices(u8, res.third.toSlice(), "Hello World");
+    testing.expectEqualSlices(u8, "Hello World", res.third.toSlice());
 }
 test "hashmap" {
     const allocator = std.heap.direct_allocator;
-    const FloatDict = std.AutoHashMap([3]u8, f64);
+    const FloatDict = std.StringHashMap(f64);
     const res = try RESP3Parser.parseAlloc(FloatDict, allocator, &MakeFloatMap().stream);
     testing.expect(12.34 == res.getValue("aaa").?);
     testing.expect(56.78 == res.getValue("bbb").?);

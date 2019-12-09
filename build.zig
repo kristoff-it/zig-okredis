@@ -18,7 +18,7 @@ pub fn build(b: *Builder) void {
         test_all_step.dependOn(test_step);
     }
 
-    const build_docs = b.addSystemCommand([_][]const u8{
+    const build_docs = b.addSystemCommand(&[_][]const u8{
         b.zig_exe,
         "test",
         "src/heyredis.zig",
