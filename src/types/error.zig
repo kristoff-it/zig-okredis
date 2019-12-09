@@ -8,7 +8,7 @@ pub const Error = struct {
     end: usize,
 
     const Self = @This();
-    pub fn getCode(self: Self) []u8 {
+    pub fn getCode(self: Self) []const u8 {
         return self._buf[0..self.end];
     }
 };
@@ -19,7 +19,7 @@ pub const FullError = struct {
     message: []u8,
 
     const Self = @This();
-    pub fn getCode(self: Self) []u8 {
+    pub fn getCode(self: Self) []const u8 {
         return self._buf[0..self.end];
     }
 };
@@ -197,7 +197,7 @@ pub fn OrFullErr(comptime T: type) type {
                             try msg.skipBytes(1);
                             var size = try fmt.parseInt(usize, buf[0..end], 10);
                             var res = Self{ .Err = undefined };
-                            res.Err.message = [0]u8{};
+                            res.Err.message = &[0]u8{};
 
                             // Parse the Code part
                             var ch = try msg.readByte();
@@ -237,7 +237,7 @@ pub fn OrFullErr(comptime T: type) type {
                         },
                         '-' => {
                             var res = Self{ .Err = undefined };
-                            res.Err.message = [0]u8{};
+                            res.Err.message = &[0]u8{};
 
                             // Parse the Code part
                             var ch = try msg.readByte();

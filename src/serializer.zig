@@ -1,7 +1,7 @@
 const std = @import("std");
 const traits = @import("./traits.zig");
 
-pub const ArgSerializer = struct {
+pub const CommandSerializer = struct {
     pub fn serializeCommand(msg: var, command: var) !void {
         // Serializes an entire command.
         // Callers can expect this function to:
@@ -27,14 +27,14 @@ pub const ArgSerializer = struct {
         // argument.
         const CmdT = @typeOf(command);
         if (comptime traits.isCommand(CmdT)) {
-            return CmdT.Redis.Command.serialize(command, ArgSerializer, msg);
+            return CmdT.Redis.Command.serialize(command, CommandSerializer, msg);
         }
 
         // TODO: decide if this should be removed.
         // Why would someone use Arguments directly?
         if (comptime traits.isArguments(CmdT)) {
             try msg.print("*{}\r\n", CmdT.Redis.Arguments.count(command));
-            return CmdT.Redis.Arguments.serialize(command, ArgSerializer, msg);
+            return CmdT.Redis.Arguments.serialize(command, CommandSerializer, msg);
         }
 
         switch (@typeInfo(CmdT)) {
@@ -64,7 +64,7 @@ pub const ArgSerializer = struct {
                     const arg = @field(command, field.name);
                     const ArgT = @typeOf(arg);
                     if (comptime traits.isArguments(ArgT)) {
-                        try ArgT.Redis.Arguments.serialize(arg, ArgSerializer, msg);
+                        try ArgT.Redis.Arguments.serialize(arg, CommandSerializer, msg);
                     } else {
                         try serializeArgument(msg, ArgT, arg);
                     }
@@ -76,7 +76,7 @@ pub const ArgSerializer = struct {
     pub fn serializeArgument(msg: var, comptime T: type, val: T) !void {
         // Serializes a single argument.
         // Supports the following types:
-        // 1. Strings ([]const u8, [_]const u8)
+        // 1. Strings
         // 2. Numbers
         //
         // Redis.Argument types can use this function
@@ -97,11 +97,29 @@ pub const ArgSerializer = struct {
                 try msg.print("${}\r\n{s}\r\n", val.len, val);
             },
             .Pointer => |ptr| {
-                if (ptr.size != .Slice and ptr.child != u8) {
-                    @compileError("Unsupported type.");
+                switch (ptr.size) {
+                    .One => {
+                        switch (@typeInfo(ptr.child)) {
+                            .Array => {
+                                const arr = val.*;
+                                try msg.print("${}\r\n{s}\r\n", arr.len, arr);
+                                return;
+                            },
+                            else => @compileError("unsupported"),
+                        }
+                    },
+                    .Slice => {
+                        try msg.print("${}\r\n{s}\r\n", val.len, val);
+                    },
+                    else => {
+                        if ((ptr.size != .Slice or ptr.size != .One) or ptr.child != u8) {
+                            @compileLog(ptr.size);
+                            @compileLog(ptr.child);
+                            @compileError("Unsupported type.");
+                        }
+                        std.debug.warn("${}\r\n{s}\r\n", val.len, val);
+                    },
                 }
-                // std.debug.warn("${}\r\n{s}\r\n", val.len, val);
-                try msg.print("${}\r\n{s}\r\n", val.len, val);
             },
             else => @compileError("Unsupported type."),
         }

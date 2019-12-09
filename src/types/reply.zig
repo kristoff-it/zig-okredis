@@ -66,7 +66,7 @@ pub const DynamicReply = struct {
                     res.attribs = rootParser.parseAllocFromTag([]KV(DynamicReply, DynamicReply), '%', allocator, msg) catch return E;
                     itemTag = msg.readByte() catch return E;
                 } else {
-                    res.attribs = [0]KV(DynamicReply, DynamicReply){};
+                    res.attribs = &[0]KV(DynamicReply, DynamicReply){};
                 }
 
                 res.data = switch (itemTag) {

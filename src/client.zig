@@ -2,19 +2,19 @@ const std = @import("std");
 const os = std.os;
 const Allocator = std.mem.Allocator;
 const RESP3 = @import("./parser.zig").RESP3Parser;
-const ArgSerializer = @import("./serializer.zig").ArgSerializer;
+const CommandSerializer = @import("./serializer.zig").CommandSerializer;
 
 pub const Client = struct {
     broken: bool = false,
     fd: os.fd_t,
     sock: std.fs.File,
     sock_addr: os.sockaddr,
-    in: std.fs.File.InStream,
-    out: std.fs.File.OutStream,
-    bufin: InBuff,
-    bufout: OutBuff,
-    inlock: if (std.io.is_async) std.event.Lock else void,
-    outlock: if (std.io.is_async) std.event.Lock else void,
+    readStream: std.fs.File.InStream,
+    writeStream: std.fs.File.OutStream,
+    bufReadStream: InBuff,
+    bufWriteStream: OutBuff,
+    readLock: if (std.io.is_async) std.event.Lock else void,
+    writeLock: if (std.io.is_async) std.event.Lock else void,
 
     const Self = @This();
     const InBuff = std.io.BufferedInStream(std.fs.File.InStream.Error);
@@ -28,14 +28,14 @@ pub const Client = struct {
         try os.connect(self.fd, &self.sock_addr, @sizeOf(os.sockaddr_in));
 
         self.sock = std.fs.File.openHandle(self.fd);
-        self.in = self.sock.inStream();
-        self.out = self.sock.outStream();
-        self.bufin = InBuff.init(&self.in.stream);
-        self.bufout = OutBuff.init(&self.out.stream);
+        self.readStream = self.sock.inStream();
+        self.writeStream = self.sock.outStream();
+        self.bufReadStream = InBuff.init(&self.readStream.stream);
+        self.bufWriteStream = OutBuff.init(&self.writeStream.stream);
 
         if (std.io.is_async) {
-            self.inlock = std.event.Lock.init();
-            self.outlock = std.event.Lock.init();
+            self.readLock = std.event.Lock.init();
+            self.writeLock = std.event.Lock.init();
         }
 
         self.send(void, .{ "HELLO", "3" }) catch |err| switch (err) {
@@ -52,85 +52,107 @@ pub const Client = struct {
         if (self.broken) return error.BrokenConnection;
         errdefer self.broken = true;
 
-        var heldIn: std.event.Lock.Held = undefined;
-        var heldOut: std.event.Lock.Held = undefined;
-        var heldOutFrame: @Frame(std.event.Lock.acquire) = undefined;
+        var heldWrite: std.event.Lock.Held = undefined;
+        var heldRead: std.event.Lock.Held = undefined;
+        var heldReadFrame: @Frame(std.event.Lock.acquire) = undefined;
 
         // If we're doing async/await we need to first grab the lock
-        // for the input stream. Once we have it, we also need to queue
-        // for the output lock, but we don't have to acquire it fully yet.
-        // For this reason we don't await `self.outlock.acquire()` and in
-        // the meantime we start writing to the input stream.
+        // for the write stream. Once we have it, we also need to queue
+        // for the read lock, but we don't have to acquire it fully yet.
+        // For this reason we don't await `self.readLock.acquire()` and in
+        // the meantime we start writing to the write stream.
         if (std.io.is_async) {
-            heldIn = self.inlock.acquire();
-            heldOutFrame = async self.outlock.acquire();
+            heldWrite = self.writeLock.acquire();
+            heldReadFrame = async self.readLock.acquire();
         }
 
-        var heldOutFrameNotAwaited = true;
-        defer if (std.io.is_async and heldOutFrameNotAwaited) {
-            heldOut = await heldOutFrame;
-            heldOut.release();
+        var heldReadFrameNotAwaited = true;
+        defer if (std.io.is_async and heldReadFrameNotAwaited) {
+            heldRead = await heldReadFrame;
+            heldRead.release();
         };
 
         {
-            // We add a block to release the input lock before we start
-            // reading from the output stream.
-            defer if (std.io.is_async) heldIn.release();
+            // We add a block to release the write lock before we start
+            // reading from the read stream.
+            defer if (std.io.is_async) heldWrite.release();
 
             // try ArgSerializer.serialize(&self.out.stream, args);
-            try ArgSerializer.serializeCommand(&self.bufout.stream, args);
-            try self.bufout.flush();
+            try CommandSerializer.serializeCommand(&self.bufWriteStream.stream, args);
+
+            // Flush only if we don't have any other frame waiting.
+            // if (@atomicLoad(u8, &self.writeLock.queue_empty_bit, .SeqCst) == 1) {
+            if (std.io.is_async) {
+                if (self.writeLock.queue.head == null) {
+                    try self.bufWriteStream.flush();
+                } else {
+                    std.debug.warn("skipping\n");
+                }
+            } else {
+                try self.bufWriteStream.flush();
+            }
         }
 
         if (std.io.is_async) {
-            heldOutFrameNotAwaited = false;
-            heldOut = await heldOutFrame;
+            heldReadFrameNotAwaited = false;
+            heldRead = await heldReadFrame;
         }
-        defer if (std.io.is_async) heldOut.release();
+        defer if (std.io.is_async) heldRead.release();
 
-        return RESP3.parse(T, &self.bufin.stream);
+        return RESP3.parse(T, &self.bufReadStream.stream);
     }
 
     pub fn sendAlloc(self: *Self, comptime T: type, allocator: *Allocator, args: var) !T {
         if (self.broken) return error.BrokenConnection;
         errdefer self.broken = true;
 
-        var heldIn: std.event.Lock.Held = undefined;
-        var heldOut: std.event.Lock.Held = undefined;
-        var heldOutFrame: @Frame(std.event.Lock.acquire) = undefined;
+        var heldWrite: std.event.Lock.Held = undefined;
+        var heldRead: std.event.Lock.Held = undefined;
+        var heldReadFrame: @Frame(std.event.Lock.acquire) = undefined;
 
         // If we're doing async/await we need to first grab the lock
-        // for the input stream. Once we have it, we also need to queue
-        // for the output lock, but we don't have to acquire it fully yet.
-        // For this reason we don't await `self.outlock.acquire()` and in
-        // the meantime we start writing to the input stream.
+        // for the write stream. Once we have it, we also need to queue
+        // for the read lock, but we don't have to acquire it fully yet.
+        // For this reason we don't await `self.readLock.acquire()` and in
+        // the meantime we start writing to the write stream.
         if (std.io.is_async) {
-            heldIn = self.inlock.acquire();
-            heldOutFrame = async self.outlock.acquire();
+            heldWrite = self.writeLock.acquire();
+            heldReadFrame = async self.readLock.acquire();
         }
 
-        var heldOutFrameNotAwaited = true;
-        defer if (std.io.is_async and heldOutFrameNotAwaited) {
-            heldOut = await heldOutFrame;
-            heldOut.release();
+        var heldReadFrameNotAwaited = true;
+        defer if (std.io.is_async and heldReadFrameNotAwaited) {
+            heldRead = await heldReadFrame;
+            heldRead.release();
         };
 
         {
-            // We add a block to release the input lock before we start
-            // reading from the output stream.
-            defer if (std.io.is_async) heldIn.release();
+            // We add a block to release the write lock before we start
+            // reading from the read stream.
+            defer if (std.io.is_async) heldWrite.release();
 
             // try ArgSerializer.serialize(&self.out.stream, args);
-            try ArgSerializer.serializeCommand(&self.bufout.stream, args);
-            try self.bufout.flush();
+            try CommandSerializer.serializeCommand(&self.bufWriteStream.stream, args);
+
+            // Flush only if we don't have any other frame waiting.
+            // if (@atomicLoad(u8, &self.writeLock.queue_empty_bit, .SeqCst) == 1) {
+            if (std.io.is_async) {
+                if (self.writeLock.queue.head == null) {
+                    try self.bufWriteStream.flush();
+                } else {
+                    std.debug.warn("skipping\n");
+                }
+            } else {
+                try self.bufWriteStream.flush();
+            }
         }
 
         if (std.io.is_async) {
-            heldOutFrameNotAwaited = false;
-            heldOut = await heldOutFrame;
+            heldReadFrameNotAwaited = false;
+            heldRead = await heldReadFrame;
         }
-        defer if (std.io.is_async) heldOut.release();
+        defer if (std.io.is_async) heldRead.release();
 
-        return RESP3.parseAlloc(T, allocator, &self.bufin.stream);
+        return RESP3.parseAlloc(T, allocator, &self.bufReadStream.stream);
     }
 };

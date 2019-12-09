@@ -6,7 +6,7 @@
 </p>
 
 <p align="center">
-    Zero-allocation client for Redis 6+ (RESP3 Only)
+    Zero-allocation client for Redis 6+
 </p>
 
 ## Handy and Efficient
@@ -20,7 +20,7 @@ The client has two main interfaces to send commands: `send` and `sendAlloc`. Fol
 The way this is achieved is by making good use of RESP3's typed responses and Zig's metaprogramming facilities.
 The library uses compile-time reflection to specialize down to the parser level, allowing heyredis to decode whenever possible a reply directly into a function frame, **without any intermediate dynamic allocation**. If you want more information about Zig's comptime:
 - [Official documentation](https://ziglang.org/documentation/master/#comptime)
-- [What is Zig's Comptime?](https://kristoff.it/blog/what-is-zig-comptime)
+- [What is Zig's Comptime?](https://kristoff.it/blog/what-is-zig-comptime) (blog post written by me)
 
 By using `sendAlloc` you can decode replies with arbrirary shape at the cost of occasionally performing dynamic allocations. The interface takes an allocator as input, so the user can setup custom allocation schemes such as [arenas](https://en.wikipedia.org/wiki/Region-based_memory_management).
 
@@ -29,6 +29,8 @@ By using `sendAlloc` you can decode replies with arbrirary shape at the cost of 
 ```zig
 const std = @import("std");
 const heyredis = @import("./src/heyredis.zig");
+const SET = heyredis.commands.SET;
+const OrErr = heyredis.OrErr;
 const Client = heyredis.Client;
 
 pub fn main() !void {
@@ -36,9 +38,20 @@ pub fn main() !void {
     try client.initIp4("127.0.0.1", 6379);
     defer client.close();
 
-    try client.send(void, "SET", "key", "42");
-    const reply = try client.send(i64, "GET", "key");
+    // Base interface
+    try client.send(void, .{ "SET", "key", "42" });
+    const reply = try client.send(i64, .{ "GET", "key" });
     if (reply != 42) @panic("out of towels");
+
+
+    // Command builder interface
+    const cmd = SET.init("key", "43", .NoExpire, .IfAlreadyExisting);
+    const otherReply = try client.send(OrErr(void), cmd);
+    switch (otherReply) {
+        .Nil => @panic("command should not have returned nil"),
+        .Err => @panic("command should not have returned an error"),
+        .Ok => std.debug.warn("success!"),
+    }
 }
 ```
 
@@ -51,7 +64,7 @@ The first argument to `send` / `sendAlloc` is a type which defines how to decode
 By using `void`, we indicate that we're not interested in inspecting the reply, so we don't even reserve memory in the function's frame for it. This will discard any reply Redis might send, **except for error replies**. If an error reply is recevied, the function will return `error.GotErrorReply`. Later we will see how to decode Redis error replies as values.
 
 ```zig
-try client.send(void, "SET", "key", "42");
+try client.send(void, .{ "SET", "key", "42" });
 ```
 
 ### Numbers
@@ -59,7 +72,7 @@ try client.send(void, "SET", "key", "42");
 Numeric replies can be decoded directly to Integer or Float types. If Redis replies with a string, the parser will try to parse a number out of it using  `fmt.parse{Int,Float}` (this is what happens with `GET`).
 
 ```zig
-const reply = try client.send(i64, "GET", "key");
+const reply = try client.send(i64, .{ "GET", "key" });
 ```
 
 ### Optionals
@@ -67,8 +80,8 @@ const reply = try client.send(i64, "GET", "key");
 Optional types let you decode `nil` replies from Redis. When the expected type is not an optional, and Redis replies with a `nil`, then `error.GotNilReply` is returned instead. This is equivalent to how error replies are decoded: if the expected type doesn't account for the possibility, a Zig error is returned.
 
 ```zig
-try client.send(void, "DEL", "nokey");
-var maybe = try client.send(?i64, "GET", "nokey");
+try client.send(void, .{ "DEL", "nokey" });
+var maybe = try client.send(?i64, .{ "GET", "nokey" });
 if (maybe) |val| {
     unreachable;
 } else {
@@ -85,8 +98,8 @@ For your convenience the library bundles a generic type called `FixBuf(N)`. A `F
 ```zig
 const FixBuf = heyredis.FixBuf;
 
-try client.send(void, "SET", "hellokey", "Hello World!");
-const hello = try client.send(FixBuf(30), "GET", "hellokey");
+try client.send(void, "SET", .{ "hellokey", "Hello World!" });
+const hello = try client.send(FixBuf(30), .{ "GET", "hellokey" });
 
 // .toSlice() lets you address the string inside FixBuf
 if(std.mem.eql(u8, "Hello World!", hello.toSlice())) { 
@@ -96,7 +109,7 @@ if(std.mem.eql(u8, "Hello World!", hello.toSlice())) {
 }
 
 // Alternatively, if the string has a known fixed length
-const helloArray = try client.send([12]u8, "GET", "hellokey");
+const helloArray = try client.send([12]u8, .{ "GET", "hellokey" });
 if(std.mem.eql(u8, "Hello World!", helloArray[0..])) { 
     // Yep, the string was decoded
 } else {
@@ -123,7 +136,7 @@ In general it's a good idea to wrap most reply types with `OrErr`.
 ```zig
 const OrErr = heyredis.OrErr;
 
-switch (try client.send(OrErr(i64), "INCR", "stringkey")) {
+switch (try client.send(OrErr(i64), .{ "INCR", "stringkey" })) {
     .Ok, .Nil => unreachable,
     .Err => |err| std.debug.warn("error code = {}\n", err.getCode()),
 }
@@ -144,10 +157,10 @@ const MyHash = struct {
 };
 
 // Create a hash with the same fields as our struct
-try client.send(void, "HSET", "myhash", "banana", "yes please", "price", "9.99");
+try client.send(void, .{ "HSET", "myhash", "banana", "yes please", "price", "9.99" });
 
 // Parse it directly into the struct
-switch (try client.send(OrErr(MyHash), "HGETALL", "myhash")) {
+switch (try client.send(OrErr(MyHash), .{ "HGETALL", "myhash" })) {
     .Nil, .Err => unreachable,
     .Ok => |val| {
         std.debug.warn("{?}", val);
@@ -178,23 +191,23 @@ The examples above perform zero allocations but consequently make it awkward to 
 const allocator = std.heap.direct_allocator;
 
 // Create a big string key
-try client.send(void, "SET", "divine",
+try client.send(void, .{ "SET", "divine",
     \\When half way through the journey of our life
     \\I found that I was in a gloomy wood,
     \\because the path which led aright was lost.
     \\And ah, how hard it is to say just what
     \\this wild and rough and stubborn woodland was,
     \\the very thought of which renews my fear!
-);
+});
 
-var inferno = try client.sendAlloc([]u8, allocator, "GET", "divine");
+var inferno = try client.sendAlloc([]u8, allocator, .{ "GET", "divine" });
 defer allocator.free(inferno);
 
 // This call doesn't require to free anything.
-_ = try client.sendAlloc(f64, allocator, "HGET", "myhash", "price");
+_ = try client.sendAlloc(f64, allocator, .{ "HGET", "myhash", "price" });
 
 // This does require a free
-var allocatedNum = try client.sendAlloc(*f64, allocator, "HGET", "myhash", "price");
+var allocatedNum = try client.sendAlloc(*f64, allocator, .{ "HGET", "myhash", "price" });
 defer allocator.destroy(allocatedNum);
 ```
 
@@ -213,7 +226,7 @@ When using `OrErr`, we were only decoding the error code and throwing away the m
 ```zig
 const OrFullErr = heyredis.OrFullErr;
 
-var incrErr = try client.sendAlloc(OrFullErr(i64), allocator, "INCR", "divine");
+var incrErr = try client.sendAlloc(OrFullErr(i64), allocator, .{ "INCR", "divine" });
 defer freeReply(incErr, allocator);
 
 switch (incrErr) {
@@ -246,7 +259,7 @@ const MyDynHash = struct {
     price: f32,
 };
 
-const dynHash = try client.sendAlloc(OrErr(MyDynHash), allocator, "HGETALL", "myhash");
+const dynHash = try client.sendAlloc(OrErr(MyDynHash), allocator, .{ "HGETALL", "myhash" });
 defer freeReply(dynHash, allocator);
 
 switch (dynHash) {
@@ -268,7 +281,7 @@ While most programs will use simple Redis commands and will know the shape of th
 ```zig
 const DynamicReply = heyredis.DynamicReply;
 
-const dynReply = try client.sendAlloc(DynamicReply, allocator, "HGETALL", "myhash");
+const dynReply = try client.sendAlloc(DynamicReply, allocator, .{ "HGETALL", "myhash" });
 defer freeReply(dynReply, allocator);
 
 switch (dynReply.data) {
@@ -318,9 +331,9 @@ Calling commands like `ZRANGE` with the `WITHSCORES` option will make Redis repl
 `KV` knows how to decode itself from couples (RESP lists of length 2).
 
 ```zig
-try client.send(void, "ZADD", "sset", "100", "elem1", "200", "elem2");
+try client.send(void, .{ "ZADD", "sset", "100", "elem1", "200", "elem2" });
 
-const sortSet = try client.sendAlloc([]KV([]u8, f64), allocator, "ZRANGE", "sset", "0", "1", "WITHSCORES");
+const sortSet = try client.sendAlloc([]KV([]u8, f64), allocator, .{ "ZRANGE", "sset", "0", "1", "WITHSCORES" });
 defer freeReply(sortSet, allocator);
 
 for (sortSet) |kv| {

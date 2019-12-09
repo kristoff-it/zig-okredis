@@ -3,6 +3,7 @@ const parser = @import("./parser.zig");
 const types = @import("./types.zig");
 const serializer = @import("./serializer.zig");
 
+pub const commands = @import("./commands.zig");
 pub const freeReply = parser.RESP3Parser.freeReply;
 pub const DynamicReply = types.DynamicReply;
 pub const OrFullErr = types.OrFullErr;

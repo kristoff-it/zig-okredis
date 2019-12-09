@@ -13,3 +13,7 @@ pub const GET = struct {
         };
     };
 };
+
+test "basic usage" {
+    const cmd = GET.init("lol");
+}

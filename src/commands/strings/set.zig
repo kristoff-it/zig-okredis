@@ -60,28 +60,28 @@ const Value = union(enum) {
     };
 };
 
-const Expire = union(enum) {
-    None,
+pub const Expire = union(enum) {
+    NoExpire,
     Seconds: u64,
     Milliseconds: u64,
     pub const Redis = struct {
         pub const Arguments = struct {
             pub fn count(self: Expire) usize {
                 return switch (self) {
-                    .None => 0,
+                    .NoExpire => 0,
                     else => 2,
                 };
             }
 
             pub fn serialize(self: Expire, comptime rootSerializer: type, msg: var) !void {
                 switch (self) {
-                    .None => {},
+                    .NoExpire => {},
                     .Seconds => |s| {
                         try rootSerializer.serializeArgument(msg, []const u8, "EX");
                         try rootSerializer.serializeArgument(msg, u64, s);
                     },
                     .Milliseconds => |m| {
-                        try rootSerializer.serializeArgument(msg, []const u8, "EX");
+                        try rootSerializer.serializeArgument(msg, []const u8, "PX");
                         try rootSerializer.serializeArgument(msg, u64, m);
                     },
                 }
@@ -91,7 +91,7 @@ const Expire = union(enum) {
 };
 
 const Existing = union(enum) {
-    None,
+    Always,
     IfNotExisting,
     IfAlreadyExisting,
     const ArgSelf = @This();
@@ -99,14 +99,14 @@ const Existing = union(enum) {
         pub const Arguments = struct {
             pub fn count(self: Existing) usize {
                 return switch (self) {
-                    .None => 0,
+                    .Always => 0,
                     else => 1,
                 };
             }
 
             pub fn serialize(self: Existing, comptime rootSerializer: type, msg: var) !void {
                 switch (self) {
-                    .None => {},
+                    .Always => {},
                     .IfNotExisting => |s| try rootSerializer.serializeArgument(msg, []const u8, "NX"),
                     .IfAlreadyExisting => |m| try rootSerializer.serializeArgument(msg, []const u8, "XX"),
                 }
@@ -114,3 +114,9 @@ const Existing = union(enum) {
         };
     };
 };
+
+test "basic usage" {
+    var cmd = SET.init("mykey", 42, .NoExpire, .Always);
+    cmd = SET.init("mykey", "banana", .NoExpire, .Always);
+    // cmd = SET.init("mykey", "banana", .{ .Seconds = 40 }, .IfNotExisting);
+}

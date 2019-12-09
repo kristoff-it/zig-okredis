@@ -30,7 +30,12 @@ pub fn WithAttribs(comptime T: type) type {
                     var res: Self = undefined;
                     if (itemTag == '|') {
                         // Here we lie to the root parser and claim we encountered a map type >:3
-                        res.attribs = try rootParser.parseAllocFromTag([]KV(DynamicReply, DynamicReply), '%', allocator, msg);
+                        res.attribs = try rootParser.parseAllocFromTag(
+                            []KV(DynamicReply, DynamicReply),
+                            '%',
+                            allocator,
+                            msg,
+                        );
                         itemTag = try msg.readByte();
                     } else {
                         res.attribs = [0]KV(DynamicReply, DynamicReply){};
@@ -48,7 +53,11 @@ test "WithAttribs" {
     const parser = @import("../parser.zig").RESP3Parser;
     const allocator = std.heap.direct_allocator;
 
-    const res = try parser.parseAlloc(WithAttribs([2]WithAttribs([]WithAttribs(i64))), allocator, &MakeComplexListWithAttributes().stream);
+    const res = try parser.parseAlloc(
+        WithAttribs([2]WithAttribs([]WithAttribs(i64))),
+        allocator,
+        &MakeComplexListWithAttributes().stream,
+    );
     testing.expectEqual(@as(usize, 2), res.attribs.len);
     testing.expectEqualSlices(u8, "Ciao", res.attribs[0].key.data.String.string);
     testing.expectEqualSlices(u8, "World", res.attribs[0].value.data.String.string);

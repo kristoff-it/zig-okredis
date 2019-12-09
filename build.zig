@@ -7,7 +7,7 @@ pub fn build(b: *Builder) void {
     const mode = b.standardReleaseOptions();
 
     const test_all_step = b.step("test", "Run all tests in all modes.");
-    inline for ([_]Mode{ Mode.Debug, Mode.ReleaseFast, Mode.ReleaseSafe, Mode.ReleaseSmall }) |test_mode| {
+    inline for ([_]Mode{ Mode.Debug, Mode.ReleaseSafe }) |test_mode| {
         const mode_str = @tagName(test_mode);
         const tests = b.addTest("src/heyredis.zig");
         tests.setBuildMode(test_mode);
