@@ -19,8 +19,8 @@ pub const XREAD = struct {
 
     /// Validates if the command is syntactically correct.
     pub fn validate(self: XREAD) !void {
-        // Zero means blocking forever.
-        // Use `.Forever` in such case.
+
+        // Zero means blocking forever, use `.Forever` in such case.
         switch (self.block) {
             else => {},
             .Milliseconds => |m| if (m == 0) return error.ZeroMeansBlockingForever,

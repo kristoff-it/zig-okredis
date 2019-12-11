@@ -1,14 +1,14 @@
-pub const KV = struct {
-    key: []const u8,
+pub const FV = struct {
+    field: []const u8,
     value: []const u8,
 
     pub const RedisArguments = struct {
-        pub fn count(self: KV) usize {
+        pub fn count(self: FV) usize {
             return 2;
         }
 
-        pub fn serialize(self: KV, comptime rootSerializer: type, msg: var) !void {
-            try rootSerializer.serializeArgument(msg, []const u8, self.key);
+        pub fn serialize(self: FV, comptime rootSerializer: type, msg: var) !void {
+            try rootSerializer.serializeArgument(msg, []const u8, self.field);
             try rootSerializer.serializeArgument(msg, []const u8, self.value);
         }
     };

@@ -32,10 +32,19 @@ pub const strings = struct {
 /// All the commands that operate on stream keys.
 pub const streams = struct {
     pub const utils = struct {
-        pub const KV = @import("./commands/utils/common.zig").KV;
+        pub const FV = @import("./commands/utils/common.zig").FV;
     };
-    pub const XREAD = @import("./commands/streams_xread.zig").XREAD;
     pub const XADD = @import("./commands/streams_xadd.zig").XADD;
+    pub const XREAD = @import("./commands/streams_xread.zig").XREAD;
+    pub const XTRIM = @import("./commands/streams_xtrim.zig").XTRIM;
+};
+
+/// All the commands that operate on hash keys.
+pub const hashes = struct {
+    pub const utils = struct {
+        pub const FV = @import("./commands/utils/common.zig").FV;
+    };
+    pub const HSET = @import("./commands/hashes_hset.zig").HSET;
 };
 
 test "strings" {
@@ -310,8 +319,9 @@ test "strings" {
 }
 
 test "streams" {
-    _ = @import("./commands/streams_xread.zig");
     _ = @import("./commands/streams_xadd.zig");
+    _ = @import("./commands/streams_xread.zig");
+    _ = @import("./commands/streams_xtrim.zig");
 }
 
 test "streams" {
@@ -329,7 +339,7 @@ test "streams" {
 
             try serializer.serializeCommand(
                 &testMsg.stream,
-                streams.XADD.init("k1", "1-1", .NoMaxLen, &[_]streams.utils.KV{.{ .key = "f1", .value = "v1" }}),
+                streams.XADD.init("k1", "1-1", .NoMaxLen, &[_]streams.utils.FV{.{ .field = "f1", .value = "v1" }}),
             );
             try serializer.serializeCommand(
                 &correctMsg.stream,
@@ -414,5 +424,81 @@ test "streams" {
         );
 
         std.testing.expectEqualSlices(u8, correctMsg.getWritten(), testMsg.getWritten());
+    }
+
+    // XTRIM
+    {
+        correctMsg.reset();
+        testMsg.reset();
+
+        try serializer.serializeCommand(
+            &testMsg.stream,
+            streams.XTRIM.init("mykey", streams.XTRIM.Strategy{ .MaxLen = .{ .count = 30 } }),
+        );
+        try serializer.serializeCommand(
+            &correctMsg.stream,
+            .{ "XTRIM", "mykey", "MAXLEN", "~", 30 },
+        );
+
+        std.testing.expectEqualSlices(u8, correctMsg.getWritten(), testMsg.getWritten());
+    }
+}
+
+test "hashes" {
+    _ = @import("./commands/hashes_hset.zig");
+}
+
+test "hashes" {
+    var correctBuf: [1000]u8 = undefined;
+    var correctMsg = std.io.SliceOutStream.init(correctBuf[0..]);
+
+    var testBuf: [1000]u8 = undefined;
+    var testMsg = std.io.SliceOutStream.init(testBuf[0..]);
+
+    // HSET
+    {
+        {
+            correctMsg.reset();
+            testMsg.reset();
+
+            try serializer.serializeCommand(
+                &testMsg.stream,
+                hashes.HSET.init("k1", &[_]hashes.utils.FV{.{ .field = "f1", .value = "v1" }}),
+            );
+            try serializer.serializeCommand(
+                &correctMsg.stream,
+                .{ "HSET", "k1", "f1", "v1" },
+            );
+
+            // std.debug.warn("{}\n\n\n{}\n", .{ correctMsg.getWritten(), testMsg.getWritten() });
+            std.testing.expectEqualSlices(u8, correctMsg.getWritten(), testMsg.getWritten());
+        }
+
+        {
+            correctMsg.reset();
+            testMsg.reset();
+
+            const MyStruct = struct {
+                field1: []const u8,
+                field2: u8,
+                field3: usize,
+            };
+
+            const MyHSET = hashes.HSET.forStruct(MyStruct);
+
+            try serializer.serializeCommand(
+                &testMsg.stream,
+                MyHSET.init(
+                    "k1",
+                    .{ .field1 = "nice!", .field2 = 'a', .field3 = 42 },
+                ),
+            );
+            try serializer.serializeCommand(
+                &correctMsg.stream,
+                .{ "HSET", "k1", "field1", "nice!", "field2", 'a', "field3", 42 },
+            );
+
+            std.testing.expectEqualSlices(u8, correctMsg.getWritten(), testMsg.getWritten());
+        }
     }
 }

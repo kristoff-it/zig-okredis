@@ -2,17 +2,17 @@
 const std = @import("std");
 const utils = @import("./utils/streams.zig");
 const common = @import("./utils/common.zig");
-const KV = common.KV;
+const FV = common.FV;
 
 pub const XADD = struct {
     key: []const u8,
     id: []const u8,
     maxlen: MaxLen = .NoMaxLen,
-    kvs: []const KV,
+    fvs: []const FV,
 
     /// Instantiates a new XADD command.
-    pub fn init(key: []const u8, id: []const u8, maxlen: MaxLen, kvs: []const KV) XADD {
-        return .{ .key = key, .id = id, .maxlen = maxlen, .kvs = kvs };
+    pub fn init(key: []const u8, id: []const u8, maxlen: MaxLen, fvs: []const FV) XADD {
+        return .{ .key = key, .id = id, .maxlen = maxlen, .fvs = fvs };
     }
 
     // This reassignment is necessary to avoid having two definitions of
@@ -21,15 +21,15 @@ pub const XADD = struct {
 
     /// Validates if the command is syntactically correct.
     pub fn validate(self: XADD) !void {
-        if (self.kvs.len == 0) return error.KVsArrayIsEmpty;
         if (self.key.len == 0) return error.EmptyKeyName;
+        if (self.fvs.len == 0) return error.FVsArrayIsEmpty;
         if (!utils.isValidStreamID(.XADD, self.id)) return error.InvalidID;
 
         // Check the individual KV pairs
         // TODO: how the hell do I check for dups without an allocator?
         var i: usize = 0;
-        while (i < self.kvs.len) : (i += 1) {
-            if (self.kvs[i].key.len == 0) return error.EmptyKeyName;
+        while (i < self.fvs.len) : (i += 1) {
+            if (self.fvs[i].field.len == 0) return error.EmptyFieldName;
         }
     }
 
@@ -40,7 +40,7 @@ pub const XADD = struct {
                 self.key,
                 self.id,
                 self.maxlen,
-                self.kvs,
+                self.fvs,
             });
         }
     };
@@ -84,11 +84,11 @@ fn _forStruct(comptime T: type) type {
         key: []const u8,
         id: []const u8,
         maxlen: XADD.MaxLen,
-        value: T,
+        values: T,
 
         const Self = @This();
-        pub fn init(key: []const u8, id: []const u8, maxlen: XADD.MaxLen, value: T) Self {
-            return .{ .key = key, .id = id, .maxlen = maxlen, .value = value };
+        pub fn init(key: []const u8, id: []const u8, maxlen: XADD.MaxLen, values: T) Self {
+            return .{ .key = key, .id = id, .maxlen = maxlen, .values = values };
         }
 
         pub fn validate(self: Self) !void {
@@ -118,7 +118,7 @@ fn _forStruct(comptime T: type) type {
 
             pub fn serialize(self: Self, comptime rootSerializer: type, msg: var) !void {
                 inline for (std.meta.fields(T)) |field| {
-                    const arg = @field(self.value, field.name);
+                    const arg = @field(self.values, field.name);
                     const ArgT = @TypeOf(arg);
                     try rootSerializer.serializeArgument(msg, []const u8, field.name);
                     try rootSerializer.serializeArgument(msg, ArgT, arg);
@@ -129,9 +129,9 @@ fn _forStruct(comptime T: type) type {
 }
 
 test "basic usage" {
-    const cmd = XADD.init("mykey", "*", .NoMaxLen, &[_]KV{
-        .{ .key = "field1", .value = "val1" },
-        .{ .key = "field2", .value = "val2" },
+    const cmd = XADD.init("mykey", "*", .NoMaxLen, &[_]FV{
+        .{ .field = "field1", .value = "val1" },
+        .{ .field = "field2", .value = "val2" },
     });
     try cmd.validate();
 
