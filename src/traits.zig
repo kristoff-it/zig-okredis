@@ -83,14 +83,12 @@ pub fn noOptionalWrapper(comptime T: type) bool {
 ///     HMSET mystruct field1 val1 field2 val2 ...
 pub fn isArguments(comptime T: type) bool {
     const tid = @typeId(T);
-    return (tid == .Struct or tid == .Enum or tid == .Union) and
-        @hasDecl(T, "Redis") and @hasDecl(T.Redis, "Arguments");
+    return (tid == .Struct or tid == .Enum or tid == .Union) and @hasDecl(T, "RedisArguments");
 }
 
 pub fn isCommand(comptime T: type) bool {
     const tid = @typeId(T);
-    return (tid == .Struct or tid == .Enum or tid == .Union) and
-        @hasDecl(T, "Redis") and @hasDecl(T.Redis, "Command");
+    return (tid == .Struct or tid == .Enum or tid == .Union) and @hasDecl(T, "RedisCommand");
 }
 // test "trait error message" {
 //     const T = struct {

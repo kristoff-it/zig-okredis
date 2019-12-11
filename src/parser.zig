@@ -116,7 +116,7 @@ pub const RESP3Parser = struct {
         // Call the right parser based on the tag we just read from the stream.
         switch (tag) {
             else => std.debug.panic("Found `{}` in the main parser's switch." ++
-                " Probably a bug in a type that implements `Redis.Parser`.", tag),
+                " Probably a bug in a type that implements `Redis.Parser`.", .{tag}),
             '_' => return error.GotNilReply,
             '-', '!' => return error.GotErrorReply,
             ':' => return try ifSupported(NumberParser, UnwrappedType, msg),
@@ -275,7 +275,7 @@ pub const RESP3Parser = struct {
 
         switch (itemTag) {
             else => std.debug.panic("Found `{c}` in the main parser's switch." ++
-                " Probably a bug in a type that implements `Redis.Parser`.", itemTag),
+                " Probably a bug in a type that implements `Redis.Parser`.", .{itemTag}),
             '_' => return error.GotNilReply,
             '-', '!' => return error.GotErrorReply,
             ':' => return try ifSupportedAlloc(NumberParser, UnwrappedType, allocator, msg),
@@ -301,7 +301,7 @@ pub const RESP3Parser = struct {
     // If the top value is a pointer, it frees that too.
     // TODO: free stdlib types!
     pub fn freeReply(val: var, allocator: *Allocator) void {
-        const T = @typeOf(val);
+        const T = @TypeOf(val);
 
         switch (@typeInfo(T)) {
             else => return,

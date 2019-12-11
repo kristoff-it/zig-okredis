@@ -19,7 +19,7 @@ pub const VoidParser = struct {
             itemsToConsume -= 1;
             switch (itemTag) {
                 else => std.debug.panic("Found `{c}` in the *VOID* parser's switch." ++
-                    " Probably a bug in a type that implements `Redis.Parser`.", itemTag),
+                    " Probably a bug in a type that implements `Redis.Parser`.", .{itemTag}),
                 '-', '!' => return error.GotErrorReply,
                 '_' => try msg.skipBytes(2), // `_\r\n`
                 '#' => try msg.skipBytes(3), // `#t\r\n`, `#t\r\n`

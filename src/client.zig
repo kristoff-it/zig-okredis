@@ -56,6 +56,8 @@ pub const Client = struct {
         var heldRead: std.event.Lock.Held = undefined;
         var heldReadFrame: @Frame(std.event.Lock.acquire) = undefined;
 
+        // std.debug.warn("[TEST] {} TEEST\n", std.Thread.getCurrentId());
+
         // If we're doing async/await we need to first grab the lock
         // for the write stream. Once we have it, we also need to queue
         // for the read lock, but we don't have to acquire it fully yet.
@@ -63,22 +65,32 @@ pub const Client = struct {
         // the meantime we start writing to the write stream.
         if (std.io.is_async) {
             heldWrite = self.writeLock.acquire();
+            // std.debug.warn("[WRITE] {} TAKES\n", std.Thread.getCurrentId());
+
             heldReadFrame = async self.readLock.acquire();
         }
 
         var heldReadFrameNotAwaited = true;
         defer if (std.io.is_async and heldReadFrameNotAwaited) {
             heldRead = await heldReadFrame;
+
+            // std.debug.warn("[READ] {} RELEASES", std.Thread.getCurrentId());
             heldRead.release();
         };
 
         {
             // We add a block to release the write lock before we start
             // reading from the read stream.
-            defer if (std.io.is_async) heldWrite.release();
+            defer {
+                if (std.io.is_async) {
+                    // std.debug.warn("[WRITE] {} RELEASES", std.Thread.getCurrentId());
+                    heldWrite.release();
+                }
+            }
 
             // try ArgSerializer.serialize(&self.out.stream, args);
             try CommandSerializer.serializeCommand(&self.bufWriteStream.stream, args);
+            // std.debug.warn("{} WRITES", std.Thread.getCurrentId());
 
             // Flush only if we don't have any other frame waiting.
             // if (@atomicLoad(u8, &self.writeLock.queue_empty_bit, .SeqCst) == 1) {
@@ -97,8 +109,12 @@ pub const Client = struct {
             heldReadFrameNotAwaited = false;
             heldRead = await heldReadFrame;
         }
-        defer if (std.io.is_async) heldRead.release();
+        defer {
+            // std.debug.warn("[READ] {} RELEASES", std.Thread.getCurrentId());
+            if (std.io.is_async) heldRead.release();
+        }
 
+        // std.debug.warn("{} READS", std.Thread.getCurrentId());
         return RESP3.parse(T, &self.bufReadStream.stream);
     }
 

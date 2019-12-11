@@ -11,8 +11,8 @@ pub const CommandSerializer = struct {
         //    (optionally using the Redis.Arguments trait)
         //
         // `command` can be:
-        // 1. Redis.Command trait
-        // 2. Redis.Arguments trait
+        // 1. RedisCommand trait
+        // 2. RedisArguments trait
         // 3. ArgList
         // 4. Array / Slice
         //
@@ -25,16 +25,16 @@ pub const CommandSerializer = struct {
         // As an example, the `commands.GET` command calls this
         // function passing `.{"GET", self.key}` as
         // argument.
-        const CmdT = @typeOf(command);
+        const CmdT = @TypeOf(command);
         if (comptime traits.isCommand(CmdT)) {
-            return CmdT.Redis.Command.serialize(command, CommandSerializer, msg);
+            return CmdT.RedisCommand.serialize(command, CommandSerializer, msg);
         }
 
         // TODO: decide if this should be removed.
         // Why would someone use Arguments directly?
         if (comptime traits.isArguments(CmdT)) {
-            try msg.print("*{}\r\n", CmdT.Redis.Arguments.count(command));
-            return CmdT.Redis.Arguments.serialize(command, CommandSerializer, msg);
+            try msg.print("*{}\r\n", CmdT.RedisArguments.count(command));
+            return CmdT.RedisArguments.serialize(command, CommandSerializer, msg);
         }
 
         switch (@typeInfo(CmdT)) {
@@ -47,26 +47,82 @@ pub const CommandSerializer = struct {
                 var argNum: usize = 0;
                 inline for (std.meta.fields(CmdT)) |field| {
                     const arg = @field(command, field.name);
-                    const ArgT = @typeOf(arg);
+                    const ArgT = @TypeOf(arg);
                     if (comptime traits.isArguments(ArgT)) {
-                        argNum += ArgT.Redis.Arguments.count(arg);
+                        argNum += ArgT.RedisArguments.count(arg);
                     } else {
-                        argNum += 1;
+                        argNum += switch (@typeInfo(ArgT)) {
+                            .Array => |arr| if (arr.child != u8) arg.len else 1,
+                            .Pointer => |ptr| switch (ptr.size) {
+                                .Slice => if (ptr.child != u8) arg.len else 1,
+                                .One => switch (@typeInfo(ptr.child)) {
+                                    .Array => |arr| if (arr.child != u8) arg.len else 1,
+                                    else => @compileError("unsupported"),
+                                },
+                                else => @compileError("unsupported"),
+                            },
+                            else => 1,
+                        };
                     }
                 }
 
                 // Write the number of arguments
                 // std.debug.warn("*{}\r\n", argNum);
-                try msg.print("*{}\r\n", argNum);
+                try msg.print("*{}\r\n", .{argNum});
 
                 // Serialize each argument
                 inline for (std.meta.fields(CmdT)) |field| {
                     const arg = @field(command, field.name);
-                    const ArgT = @typeOf(arg);
+                    const ArgT = @TypeOf(arg);
                     if (comptime traits.isArguments(ArgT)) {
-                        try ArgT.Redis.Arguments.serialize(arg, CommandSerializer, msg);
+                        try ArgT.RedisArguments.serialize(arg, CommandSerializer, msg);
                     } else {
-                        try serializeArgument(msg, ArgT, arg);
+                        switch (@typeInfo(ArgT)) {
+                            .Array => |arr| if (arr.child != u8) {
+                                for (arg) |elem| {
+                                    if (comptime traits.isArguments(arr.child)) {
+                                        try arr.child.RedisArguments.serialize(elem, CommandSerializer, msg);
+                                    } else {
+                                        try serializeArgument(msg, arr.child, elem);
+                                    }
+                                }
+                            } else {
+                                try serializeArgument(msg, ArgT, arg);
+                            },
+                            .Pointer => |ptr| switch (ptr.size) {
+                                .Slice => {
+                                    if (ptr.child != u8) {
+                                        for (arg) |elem| {
+                                            if (comptime traits.isArguments(ptr.child)) {
+                                                try ptr.child.RedisArguments.serialize(elem, CommandSerializer, msg);
+                                            } else {
+                                                try serializeArgument(msg, ptr.child, elem);
+                                            }
+                                        }
+                                    } else {
+                                        try serializeArgument(msg, ArgT, arg);
+                                    }
+                                },
+                                .One => switch (@typeInfo(ptr.child)) {
+                                    .Array => |arr| {
+                                        if (arr.child != u8) {
+                                            for (arg) |elem| {
+                                                if (comptime traits.isArguments(arr.child)) {
+                                                    try arr.child.RedisArguments.serialize(elem, CommandSerializer, msg);
+                                                } else {
+                                                    try serializeArgument(msg, arr.child, elem);
+                                                }
+                                            }
+                                        } else {
+                                            try serializeArgument(msg, ptr.child, arg.*);
+                                        }
+                                    },
+                                    else => @compileError("unsupported"),
+                                },
+                                else => @compileError("unsupported"),
+                            },
+                            else => try serializeArgument(msg, ArgT, arg),
+                        }
                     }
                 }
             },
@@ -85,43 +141,62 @@ pub const CommandSerializer = struct {
         // and serializeCommand(), Redis.Argument types
         // can call this function and pass a basic type.
         switch (@typeInfo(T)) {
-            .Int, .Float, .ComptimeInt, .ComptimeFloat => {
+            .Int,
+            .Float,
+            .ComptimeInt,
+            => {
                 // TODO: write a better method
                 var buf: [100]u8 = undefined;
-                var res = try std.fmt.bufPrint(buf[0..], "{}", val);
+                var res = try std.fmt.bufPrint(buf[0..], "{}", .{val});
                 // std.debug.warn("${}\r\n{s}\r\n", res.len, res);
-                try msg.print("${}\r\n{s}\r\n", res.len, res);
+                try msg.print("${}\r\n{s}\r\n", .{ res.len, res });
+            },
+            .ComptimeFloat => {
+                // TODO: write a better method, avoid duplication?
+                var buf: [100]u8 = undefined;
+                var res = try std.fmt.bufPrint(buf[0..], "{}", .{@as(f64, val)});
+                // std.debug.warn("${}\r\n{s}\r\n", res.len, res);
+                try msg.print("${}\r\n{s}\r\n", .{ res.len, res });
             },
             .Array => {
                 // std.debug.warn("${}\r\n{s}\r\n", val.len, val);
-                try msg.print("${}\r\n{s}\r\n", val.len, val);
+                try msg.print("${}\r\n{s}\r\n", .{ val.len, val });
             },
             .Pointer => |ptr| {
                 switch (ptr.size) {
-                    .One => {
-                        switch (@typeInfo(ptr.child)) {
-                            .Array => {
-                                const arr = val.*;
-                                try msg.print("${}\r\n{s}\r\n", arr.len, arr);
-                                return;
-                            },
-                            else => @compileError("unsupported"),
-                        }
-                    },
+                    // .One => {
+                    //     switch (@typeInfo(ptr.child)) {
+                    //         .Array => {
+                    //             const arr = val.*;
+                    //             try msg.print("${}\r\n{s}\r\n", .{ arr.len, arr });
+                    //             return;
+                    //         },
+                    //         else => @compileError("unsupported"),
+                    //     }
+                    // },
                     .Slice => {
-                        try msg.print("${}\r\n{s}\r\n", val.len, val);
+                        try msg.print("${}\r\n{s}\r\n", .{ val.len, val });
                     },
                     else => {
                         if ((ptr.size != .Slice or ptr.size != .One) or ptr.child != u8) {
                             @compileLog(ptr.size);
                             @compileLog(ptr.child);
-                            @compileError("Unsupported type.");
+                            @compileError("Type " ++ T ++ " is not supported.");
                         }
-                        std.debug.warn("${}\r\n{s}\r\n", val.len, val);
                     },
                 }
             },
-            else => @compileError("Unsupported type."),
+            else => @compileError("Type " ++ @typeName(T) ++ " is not supported."),
         }
     }
 };
+
+fn fieldArgNum(field: var) usize {
+    if (comptime traits.isArguments(ArgT)) {
+        return ArgT.RedisArguments.count(arg);
+    } else {
+        return 1;
+    }
+}
+
+// fn sequenceArgNum()

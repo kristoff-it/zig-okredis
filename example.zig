@@ -23,16 +23,16 @@ pub fn main() !void {
     // parser is nice enough to try and parse it for us.
     // Works with both integers and floats.
     const reply = try client.send(i64, .{ "GET", "key" });
-    std.debug.warn("key = {}\n", reply);
+    std.debug.warn("key = {}\n", .{reply});
 
     // Try to get the value, but this time using an optional type,
     // this allows decoding Redis Nil replies.
     try client.send(void, .{ "DEL", "nokey" });
     var maybe = try client.send(?i64, .{ "GET", "nokey" });
     if (maybe) |val| {
-        std.debug.warn("Found nokey with value = {}\n", val); // Won't be printed.
+        std.debug.warn("Found nokey with value = {}\n", .{val}); // Won't be printed.
     } else {
-        std.debug.warn("Yep, nokey is not present.\n");
+        std.debug.warn("Yep, nokey is not present.\n", .{});
     }
 
     // To decode strings without allocating, use a FixBuf type.
@@ -43,7 +43,7 @@ pub fn main() !void {
 
     try client.send(void, .{ "SET", "stringkey", "Hello World!" });
     var stringkey = try client.send(FixBuf(30), .{ "GET", "stringkey" });
-    std.debug.warn("stringkey = {}\n", stringkey.toSlice());
+    std.debug.warn("stringkey = {}\n", .{stringkey.toSlice()});
 
     // Send a bad command, this time we are interested in the error response.
     // OrErr also has a .Nil case, so you don't need to make your return type
@@ -53,7 +53,7 @@ pub fn main() !void {
 
     switch (try client.send(OrErr(i64), .{ "INCR", "stringkey" })) {
         .Ok, .Nil => unreachable,
-        .Err => |err| std.debug.warn("error code = {}\n", err.getCode()),
+        .Err => |err| std.debug.warn("error code = {}\n", .{err.getCode()}),
     }
 
     const MyHash = struct {
@@ -68,7 +68,7 @@ pub fn main() !void {
     switch (try client.send(OrErr(MyHash), .{ "HGETALL", "myhash" })) {
         .Nil, .Err => unreachable,
         .Ok => |val| {
-            std.debug.warn("myhash = \n\t{?}\n", val);
+            std.debug.warn("myhash = \n\t{?}\n", .{val});
         },
     }
 
@@ -91,7 +91,7 @@ pub fn main() !void {
     // But then it's up to you to free all that was allocated.
     var inferno = try client.sendAlloc([]u8, allocator, .{ "GET", "divine" });
     defer allocator.free(inferno);
-    std.debug.warn("\ndivine comedy - inferno 1: \n{}\n\n", inferno);
+    std.debug.warn("\ndivine comedy - inferno 1: \n{}\n\n", .{inferno});
 
     // When using sendAlloc, you can use OrFullErr to parse not just the error code
     // but also the full error message. The error message is allocated with `allocator`
@@ -100,7 +100,7 @@ pub fn main() !void {
     var incrErr = try client.sendAlloc(OrFullErr(i64), allocator, .{ "INCR", "divine" });
     switch (incrErr) {
         .Ok, .Nil => unreachable,
-        .Err => |err| std.debug.warn("error code = {} message = '{}'\n", err.getCode(), err.message),
+        .Err => |err| std.debug.warn("error code = {} message = '{}'\n", .{ err.getCode(), err.message }),
     }
 
     // To help deallocating resources allocated by `sendAlloc`, you can use `freeReply`.
@@ -119,7 +119,7 @@ pub fn main() !void {
     defer freeReply(allocatedNum, allocator);
     // alternatively: defer allocator.destroy(allocatedNum);
 
-    std.debug.warn("allocated num = {} ptr = {}\n", allocatedNum.*, allocatedNum);
+    std.debug.warn("allocated num = {} ptr = {}\n", .{ allocatedNum.*, allocatedNum });
 
     // Now we can decode the reply in a struct that doesn't need a FixBuf
     const MyDynHash = struct {
@@ -133,7 +133,7 @@ pub fn main() !void {
     switch (dynHash) {
         .Nil, .Err => unreachable,
         .Ok => |val| {
-            std.debug.warn("mydynhash = \n\t{?}\n", val);
+            std.debug.warn("mydynhash = \n\t{?}\n", .{val});
         },
     }
     //   -
@@ -149,12 +149,12 @@ pub fn main() !void {
     defer freeReply(dynReply, allocator);
 
     // DynamicReply is a union that represents all possible replies.
-    std.debug.warn("\nmyhash decoded as DynamicReply:\n");
+    std.debug.warn("\nmyhash decoded as DynamicReply:\n", .{});
     switch (dynReply.data) {
         .Nil, .Bool, .Number, .Double, .Bignum, .String, .List, .Set => {},
         .Map => |kvs| {
             for (kvs) |kv| {
-                std.debug.warn("\t[{}] => '{}'\n", kv.key.data.String.string, kv.value.data.String);
+                std.debug.warn("\t[{}] => '{}'\n", .{ kv.key.data.String.string, kv.value.data.String });
             }
         },
     }
@@ -169,18 +169,18 @@ pub fn main() !void {
     try client.send(void, .{ "DEL", "sset" });
     try client.send(void, .{ "ZADD", "sset", "100", "elem1", "200", "elem2" });
 
-    std.debug.warn("\n\nSorted set to KV slice:\n");
+    std.debug.warn("\n\nSorted set to KV slice:\n", .{});
     const sortSet = try client.sendAlloc([]KV([]u8, f64), allocator, .{ "ZRANGE", "sset", "0", "1", "WITHSCORES" });
     defer freeReply(sortSet, allocator);
 
     for (sortSet) |kv| {
-        std.debug.warn("\t[{}] => {}\n", kv.key, kv.value);
+        std.debug.warn("\t[{}] => {}\n", .{ kv.key, kv.value });
     }
 
     // Combining the tools at our disposal we could run again the
     // previous command without requiring dynamic allocations.
-    std.debug.warn("\n\nAgain, but no allocator this time:\n");
+    std.debug.warn("\n\nAgain, but no allocator this time:\n", .{});
     for (try client.send([2]KV(FixBuf(100), f64), .{ "ZRANGE", "sset", "0", "1", "WITHSCORES" })) |kv| {
-        std.debug.warn("\t[{}] => {}\n", kv.key.toSlice(), kv.value);
+        std.debug.warn("\t[{}] => {}\n", .{ kv.key.toSlice(), kv.value });
     }
 }

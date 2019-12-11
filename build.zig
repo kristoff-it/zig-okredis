@@ -21,15 +21,17 @@ pub fn build(b: *Builder) void {
     const build_docs = b.addSystemCommand(&[_][]const u8{
         b.zig_exe,
         "test",
-        "src/heyredis.zig",
+        "src/commands.zig",
         "-femit-docs",
-        "-fno-emit-bin",
+        // "-fno-emit-bin",
         "--output-dir",
         ".",
     });
 
-    const all_step = b.step("all", "Build everything and runs all tests");
-    all_step.dependOn(&build_docs.step);
+    const all_step = b.step("all", "Builds docs and runs all tests");
+    const docs = b.step("docs", "Builds docs");
+    docs.dependOn(&build_docs.step);
     all_step.dependOn(test_all_step);
-    b.default_step.dependOn(&build_docs.step);
+    all_step.dependOn(docs);
+    b.default_step.dependOn(docs);
 }
