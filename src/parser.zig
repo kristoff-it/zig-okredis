@@ -24,6 +24,7 @@ const traits = @import("./traits.zig");
 /// a couple quality-of-life custom ones:
 ///     - RESP Strings can be parsed to numbers (the parser will use fmt.parse{Int,Float})
 ///     - RESP Maps can be parsed into std.HashMaps and Structs
+///     - RESP Lists can be parsed into structs (if # of fields and length match)
 ///
 /// Additionally, the parser can be extented. If the type requested has a
 /// `Redis.Parser` declaration, then their .parse/.parseAlloc will be called.
@@ -39,7 +40,7 @@ const traits = @import("./traits.zig");
 /// Zig `error.GorErrorReply` error will be returned. This makes it impossible
 /// to erroneusly ignore error replies, but discards the error message that
 /// Redis sent. To decode a Redis error reply as a value, in order to inspect
-/// the error code for example, one must wrap the expected type with OrErr or a
+/// the error code, for example, one must wrap the expected type with OrErr or a
 /// similar type. Asking for an incompatible type will return a Zig error and
 /// will leave the connection in a corrupted state.
 ///

@@ -3,6 +3,7 @@ const os = std.os;
 const Allocator = std.mem.Allocator;
 const RESP3 = @import("./parser.zig").RESP3Parser;
 const CommandSerializer = @import("./serializer.zig").CommandSerializer;
+const OrErr = @import("./types/error.zig").OrErr;
 
 pub const Client = struct {
     broken: bool = false,
@@ -49,76 +50,14 @@ pub const Client = struct {
     }
 
     pub fn send(self: *Self, comptime T: type, args: var) !T {
-        if (self.broken) return error.BrokenConnection;
-        errdefer self.broken = true;
-
-        var heldWrite: std.event.Lock.Held = undefined;
-        var heldRead: std.event.Lock.Held = undefined;
-        var heldReadFrame: @Frame(std.event.Lock.acquire) = undefined;
-
-        // std.debug.warn("[TEST] {} TEEST\n", std.Thread.getCurrentId());
-
-        // If we're doing async/await we need to first grab the lock
-        // for the write stream. Once we have it, we also need to queue
-        // for the read lock, but we don't have to acquire it fully yet.
-        // For this reason we don't await `self.readLock.acquire()` and in
-        // the meantime we start writing to the write stream.
-        if (std.io.is_async) {
-            heldWrite = self.writeLock.acquire();
-            // std.debug.warn("[WRITE] {} TAKES\n", std.Thread.getCurrentId());
-
-            heldReadFrame = async self.readLock.acquire();
-        }
-
-        var heldReadFrameNotAwaited = true;
-        defer if (std.io.is_async and heldReadFrameNotAwaited) {
-            heldRead = await heldReadFrame;
-
-            // std.debug.warn("[READ] {} RELEASES", std.Thread.getCurrentId());
-            heldRead.release();
-        };
-
-        {
-            // We add a block to release the write lock before we start
-            // reading from the read stream.
-            defer {
-                if (std.io.is_async) {
-                    // std.debug.warn("[WRITE] {} RELEASES", std.Thread.getCurrentId());
-                    heldWrite.release();
-                }
-            }
-
-            // try ArgSerializer.serialize(&self.out.stream, args);
-            try CommandSerializer.serializeCommand(&self.bufWriteStream.stream, args);
-            // std.debug.warn("{} WRITES", std.Thread.getCurrentId());
-
-            // Flush only if we don't have any other frame waiting.
-            // if (@atomicLoad(u8, &self.writeLock.queue_empty_bit, .SeqCst) == 1) {
-            if (std.io.is_async) {
-                if (self.writeLock.queue.head == null) {
-                    try self.bufWriteStream.flush();
-                } else {
-                    std.debug.warn("skipping\n");
-                }
-            } else {
-                try self.bufWriteStream.flush();
-            }
-        }
-
-        if (std.io.is_async) {
-            heldReadFrameNotAwaited = false;
-            heldRead = await heldReadFrame;
-        }
-        defer {
-            // std.debug.warn("[READ] {} RELEASES", std.Thread.getCurrentId());
-            if (std.io.is_async) heldRead.release();
-        }
-
-        // std.debug.warn("{} READS", std.Thread.getCurrentId());
-        return RESP3.parse(T, &self.bufReadStream.stream);
+        return sendImpl(self, T, args, .{});
     }
 
     pub fn sendAlloc(self: *Self, comptime T: type, allocator: *Allocator, args: var) !T {
+        return sendImpl(self, T, args, .{ .ptr = allocator });
+    }
+
+    fn sendImpl(self: *Client, comptime T: type, args: var, comptime allocator: var) !T {
         if (self.broken) return error.BrokenConnection;
         errdefer self.broken = true;
 
@@ -168,7 +107,37 @@ pub const Client = struct {
             heldRead = await heldReadFrame;
         }
         defer if (std.io.is_async) heldRead.release();
+        if (@hasDecl(@TypeOf(allocator), "ptr")) {
+            return RESP3.parseAlloc(T, allocator.ptr, &self.bufReadStream.stream);
+        } else {
+            return RESP3.parse(T, &self.bufReadStream.stream);
+        }
+    }
 
-        return RESP3.parseAlloc(T, allocator, &self.bufReadStream.stream);
+    pub fn transaction(self: *Client, comptime Ts: type, cmds: var) !Ts {
+        return transactionImpl(self, Ts, cmds, .{});
+    }
+
+    pub fn transactionAlloc(self: *Client, comptime Ts: type, allocator: *Allocator, cmds: var) !Ts {
+        return transactionImpl(self, Ts, cmds, .{ .ptr = allocator });
+    }
+
+    fn transactionImpl(self: *Client, comptime Ts: type, cmds: var, allocator: var) !Ts {
+        // TODO: type checks, error checks, make it efficient.
+        //       (i.e., write a real implementation lmao)
+        //       Right now we are reusing the code in .send,
+        //       but we are not doing any pipelining.
+        _ = try self.send(OrErr(void), .{"MULTI"});
+
+        inline for (std.meta.fields(@TypeOf(cmds))) |field| {
+            const cmd = @field(cmds, field.name);
+            _ = try self.send(OrErr(void), cmd);
+        }
+
+        if (@hasDecl(@TypeOf(allocator), "ptr")) {
+            return self.sendAlloc(Ts, allocator.ptr, .{"EXEC"});
+        } else {
+            return self.send(Ts, .{"EXEC"});
+        }
     }
 };

@@ -8,7 +8,7 @@ pub const ListParser = struct {
     // TODO: prevent users from unmarshaling structs out of strings
     pub fn isSupported(comptime T: type) bool {
         return switch (@typeId(T)) {
-            .Array => true,
+            .Array, .Struct => true,
             else => false,
         };
     }
@@ -37,6 +37,17 @@ pub const ListParser = struct {
                 var result: T = undefined;
                 for (result) |*elem| {
                     elem.* = try rootParser.parse(arr.child, msg);
+                }
+                return result;
+            },
+            .Struct => |stc| {
+                if (stc.fields.len != size) {
+                    return error.LengthMismatch;
+                }
+
+                var result: T = undefined;
+                inline for (stc.fields) |field| {
+                    @field(result, field.name) = try rootParser.parse(field.field_type, msg);
                 }
                 return result;
             },
