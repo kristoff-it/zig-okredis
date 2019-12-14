@@ -114,6 +114,8 @@ pub const Client = struct {
         }
     }
 
+    // TODO: consider if a transaction should just be a block of commands
+    // that gets passed to .send()
     pub fn transaction(self: *Client, comptime Ts: type, cmds: var) !Ts {
         return transactionImpl(self, Ts, cmds, .{});
     }
