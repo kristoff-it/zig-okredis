@@ -9,6 +9,8 @@ pub fn FixBuf(comptime size: usize) type {
         len: usize,
 
         const Self = @This();
+
+        /// Returns a slice pointing to the contents in the buffer.
         pub fn toSlice(self: *const Self) []const u8 {
             return self.buf[0..self.len];
         }
@@ -68,4 +70,9 @@ pub fn FixBuf(comptime size: usize) type {
             };
         };
     };
+}
+
+test "docs" {
+    @import("std").meta.refAllDecls(@This());
+    @import("std").meta.refAllDecls(FixBuf(42));
 }

@@ -1,12 +1,12 @@
-/// A type that knows how to decode itself form a RESP3 stream. It's
-/// expected to implement three functions:
-///
+/// A type that knows how to decode itself form a RESP3 stream.
+/// It's expected to implement three functions:
+/// ```
 /// fn parse(tag: u8, comptime rootParser: type, msg: var) !Self
 /// fn parseAlloc(tag: u8, comptime rootParser: type, allocator: *Allocator, msg: var) !Self
 /// fn destroy(self: Self, comptime rootParser: type, allocator: *Allocator) void
-///
+/// ```
 /// `rootParser` is a reference to the RESP3Parser, which contains the main
-/// parsing logic. It's passed to the type in order to be able to recursively
+/// parsing logic. It's passed to the type in order to allow it  to recursively
 /// reuse the logic already implemented. For example, the KV type uses it to
 /// parse both `key` and `value` fields.
 ///
@@ -99,3 +99,7 @@ pub fn isCommand(comptime T: type) bool {
 
 //     _ = isParserType(T);
 // }
+
+test "docs" {
+    @import("std").meta.refAllDecls(@This());
+}

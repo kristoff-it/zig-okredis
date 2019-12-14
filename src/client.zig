@@ -21,6 +21,7 @@ pub const Client = struct {
     const InBuff = std.io.BufferedInStream(std.fs.File.InStream.Error);
     const OutBuff = std.io.BufferedOutStream(std.fs.File.OutStream.Error);
 
+    /// Initializes a Client and connects it to the specified IPv4 address and port.
     pub fn initIp4(self: *Self, addr: []const u8, port: u16) !void {
         self.fd = try os.socket(os.AF_INET, os.SOCK_STREAM, 0);
         errdefer os.close(self.fd);
@@ -49,10 +50,13 @@ pub const Client = struct {
         os.close(self.fd);
     }
 
+    /// Sends a command to Redis and tries to parse the response as the specified type.
     pub fn send(self: *Self, comptime T: type, args: var) !T {
         return sendImpl(self, T, args, .{});
     }
 
+    /// Like `.send`, but requires an allocator in order to parse replies that need
+    /// dynamic allocations.
     pub fn sendAlloc(self: *Self, comptime T: type, allocator: *Allocator, args: var) !T {
         return sendImpl(self, T, args, .{ .ptr = allocator });
     }
@@ -114,12 +118,15 @@ pub const Client = struct {
         }
     }
 
-    // TODO: consider if a transaction should just be a block of commands
-    // that gets passed to .send()
+    /// Performs a Redis MULTI/EXEC transaction.
     pub fn transaction(self: *Client, comptime Ts: type, cmds: var) !Ts {
+        // TODO: consider if a transaction should just be a block of commands
+        // that gets passed to .send()
         return transactionImpl(self, Ts, cmds, .{});
     }
 
+    /// Same as `transaction`, but it requires an allocator to parse replies that need
+    /// dynamic memory allocations.
     pub fn transactionAlloc(self: *Client, comptime Ts: type, allocator: *Allocator, cmds: var) !Ts {
         return transactionImpl(self, Ts, cmds, .{ .ptr = allocator });
     }
@@ -143,3 +150,7 @@ pub const Client = struct {
         }
     }
 };
+
+test "docs" {
+    @import("std").meta.refAllDecls(Client);
+}

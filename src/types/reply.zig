@@ -14,7 +14,7 @@ pub const DynamicReply = struct {
     attribs: []KV(DynamicReply, DynamicReply),
     data: Data,
 
-    const Data = union(enum) {
+    pub const Data = union(enum) {
         Nil: void,
         Bool: bool,
         Number: i64,
@@ -177,3 +177,8 @@ fn MakeComplexListWithAttributes() std.io.SliceInStream {
     [1..]);
 }
 //zig fmt: on
+
+test "docs" {
+    @import("std").meta.refAllDecls(@This());
+    @import("std").meta.refAllDecls(DynamicReply);
+}

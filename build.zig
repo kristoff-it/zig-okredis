@@ -21,9 +21,9 @@ pub fn build(b: *Builder) void {
     const build_docs = b.addSystemCommand(&[_][]const u8{
         b.zig_exe,
         "test",
-        "src/commands.zig",
+        "src/heyredis.zig",
         "-femit-docs",
-        // "-fno-emit-bin",
+        "-fno-emit-bin",
         "--output-dir",
         ".",
     });

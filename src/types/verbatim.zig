@@ -3,6 +3,12 @@ const fmt = std.fmt;
 const Allocator = std.mem.Allocator;
 const testing = std.testing;
 
+/// Parses the different types of Redis strings and keeps
+/// track of the string metadata information when present.
+/// Useful to know when Redis is replying with a verbatim
+/// markdown string, for example.
+///
+/// Requires an allocator, so it can only be used with `sendAlloc`.
 pub const Verbatim = struct {
     format: Format,
     string: []u8,

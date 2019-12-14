@@ -1,12 +1,15 @@
 const std = @import("std");
 const Allocator = std.mem.Allocator;
 const KV = @import("./kv.zig").KV;
+const FixBuf = @import("./fixbuf.zig").FixBuf;
 const DynamicReply = @import("./reply.zig").DynamicReply;
 const testing = std.testing;
 
-/// A generic type that can capture attributes from a reply
+/// A generic type that can capture attributes from a Redis reply.
 pub fn WithAttribs(comptime T: type) type {
     return struct {
+        /// Attributes are stored as an array of key-value pairs.
+        /// Each element of a pair is a DynamicReply.
         attribs: []KV(DynamicReply, DynamicReply),
         data: T,
 
@@ -105,3 +108,10 @@ fn MakeComplexListWithAttributes() std.io.SliceInStream {
     [0..]);
 }
 //zig fmt: on
+
+test "docs" {
+    @import("std").meta.refAllDecls(@This());
+    @import("std").meta.refAllDecls(WithAttribs(FixBuf(100)));
+    @import("std").meta.refAllDecls(WithAttribs([]u8));
+    @import("std").meta.refAllDecls(WithAttribs(usize));
+}

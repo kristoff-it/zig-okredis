@@ -7,8 +7,8 @@ pub const Error = struct {
     _buf: [32]u8,
     end: usize,
 
-    const Self = @This();
-    pub fn getCode(self: Self) []const u8 {
+    /// Get the error code.
+    pub fn getCode(self: Error) []const u8 {
         return self._buf[0..self.end];
     }
 };
@@ -16,23 +16,28 @@ pub const Error = struct {
 pub const FullError = struct {
     _buf: [32]u8,
     end: usize,
+
+    /// The full error message
     message: []u8,
 
-    const Self = @This();
-    pub fn getCode(self: Self) []const u8 {
+    /// Get the error code.
+    pub fn getCode(self: FullError) []const u8 {
         return self._buf[0..self.end];
     }
 };
 
 /// Creates a union over T that is capable of optionally parsing
-/// Redis Errors. It's the only way to successfully decode a
-/// server error, in order to ensure that error replies don't
-/// get silently ignored. In other words, the main parser
-/// always errors out when trying to parse Redis Error replies.
+/// Redis Errors. It's the idiomatic way of parsing Redis errors
+/// as inspectable values. `OrErr` only captures the error code,
+/// use `OrFullErr` to also obtain the error message.
+///
+/// You can also decode `nil` replies using this union.
 pub fn OrErr(comptime T: type) type {
     return union(enum) {
         Ok: T,
         Nil: void,
+
+        /// Use `.getCode()` to obtain the error code as a `[]const u8`
         Err: Error,
 
         const Self = @This();
@@ -150,11 +155,14 @@ pub fn OrErr(comptime T: type) type {
     };
 }
 
-// Like OrErr, but it uses an allocator to store the msg error message
+/// Like `OrErr`, but it uses an allocator to store the full error message.
 pub fn OrFullErr(comptime T: type) type {
     return union(enum) {
         Ok: T,
         Nil: void,
+
+        /// Use `.getCode()` to obtain the error code as a `[]const u8`,
+        /// and `.message` to obtain the full error message as a `[]const u8`.
         Err: FullError,
 
         const Self = @This();
@@ -346,4 +354,10 @@ fn MakeBlobErr() std.io.SliceInStream {
 }
 fn MakeNil() std.io.SliceInStream {
     return std.io.SliceInStream.init("_\r\n"[1..]);
+}
+
+test "docs" {
+    @import("std").meta.refAllDecls(@This());
+    @import("std").meta.refAllDecls(Error);
+    @import("std").meta.refAllDecls(FullError);
 }
