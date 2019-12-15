@@ -66,6 +66,8 @@ pub fn main() !void {
 ```
 
 ## Available Documentation
+The reference documentation [is available here](https://kristoff.it/zig-okredis).
+
    * [Command Builder Interface](COMMANDS.md#command-builder-interface)
       * [Introduction](COMMANDS.md#introduction)
       * [Included command builders](COMMANDS.md#included-command-builders)
