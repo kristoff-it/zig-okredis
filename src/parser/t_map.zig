@@ -185,6 +185,9 @@ pub const MapParser = struct {
                 return res;
             },
             .Struct => |stc| {
+                // TODO: consider removing perfect hashing
+                // and just implement a reasonable algo,
+                // using radix trees for example.
                 comptime var max_len = 0;
                 comptime var fieldNames: [stc.fields.len][]const u8 = undefined;
                 comptime {

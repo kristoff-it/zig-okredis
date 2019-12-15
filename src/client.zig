@@ -17,12 +17,11 @@ pub const Client = struct {
     readLock: if (std.io.is_async) std.event.Lock else void,
     writeLock: if (std.io.is_async) std.event.Lock else void,
 
-    const Self = @This();
     const InBuff = std.io.BufferedInStream(std.fs.File.InStream.Error);
     const OutBuff = std.io.BufferedOutStream(std.fs.File.OutStream.Error);
 
     /// Initializes a Client and connects it to the specified IPv4 address and port.
-    pub fn initIp4(self: *Self, addr: []const u8, port: u16) !void {
+    pub fn initIp4(self: *Client, addr: []const u8, port: u16) !void {
         self.fd = try os.socket(os.AF_INET, os.SOCK_STREAM, 0);
         errdefer os.close(self.fd);
 
@@ -46,22 +45,59 @@ pub const Client = struct {
         };
     }
 
-    pub fn close(self: Self) void {
+    pub fn close(self: Client) void {
         os.close(self.fd);
     }
 
     /// Sends a command to Redis and tries to parse the response as the specified type.
-    pub fn send(self: *Self, comptime T: type, args: var) !T {
-        return sendImpl(self, T, args, .{});
+    pub fn send(self: *Client, comptime T: type, cmd: var) !T {
+        return self.pipelineImpl(T, cmd, .{ .one = {} });
     }
 
-    /// Like `.send`, but requires an allocator in order to parse replies that need
-    /// dynamic allocations.
-    pub fn sendAlloc(self: *Self, comptime T: type, allocator: *Allocator, args: var) !T {
-        return sendImpl(self, T, args, .{ .ptr = allocator });
+    /// Like `send`, can allocate memory.
+    pub fn sendAlloc(self: *Client, comptime T: type, allocator: *Allocator, cmd: var) !T {
+        return self.pipelineImpl(T, cmd, .{ .one = {}, .ptr = allocator });
     }
 
-    fn sendImpl(self: *Client, comptime T: type, args: var, comptime allocator: var) !T {
+    /// Performs a Redis MULTI/EXEC transaction using pipelining.
+    /// It's mostly provided for convenience as the same result
+    /// can be achieved by making explicit use of `pipe` and `pipeAlloc`.
+    pub fn trans(self: *Client, comptime Ts: type, cmds: var) !Ts {
+        return self.transactionImpl(Ts, cmds, .{});
+    }
+
+    /// Like `trans`, but can allocate memory.
+    pub fn transAlloc(self: *Client, comptime Ts: type, allocator: *Allocator, cmds: var) !Ts {
+        return transactionImpl(self, Ts, cmds, .{ .ptr = allocator });
+    }
+
+    fn transactionImpl(self: *Client, comptime Ts: type, cmds: var, allocator: var) !Ts {
+        // TODO: this is not threadsafe.
+        _ = try self.send(OrErr(void), .{"MULTI"});
+
+        const len = std.meta.fields(Ts).len;
+        // try self.pipe(void, cmds);
+
+        if (@hasDecl(@TypeOf(allocator), "ptr")) {
+            return self.sendAlloc(Ts, allocator.ptr, .{"EXEC"});
+        } else {
+            return self.send(Ts, .{"EXEC"});
+        }
+    }
+
+    /// Sends a group of commands more efficiently than sending them one by one.
+    pub fn pipe(self: *Client, comptime Ts: type, cmds: var) !Ts {
+        return pipelineImpl(self, Ts, cmds, .{});
+    }
+
+    /// Like `pipe`, but can allocate memory.
+    pub fn pipeAlloc(self: *Client, comptime Ts: type, allocator: *Allocator, cmds: var) !Ts {
+        return pipelineImpl(self, Ts, cmds, .{ .ptr = allocator });
+    }
+
+    fn pipelineImpl(self: *Client, comptime Ts: type, cmds: var, allocator: var) !Ts {
+        // TODO: find a way to express some of the metaprogramming requirements
+        // in a more clear way. Using @hasField is ugly.
         if (self.broken) return error.BrokenConnection;
         errdefer self.broken = true;
 
@@ -90,10 +126,18 @@ pub const Client = struct {
             // reading from the read stream.
             defer if (std.io.is_async) heldWrite.release();
 
-            // try ArgSerializer.serialize(&self.out.stream, args);
-            try CommandSerializer.serializeCommand(&self.bufWriteStream.stream, args);
+            // Serialize all the commands
+            if (@hasField(@TypeOf(allocator), "one")) {
+                try CommandSerializer.serializeCommand(&self.bufWriteStream.stream, cmds);
+            } else {
+                inline for (std.meta.fields(@TypeOf(cmds))) |field| {
+                    const cmd = @field(cmds, field.name);
+                    // try ArgSerializer.serialize(&self.out.stream, args);
+                    try CommandSerializer.serializeCommand(&self.bufWriteStream.stream, cmd);
+                }
+            }
 
-            // Flush only if we don't have any other frame waiting.
+            // TODO: Flush only if we don't have any other frame waiting.
             // if (@atomicLoad(u8, &self.writeLock.queue_empty_bit, .SeqCst) == 1) {
             if (std.io.is_async) {
                 if (self.writeLock.queue.head == null) {
@@ -111,42 +155,24 @@ pub const Client = struct {
             heldRead = await heldReadFrame;
         }
         defer if (std.io.is_async) heldRead.release();
-        if (@hasDecl(@TypeOf(allocator), "ptr")) {
-            return RESP3.parseAlloc(T, allocator.ptr, &self.bufReadStream.stream);
+
+        // TODO: error procedure
+        if (@hasField(@TypeOf(allocator), "one")) {
+            if (@hasField(@TypeOf(allocator), "ptr")) {
+                return RESP3.parseAlloc(Ts, allocator.ptr, &self.bufReadStream.stream);
+            } else {
+                return RESP3.parse(Ts, &self.bufReadStream.stream);
+            }
         } else {
-            return RESP3.parse(T, &self.bufReadStream.stream);
-        }
-    }
-
-    /// Performs a Redis MULTI/EXEC transaction.
-    pub fn transaction(self: *Client, comptime Ts: type, cmds: var) !Ts {
-        // TODO: consider if a transaction should just be a block of commands
-        // that gets passed to .send()
-        return transactionImpl(self, Ts, cmds, .{});
-    }
-
-    /// Same as `transaction`, but it requires an allocator to parse replies that need
-    /// dynamic memory allocations.
-    pub fn transactionAlloc(self: *Client, comptime Ts: type, allocator: *Allocator, cmds: var) !Ts {
-        return transactionImpl(self, Ts, cmds, .{ .ptr = allocator });
-    }
-
-    fn transactionImpl(self: *Client, comptime Ts: type, cmds: var, allocator: var) !Ts {
-        // TODO: type checks, error checks, make it efficient.
-        //       (i.e., write a real implementation lmao)
-        //       Right now we are reusing the code in .send,
-        //       but we are not doing any pipelining.
-        _ = try self.send(OrErr(void), .{"MULTI"});
-
-        inline for (std.meta.fields(@TypeOf(cmds))) |field| {
-            const cmd = @field(cmds, field.name);
-            _ = try self.send(OrErr(void), cmd);
-        }
-
-        if (@hasDecl(@TypeOf(allocator), "ptr")) {
-            return self.sendAlloc(Ts, allocator.ptr, .{"EXEC"});
-        } else {
-            return self.send(Ts, .{"EXEC"});
+            var result: Ts = undefined;
+            inline for (std.meta.fields(Ts)) |field| {
+                if (@hasField(@TypeOf(allocator), "ptr")) {
+                    @field(result, field.name) = try RESP3.parseAlloc(field.field_type, allocator.ptr, &self.bufReadStream.stream);
+                } else {
+                    @field(result, field.name) = try RESP3.parse(field.field_type, &self.bufReadStream.stream);
+                }
+            }
+            return result;
         }
     }
 };
