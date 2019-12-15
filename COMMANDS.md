@@ -67,7 +67,7 @@ signature, or that are relatively expensive to check.
 For this reason all command builders have a `validate` method that can be used
 to apply syntax checks. 
 
-**In other words, `init` will allow users to create invalid commands, and it's 
+**In other words, `init` doesn't guarantee correctness, and it's 
 the user's responsibility to use `validate` when appropriate.**
 
 Usage example:
