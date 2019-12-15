@@ -9,7 +9,7 @@ pub fn build(b: *Builder) void {
     const test_all_step = b.step("test", "Run all tests in all modes.");
     inline for ([_]Mode{ Mode.Debug, Mode.ReleaseSafe }) |test_mode| {
         const mode_str = @tagName(test_mode);
-        const tests = b.addTest("src/heyredis.zig");
+        const tests = b.addTest("src/okredis.zig");
         tests.setBuildMode(test_mode);
         tests.setNamePrefix(mode_str ++ " ");
 
@@ -21,7 +21,7 @@ pub fn build(b: *Builder) void {
     const build_docs = b.addSystemCommand(&[_][]const u8{
         b.zig_exe,
         "test",
-        "src/heyredis.zig",
+        "src/okredis.zig",
         "-femit-docs",
         "-fno-emit-bin",
         "--output-dir",

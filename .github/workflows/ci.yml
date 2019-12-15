@@ -17,4 +17,4 @@ jobs:
       run: sudo chown root:root /
       
     - name: Run tests
-      run: zig test src/heyredis.zig
+      run: zig build test
