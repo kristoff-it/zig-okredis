@@ -1,6 +1,7 @@
 # Command Builder Interface
 
 ## Table of contents
+* [Introduction](#introduction)
 * [Included command builders](#included-command-builders)
 * [Validating command syntax](#validating-command-syntax)
 * [Optimized command builders](#optimized-command-builders)

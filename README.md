@@ -67,7 +67,6 @@ pub fn main() !void {
 
 ## Available Documentation
    * [Command Builder Interface](COMMANDS.md#command-builder-interface)
-      * [Table of contents](COMMANDS.md#table-of-contents)
       * [Introduction](COMMANDS.md#introduction)
       * [Included command builders](COMMANDS.md#included-command-builders)
       * [Validating command syntax](COMMANDS.md#validating-command-syntax)
@@ -76,6 +75,7 @@ pub fn main() !void {
       * [An afterword on command builders vs methods](COMMANDS.md#an-afterword-on-command-builders-vs-methods)
 
    * [Decoding Redis Replies](REPLIES.md#decoding-redis-replies)
+      * [Introduction](REPLIES.md#introduction)
       * [The first and second rule of decoding replies](REPLIES.md#the-first-and-second-rule-of-decoding-replies)
       * [Decoding Zig types](REPLIES.md#decoding-zig-types)
          * [Void](REPLIES.md#void)
