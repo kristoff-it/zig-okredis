@@ -1,7 +1,5 @@
 # Command Builder Interface
 
-
-## Intro
 The main way of sending commands using OkRedis is to just use an argument list
 or an array:
 
@@ -34,7 +32,7 @@ to have to deal with a different way of doing things, but I'll show in this
 document how this pattern brings enough advantages to the table to make the 
 switch well worth.
 
-## Included Command Builders
+## Included command builders
 OkRedis includes command builders for all the basic Redis commands.
 All commands are grouped by the type of key they operate on (e.g., `strings`, 
 `hashes`, `streams`), in the same way they are grouped on 
@@ -61,7 +59,7 @@ pub fn main() !void {
 For the full list of available command builders consult 
 [the documentation](https://kristoff.it/zig-okredis/).
 
-## Validating Command Syntax
+## Validating command syntax
 The `init` function of each type helps ensuring the command is properly formed,
 but some commands have constraints that can't be enforced via a function 
 signature, or that are relatively expensive to check.
@@ -101,7 +99,7 @@ With the command builder interface it's easier to let the user choose whether
 to apply validation or not, and when (comptime vs runtime). Using a method-based
 interface we would lose many of those options.
 
-## Optimized Command Builders
+## Optimized command builders
 Some command builders implement commands that deal with struct-shaped data.
 Two notable examples are `HSET` and `XADD`.
 In the previous example we saw how `commands.streams.XADD` takes a slice of `FV`
@@ -127,7 +125,7 @@ const xadd_loris = XADDPerson.init("people-stream", "*", .{
 });
 ```
 
-## Creating New Command Builders
+## Creating new command builders
 Another advantage of command builders is the possibility of adding new commands 
 to the ones that are included in OkRedis.
 While in some languages it's trivial to monkey patch new methods onto a 
@@ -153,22 +151,34 @@ comptime. Another place where this approach shines is with pipelining and
 transactions, where passing commands around as data makes it very easy to 
 unsterstand what's happening.
 
-One last, and in some ways equally important, reason why I opted for command
-builders is that it's clear that thse two things are conceptually the same:
+One last, and in some ways even more important, reason why I opted for command
+builders is that it's clear that these two things are conceptually the same:
 
 ```zig
-const cmd = SET.init("key", "val", .NoExpire, .NoConditions);
-const cmd = .{"SET", "key", "val"};
+const cmd = SET.init("key", 1, .NoExpire, .NoConditions);
+const cmd = .{"SET", "key", 1};
 ```
 
-And that regardless of how which interface you chose to build your command,
-at the end you always have to do the same thing:
+Regardless of which interface you chose to build your command with, at the end 
+you always have to do the same thing:
 
 ```zig
 try client.send(void, cmd);
+
+try client.pipe([2]void, .{
+    INCR.init("key"),
+    .{ "INCR", "key" },
+});
+
+try client.trans(OrErr([2]void), .{
+    INCRBY.init("key", 10),
+    .{ "INCRBY", "key", 10 },
+});
 ```
 
-This might seem a small detail, but it really helps users to build a mental 
-model of the client that is simpler, but still equally useful.
+This might seem a small detail, but it really helps users build a mental model 
+of the client that is simpler, but still equally useful.
 This choice also frees space in the `client` namespace to add methods that 
-instead do imply differeny communication behaviors, like `pipe` and `trans`.
+instead do imply different communication behavior, like `pipe` and `trans`.
+It's easy to miss that you're doing completely different things when calling
+`client.xadd()` vs `client.subscribe()`.
