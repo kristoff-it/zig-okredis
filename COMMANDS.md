@@ -1,5 +1,4 @@
 # Command Builder Interface
-
 The main way of sending commands using OkRedis is to just use an argument list
 or an array:
 
@@ -31,6 +30,13 @@ approach based on the idea of command builders. It might feel annoying at first
 to have to deal with a different way of doing things, but I'll show in this 
 document how this pattern brings enough advantages to the table to make the 
 switch well worth.
+
+## Table of contents
+* [Included command builders](#included-command-builders)
+* [Validating command syntax](#validating-command-syntax)
+* [Optimized command builders](#optimized-command-builders)
+* [Creating new command builders](#creating-new-command-builders)
+* [An afterword on command builders vs methods](#an-afterword-on-command-builders-vs-methods)
 
 ## Included command builders
 OkRedis includes command builders for all the basic Redis commands.
@@ -180,5 +186,5 @@ This might seem a small detail, but it really helps users build a mental model
 of the client that is simpler, but still equally useful.
 This choice also frees space in the `client` namespace to add methods that 
 instead do imply different communication behavior, like `pipe` and `trans`.
-It's easy to miss that you're doing completely different things when calling
-`client.xadd()` vs `client.subscribe()`.
+It's easy to miss the implications behind calling `client.xadd()` vs 
+`client.subscribe()`.
