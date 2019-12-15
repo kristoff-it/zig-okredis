@@ -1,10 +1,8 @@
-# Parsing Redis Replies
-
-## Intro
-One of the main features of OkRedis is the ability of parsing Redis replies 
+# Decoding Redis Replies
+One of the main features of OkRedis is the ability of decoding Redis replies 
 without having to resort to dynamic allocations when not stricly necessary.
 
-The main way the user can negotiate reply parsing with the client is via the
+The main way the user can negotiate reply decoding with the client is via the
 first argument of `send` and `sendAlloc`.
 
 Basic example:
@@ -27,8 +25,8 @@ document will try to explain how the client tries to be handy without appearing
 too magical.
 
 
-## The First And Second Rule Of Parsing Replies
-Let's start with the two most important principles of parsing Redis replies.
+## The first and second rule of decoding replies
+Let's start with the two most important principles of decoding Redis replies.
 
 Redis commands can be considered dynamically typed and, while in practice it's 
 easy to know what to expect from a command (by reading the documentation), it's 
@@ -46,25 +44,24 @@ which brings us to the second rule:
 
 **If the requested type doesn't account for the possiblity of receiving an error
 or a `nil` reply, the client will return `error.GotErrorReply` or 
-`error.GotNilReply` in such event.**
+`error.GotNilReply` if any such event occurs.**
 
 At the moment triggering any of these errors will result in a corrupted 
-connection and will require you to close and reopen the client. This might 
-change in the future.
+connection and will require you to close and reopen the client. *This might 
+change in the future.*
 
-Later in this document you will see how to properly parse errors, `nil` replies
-and how to parse replies whose type you can't predict, for example when writing 
+Later in this document you will see how to properly decode errors, `nil` replies
+and how to decode replies whose type you can't predict, for example when writing 
 an interactive client.
 
 
-## Decoding Basic Types
+## Decoding Zig types
 
 ### Void
 By using `void`, we indicate that we're not interested in inspecting the reply, 
-so we don't even reserve memory in the function's frame for it. This will 
-discard any reply Redis might send, **except for error replies**. If an error 
-reply is recevied, the function will return `error.GotErrorReply`. Later we will 
-see how to parse Redis error replies as values.
+so we don't even reserve memory on the stack for it. This will discard any reply 
+Redis might send, **except for error and nil replies**. Later we will see how to 
+parse Redis error replies as values.
 
 ```zig
 try client.send(void, .{ "SET", "key", 42 });
@@ -80,10 +77,9 @@ const reply = try client.send(i64, .{ "GET", "key" });
 ```
 
 ### Optionals
-Optional types let you parse `nil` replies from Redis. When the expected type 
+Optional types let you decode `nil` replies from Redis. When the expected type 
 is not an optional, and Redis replies with a `nil`, then `error.GotNilReply` is 
-returned instead. This is equivalent to how error replies are parsed: if the 
-expected type doesn't account for the possibility, a Zig error is returned.
+returned instead. 
 
 ```zig
 try client.send(void, .{ "DEL", "nokey" });
@@ -129,8 +125,7 @@ if(std.mem.eql(u8, "Hello World!", helloArray[0..])) {
 ```
 
 ### Structs
-
-Map types in Redis (e.g., Hashes, Stream entries) can be parsed into structs.
+Map types in Redis (e.g., Hashes, Stream entries) can be decoded as structs.
 
 ```zig
 const MyHash = struct {
@@ -156,7 +151,7 @@ The code above prints:
 MyHash{ .banana = src.types.fixbuf.FixBuf(11){ .buf = yes please�, .len = 10 }, .price = 9.98999977e+00 }
 ```
 
-## Parsing Errors As Values
+## Decoding Redis errors and `nil` replies as values
 We saw before that receiving an error reply from Redis causes a Zig error: 
 `error.GotErrorReply`. This is because the types we tried to decode did not 
 account for the possiblity of an error reply. Error replies are just strings 
@@ -176,7 +171,8 @@ your expected return type inside a union. The union has three cases:
 - `.Nil` for when the reply is `nil`
 
 The last case is there just for convenience, as it's basically equivalent to 
-making the expected return type an optional.
+making the expected return type an optional. Adding `.Nil` basically makes 
+`OrErr` your one-stop-shop for error checking.
 
 **In general it's a good idea to wrap most reply types with `OrErr`.**
 
@@ -203,13 +199,13 @@ switch (try client.send(OrErr(i64), .{ "INCR", "stringkey" })) {
 `OrErr(void)` is a good way of parsing `OK` replies from Redis in case you want 
 to inspect error codes. 
 
-## Allocating Memory Dynamically
+## Allocating memory dynamically
 
 The examples above perform zero allocations but consequently make it awkward to 
 work with strings. Using `sendAlloc` you can allocate dynamic memory every time 
 the reply type is a pointer or a slice.
 
-### Allocating Strings
+### Allocating strings
 
 ```zig
 const allocator = std.heap.direct_allocator;
@@ -239,7 +235,7 @@ defer allocator.destroy(allocatedNum);
 
 The previous examples produced types that are easy to free. Later we will see 
 more complex examples where it becomes tedious to free everything by hand. For 
-this reason heyredis includes `freeReply`, which frees recursively a value 
+this reason OkRedis includes `freeReply`, which frees recursively a value 
 produced by `sendAlloc`. The following examples will showcase how to use it.
 
 ```zig
@@ -303,12 +299,16 @@ The code above will print:
 MyDynHash{ .banana = yes please, .price = 9.98999977e+00 }
 ```
 
-## Parsing Dynamic Replies
+It's also possible to use `OrErr(*MyDynHash)` to have the client allocate on the 
+heap the decoded reply, in case we plan to have the value survive longer than 
+the function's lifetime.
+
+## Parsing dynamic replies
 
 While most programs will use simple Redis commands and will know the shape of 
 the reply, one might also be in a situation where the reply is unknown or 
 dynamic, like when writing an interactive CLI, for example. To help with that, 
-heyredis includes `DynamicReply`, a type that can be decoded as any possible 
+OkRedis includes `DynamicReply`, a type that can be decoded as any possible 
 Redis reply.
 
 ```zig
@@ -339,5 +339,7 @@ For a full list of the types bundled with OkRedis, read
 [the documentation](https://kristoff.it/zig-okredis).
 
 ## Decoding Types In The Standard Library
+TODO
 
 ## Implementing Decodable Types
+TODO
