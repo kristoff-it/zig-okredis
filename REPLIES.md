@@ -129,22 +129,57 @@ if(std.mem.eql(u8, "Hello World!", helloArray[0..])) {
 }
 ```
 
-## Decoding Complex Types
+### Structs
+
+Map types in Redis (e.g., Hashes, Stream entries) can be parsed into structs.
+
+```zig
+const MyHash = struct {
+    banana: FixBuf(11),
+    price: f32,
+};
+
+// Create a hash with the same fields as our struct
+try client.send(void, .{ "HSET", "myhash", "banana", "yes please", "price", "9.99" });
+
+// Parse it directly into the struct
+switch (try client.send(OrErr(MyHash), .{ "HGETALL", "myhash" })) {
+    .Nil, .Err => unreachable,
+    .Ok => |val| {
+        std.debug.warn("{?}", val);
+    },
+}
+```
+
+The code above prints:
+
+```
+MyHash{ .banana = src.types.fixbuf.FixBuf(11){ .buf = yes please�, .len = 10 }, .price = 9.98999977e+00 }
+```
 
 ## Decoding Errors As Values
-We saw before that receiving an error reply from Redis causes a Zig error: `error.GotErrorReply`. This is because the types we tried to decode the reply into did not account for the possiblity of an error reply. Error replies are just strings with a `<ERROR CODE> <error message>` structure (e.g. "ERR unknown command"), but are tagged as errors in the underlying protocol. While it would be possible to decode them as normal strings, the parser doesn't support that possibility for two reasons:
+We saw before that receiving an error reply from Redis causes a Zig error: 
+`error.GotErrorReply`. This is because the types we tried to decode the reply 
+into did not account for the possiblity of an error reply. Error replies are 
+just strings with a `<ERROR CODE> <error message>` structure (e.g. "ERR unknown 
+command"), but are tagged as errors in the underlying protocol. While it would 
+be possible to decode them as normal strings, the parser doesn't support that 
+possibility for two reasons:
 
 1. Silently decoding errors as strings would make error-checking *mistake*-prone.
 2. Errors should be programmatically inspected only by looking at the code.
 
-To decode error replies heyredis bundles `OrErr(T)`, a generic type that wraps your expected return type inside a union. The union has three cases:
+To decode error replies heyredis bundles `OrErr(T)`, a generic type that wraps
+your expected return type inside a union. The union has three cases:
 
 - `.Ok` for when the command succeeds, contains `T`
 - `.Err` for when the reply is an error, contains the error code
 - `.Nil` for when the reply is `nil`
 
-The last case is there just for convenience, as it's basically equivalent to making the expected return type an optional.
-In general it's a good idea to wrap most reply types with `OrErr`. 
+The last case is there just for convenience, as it's basically equivalent to 
+making the expected return type an optional.
+
+**In general it's a good idea to wrap most reply types with `OrErr`.**
 
 ```zig
 const FixBuf = okredis.types.FixBuf;
@@ -166,11 +201,14 @@ switch (try client.send(OrErr(i64), .{ "INCR", "stringkey" })) {
 ```
 
 ### Redis OK replies
-`OrErr(void)` is a good way of decoding `OK` replies from Redis in case you want to inspect error codes. 
+`OrErr(void)` is a good way of decoding `OK` replies from Redis in case you want 
+to inspect error codes. 
 
 ## Allocating Memory Dynamically
 
-The examples above perform zero allocations but consequently make it awkward to work with strings. Using `sendAlloc`, you can allocate dynamic memory every time the reply type is a pointer or a slice.
+The examples above perform zero allocations but consequently make it awkward to 
+work with strings. Using `sendAlloc` you can allocate dynamic memory every time 
+the reply type is a pointer or a slice.
 
 ### Allocating Strings
 
@@ -200,34 +238,38 @@ defer allocator.destroy(allocatedNum);
 
 ### Freeing complex replies
 
-The previous examples produced types that are easy to free. Later we will see more complex examples where it becomes tedious to free everything by hand. For this reason heyredis includes `freeReply`, which frees recursively a value produced by `sendAlloc`. The following examples will showcase how to use it.
+The previous examples produced types that are easy to free. Later we will see 
+more complex examples where it becomes tedious to free everything by hand. For 
+this reason heyredis includes `freeReply`, which frees recursively a value 
+produced by `sendAlloc`. The following examples will showcase how to use it.
 
 ```zig
-const freeReply = heyredis.freeReply;
+const freeReply = okredis.freeReply;
 ```
 
 ### Allocating Redis Error messages
 
-When using `OrErr`, we were only decoding the error code and throwing away the message. Using `OrFullErr` you will also be able to inspect the full error message. The error code doesn't need to be freed (it's written to a FixBuf), but the error message will need to be freed.
+When using `OrErr`, we were only decoding the error code and throwing away the 
+message. Using `OrFullErr` you will also be able to inspect the full error 
+message. The error code doesn't need to be freed (it's written to a FixBuf), 
+but the error message will need to be freed.
 
 ```zig
-const OrFullErr = heyredis.OrFullErr;
+const OrFullErr = okredis.types.OrFullErr;
 
 var incrErr = try client.sendAlloc(OrFullErr(i64), allocator, .{ "INCR", "divine" });
 defer freeReply(incErr, allocator);
 
 switch (incrErr) {
-    .Ok, .Nil => unreachable,
+    .Ok, .Nil => @panic(),
     .Err => |err| {
-        // Alternative manual deallocation: 
+        // This is where alternatively you would perform manual deallocation: 
         // defer allocator.free(err.message)
         std.debug.warn("error code = '{}'\n", err.getCode());
         std.debug.warn("error message = '{}'\n", err.message);
     },
 }
 ```
-The error code doesn't need to be freed because `OrErr` and `OrFullErr` are unions over the input type. Since the error is mutually exclusive with a succesful reply, we reutilize the same memory to store the error code. The error message, being something that should not relied upon programmatically,
-is ignored unless you use `OrFullErr`.
 
 The code above will print:
 
@@ -238,7 +280,8 @@ error message = 'value is not an integer or out of range'
 
 ### Allocating structured types
 
-Previously when we wanted to decode a struct we had to use a `FixBuf` to decode a string field. Now we can just do it the normal way.
+Previously when we wanted to decode a struct we had to use a `FixBuf` to decode 
+a string field. Now we can just do it the normal way.
 
 ```zig
 const MyDynHash = struct {
@@ -262,6 +305,36 @@ MyDynHash{ .banana = yes please, .price = 9.98999977e+00 }
 ```
 
 ## Decoding Dynamic Replies
+
+While most programs will use simple Redis commands and will know the shape of 
+the reply, one might also be in a situation where the reply is unknown or 
+dynamic, like when writing an interactive CLI, for example. To help with that, 
+heyredis includes `DynamicReply`, a type that can decode any possible Redis 
+reply.
+
+```zig
+const DynamicReply = heyredis.DynamicReply;
+
+const dynReply = try client.sendAlloc(DynamicReply, allocator, .{ "HGETALL", "myhash" });
+defer freeReply(dynReply, allocator);
+
+switch (dynReply.data) {
+    .Nil, .Bool, .Number, .Double, .Bignum, .String, .List => {},
+    .Map => |kvs| {
+        for (kvs) |kv| {
+            std.debug.warn("[{}] => '{}'\n", kv.key.data.String, kv.value.data.String);
+        }
+    },
+}
+```
+
+The code above will print:
+
+```
+[banana] => 'yes please'
+[price] => '9.99'
+```
+## Decoding Types In The Standard Library
 
 ## Bundled Types
 For a full list of the types bundled with OkRedis, read 
