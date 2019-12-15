@@ -32,7 +32,7 @@ Let's start with the two most important principles of parsing Redis replies.
 
 Redis commands can be considered dynamically typed and, while in practice it's 
 easy to know what to expect from a command (by reading the documentation), it's 
-possible to occasionally get surprised (especially by thinking you don't need to
+possible to get surprised occasionally (especially by thinking you don't need to
 read the documentation). This brings us to the first rule:
 
 **Asking for a type that ends up being incompatible with the reply will cause 
@@ -53,9 +53,8 @@ connection and will require you to close and reopen the client. This might
 change in the future.
 
 Later in this document you will see how to properly parse errors, `nil` replies
-and how to parse replies when you can't predict what the reply type will be,
-for example when writing an interactive client.
-
+and how to parse replies whose type you can't predict, for example when writing 
+an interactive client.
 
 
 ## Decoding Basic Types

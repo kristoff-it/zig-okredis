@@ -30,8 +30,9 @@ client.set("fruit", "banana")
 
 OkRedis doesn't provide any command-specific method and instead uses a different
 approach based on the idea of command builders. It might feel annoying at first
-to have to deal with a different approach, but I'll show in this document how 
-this pattern brings enough advantages to the table to make the switch well worth.
+to have to deal with a different way of doing things, but I'll show in this 
+document how this pattern brings enough advantages to the table to make the 
+switch well worth.
 
 ## Included Command Builders
 OkRedis includes command builders for all the basic Redis commands.
@@ -143,3 +144,31 @@ a command: `RedisCommand` and `RedisArguments`.
 For now I recommend reading the source code of existing commands to get an idea
 of how they works, possibly starting with simple commands (e.g., avoid staring 
 with `SET` as the many options make it unexpectedly complex).
+
+
+## An afterword on command builders vs methods
+You saw a couple of reasons why command builders are preferable over methods, 
+especially in Zig where it's easy to execute isolated pieces of computation at 
+comptime. Another place where this approach shines is with pipelining and 
+transactions, where passing commands around as data makes it very easy to 
+unsterstand what's happening.
+
+One last, and in some ways equally important, reason why I opted for command
+builders is that it's clear that thse two things are conceptually the same:
+
+```zig
+const cmd = SET.init("key", "val", .NoExpire, .NoConditions);
+const cmd = .{"SET", "key", "val"};
+```
+
+And that regardless of how which interface you chose to build your command,
+at the end you always have to do the same thing:
+
+```zig
+try client.send(void, cmd);
+```
+
+This might seem a small detail, but it really helps users to build a mental 
+model of the client that is simpler, but still equally useful.
+This choice also frees space in the `client` namespace to add methods that 
+instead do imply differeny communication behaviors, like `pipe` and `trans`.
