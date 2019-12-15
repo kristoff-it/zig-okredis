@@ -1,4 +1,13 @@
 # Command Builder Interface
+
+## Table of contents
+* [Included command builders](#included-command-builders)
+* [Validating command syntax](#validating-command-syntax)
+* [Optimized command builders](#optimized-command-builders)
+* [Creating new command builders](#creating-new-command-builders)
+* [An afterword on command builders vs methods](#an-afterword-on-command-builders-vs-methods)
+
+## Introduction
 The main way of sending commands using OkRedis is to just use an argument list
 or an array:
 
@@ -30,13 +39,6 @@ approach based on the idea of command builders. It might feel annoying at first
 to have to deal with a different way of doing things, but I'll show in this 
 document how this pattern brings enough advantages to the table to make the 
 switch well worth.
-
-## Table of contents
-* [Included command builders](#included-command-builders)
-* [Validating command syntax](#validating-command-syntax)
-* [Optimized command builders](#optimized-command-builders)
-* [Creating new command builders](#creating-new-command-builders)
-* [An afterword on command builders vs methods](#an-afterword-on-command-builders-vs-methods)
 
 ## Included command builders
 OkRedis includes command builders for all the basic Redis commands.

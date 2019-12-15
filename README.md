@@ -66,8 +66,32 @@ pub fn main() !void {
 ```
 
 ## Available Documentation
-1. [Using OkRedis Commands](./COMMANDS.md)
-2. [Decoding Redis Replies](./REPLIES.md)
+* [Command Builder Interface](#command-builder-interface)
+   * [Introduction](#introduction)
+   * [Included command builders](#included-command-builders)
+   * [Validating command syntax](#validating-command-syntax)
+   * [Optimized command builders](#optimized-command-builders)
+   * [Creating new command builders](#creating-new-command-builders)
+   * [An afterword on command builders vs methods](#an-afterword-on-command-builders-vs-methods)
+* [Decoding Redis Replies](#decoding-redis-replies)
+  * [The first and second rule of decoding replies](#the-first-and-second-rule-of-decoding-replies)
+  * [Decoding Zig types](#decoding-zig-types)
+     * [Void](#void)
+     * [Numbers](#numbers)
+     * [Optionals](#optionals)
+     * [Strings](#strings)
+     * [Structs](#structs)
+  * [Decoding Redis errors and nil replies as values](#decoding-redis-errors-and-nil-replies-as-values)
+     * [Redis OK replies](#redis-ok-replies)
+  * [Allocating memory dynamically](#allocating-memory-dynamically)
+     * [Allocating strings](#allocating-strings)
+     * [Freeing complex replies](#freeing-complex-replies)
+     * [Allocating Redis Error messages](#allocating-redis-error-messages)
+     * [Allocating structured types](#allocating-structured-types)
+  * [Parsing dynamic replies](#parsing-dynamic-replies)
+  * [Bundled Types](#bundled-types)
+  * [Decoding Types In The Standard Library](#decoding-types-in-the-standard-library)
+  * [Implementing Decodable Types](#implementing-decodable-types)
 
 
 
