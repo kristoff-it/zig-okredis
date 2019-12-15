@@ -7,10 +7,10 @@ or an array:
 
 ```zig
 // Using an argument list
-client.send(void, .{"SET", "key", 42});
+client.send(void, .{ "SET", "key", 42 });
 
 // Using an array
-const cmd = [_][]const u8 {"SET", "key", "42"};
+const cmd = [_][]const u8{ "SET", "key", "42" };
 client.send(void, &cmd);
 ```
 
@@ -96,13 +96,13 @@ at comptime:
 comptime readCmd.validate() catch unreachable;
 ```
 
-With the command builder interface is possible to have opt-in command 
-validation, so that no useless work is performed, and it is also possible to do 
-validation at comptime whenever possible.
+With the command builder interface it's easier to let the user choose whether
+to apply validation or not, and when (comptime vs runtime). Using a method-based
+interface we would lose many of those options.
 
 ## Optimized Command Builders
 Some command builders implement commands that deal with struct-shaped data.
-Two notable examples are `HMGET` and `XADD`.
+Two notable examples are `HSET` and `XADD`.
 In the previous example we saw how `commands.streams.XADD` takes a slice of `FV`
 pairs, but it would be convinient to be able to use a struct to convey the same
 request in a more precise (and optimized) way.
@@ -112,30 +112,30 @@ can be used to create a specialized version of the command builder:
 
 ```zig
 const Person = struct {
-	name: []const u8,
-	age: u64,
+    name: []const u8,
+    age: u64,
 };
 
 // This creates a new type.
 const XADDPerson = cmds.streams.XADD.forStruct(Person);
 
 // This is an instance of a command.
-const xadd_loris = XADDPerson.init("people-stream", .{
-	.name = "loris",
-	.age = 29,
+const xadd_loris = XADDPerson.init("people-stream", "*", .{
+    .name = "loris",
+    .age = 29,
 });
 ```
 
 ## Creating New Command Builders
 Another advantage of command builders is the possibility of adding new commands 
 to the ones that are included in OkRedis.
-While in some languages it's trivial to monkey patch new methods to a 
+While in some languages it's trivial to monkey patch new methods onto a 
 pre-existing class, in others it's either not possible or the avaliable means
-have other types of issues and limitations (e.g., extension methods).
+have other types of issues and limitations (e.g., extension methods). 
 
-Creators of Redis modules might want to provide their users with client-side 
+**Creators of Redis modules might want to provide their users with client-side 
 tooling for their module and this approach makes module commands feel as native
-as the built-in ones.
+as the built-in ones.**
 
 OkRedis uses two traits to delegate serialization to a struct that implements
 a command: `RedisCommand` and `RedisArguments`.
