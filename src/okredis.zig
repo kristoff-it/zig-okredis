@@ -9,7 +9,7 @@ pub const traits = @import("./traits.zig");
 pub const freeReply = parser.RESP3Parser.freeReply;
 pub const Client = client.Client;
 
-test "heyredis" {
+test "okredis" {
     _ = @import("./client.zig");
     _ = @import("./parser.zig");
     _ = @import("./types.zig");

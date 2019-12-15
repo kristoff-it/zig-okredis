@@ -49,8 +49,8 @@ pub fn main() !void {
     try client.initIp4("127.0.0.1", 6379);
     defer client.close();
 
-    // SET key 42 
-    try client.send(void, cmds.strings.SET.init("key", 42, .NoExpire, .NoConditions));
+    // SET key 42 NX
+    try client.send(void, cmds.strings.SET.init("key", 42, .NoExpire, .IfNotExisting));
 
     // GET key
     _ = try client.send(i64, cmds.strings.GET.init("key"));
@@ -73,24 +73,19 @@ the user's responsibility to use `validate` when appropriate.**
 Usage example:
 
 ```zig
-// A type that represents Field-Value pairs.
+// FV is a type that represents Field-Value pairs.
 const FV = okredis.types.FV;
-
-var readCmd: cmds.streams.XADD = undefined;
 const fields = &[_]FV{ .{.field = "field1", .value = "value1"} };
 
 
-// Case: well-formed command
-readCmd.init("stream-key", "*", fields);
-
-// Validation will succeed
-try readCmd.validate()
+// Case 1: well-formed command
+var readCmd1 = cmds.streams.XADD.init("stream-key", "*", fields);
+try readCmd1.validate(); // Validation will succeed
 
 
-// Case: invalid ID
-readCmd.init("stream-key", "INVALID_ID", fields);
-
-try readCmd.validate() // -> error.InvalidID
+// Case 2: invalid ID
+var readCmd2 = cmds.streams.XADD.init("stream-key", "INVALID_ID", fields);
+try readCmd2.validate(); // -> error.InvalidID
 
 ```
 
@@ -101,6 +96,50 @@ at comptime:
 comptime readCmd.validate() catch unreachable;
 ```
 
+With the command builder interface is possible to have opt-in command 
+validation, so that no useless work is performed, and it is also possible to do 
+validation at comptime whenever possible.
+
 ## Optimized Command Builders
+Some command builders implement commands that deal with struct-shaped data.
+Two notable examples are `HMGET` and `XADD`.
+In the previous example we saw how `commands.streams.XADD` takes a slice of `FV`
+pairs, but it would be convinient to be able to use a struct to convey the same
+request in a more precise (and optimized) way.
+
+To answer this need, some command builders offer a `forStruct` function that
+can be used to create a specialized version of the command builder:
+
+```zig
+const Person = struct {
+	name: []const u8,
+	age: u64,
+};
+
+// This creates a new type.
+const XADDPerson = cmds.streams.XADD.forStruct(Person);
+
+// This is an instance of a command.
+const xadd_loris = XADDPerson.init("people-stream", .{
+	.name = "loris",
+	.age = 29,
+});
+```
 
 ## Creating New Command Builders
+Another advantage of command builders is the possibility of adding new commands 
+to the ones that are included in OkRedis.
+While in some languages it's trivial to monkey patch new methods to a 
+pre-existing class, in others it's either not possible or the avaliable means
+have other types of issues and limitations (e.g., extension methods).
+
+Creators of Redis modules might want to provide their users with client-side 
+tooling for their module and this approach makes module commands feel as native
+as the built-in ones.
+
+OkRedis uses two traits to delegate serialization to a struct that implements
+a command: `RedisCommand` and `RedisArguments`.
+
+For now I recommend reading the source code of existing commands to get an idea
+of how they works, possibly starting with simple commands (e.g., avoid staring 
+with `SET` as the many options make it unexpectedly complex).
