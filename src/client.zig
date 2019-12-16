@@ -73,10 +73,9 @@ pub const Client = struct {
 
     fn transactionImpl(self: *Client, comptime Ts: type, cmds: var, allocator: var) !Ts {
         // TODO: this is not threadsafe.
-        _ = try self.send(OrErr(void), .{"MULTI"});
+        _ = try self.send(void, .{"MULTI"});
 
-        const len = std.meta.fields(Ts).len;
-        // try self.pipe(void, cmds);
+        try self.pipe(void, cmds);
 
         if (@hasDecl(@TypeOf(allocator), "ptr")) {
             return self.sendAlloc(Ts, allocator.ptr, .{"EXEC"});
@@ -97,7 +96,7 @@ pub const Client = struct {
 
     fn pipelineImpl(self: *Client, comptime Ts: type, cmds: var, allocator: var) !Ts {
         // TODO: find a way to express some of the metaprogramming requirements
-        // in a more clear way. Using @hasField is ugly.
+        // in a more clear way. Using @hasField this way is ugly.
         if (self.broken) return error.BrokenConnection;
         errdefer self.broken = true;
 
@@ -135,15 +134,13 @@ pub const Client = struct {
                     // try ArgSerializer.serialize(&self.out.stream, args);
                     try CommandSerializer.serializeCommand(&self.bufWriteStream.stream, cmd);
                 }
-            }
+            } // Here is where the write lock gets released by the `defer` statement.
 
             // TODO: Flush only if we don't have any other frame waiting.
             // if (@atomicLoad(u8, &self.writeLock.queue_empty_bit, .SeqCst) == 1) {
             if (std.io.is_async) {
                 if (self.writeLock.queue.head == null) {
                     try self.bufWriteStream.flush();
-                } else {
-                    std.debug.warn("skipping\n");
                 }
             } else {
                 try self.bufWriteStream.flush();
@@ -165,13 +162,24 @@ pub const Client = struct {
             }
         } else {
             var result: Ts = undefined;
-            inline for (std.meta.fields(Ts)) |field| {
-                if (@hasField(@TypeOf(allocator), "ptr")) {
-                    @field(result, field.name) = try RESP3.parseAlloc(field.field_type, allocator.ptr, &self.bufReadStream.stream);
-                } else {
-                    @field(result, field.name) = try RESP3.parse(field.field_type, &self.bufReadStream.stream);
+
+            if (Ts == void) {
+                const cmd_num = std.meta.fields(@TypeOf(cmds)).len;
+                comptime var i: usize = 0;
+                inline while (i < cmd_num) : (i += 1) {
+                    try RESP3.parse(void, &self.bufReadStream.stream);
+                }
+                return;
+            } else {
+                inline for (std.meta.fields(Ts)) |field| {
+                    if (@hasField(@TypeOf(allocator), "ptr")) {
+                        @field(result, field.name) = try RESP3.parseAlloc(field.field_type, allocator.ptr, &self.bufReadStream.stream);
+                    } else {
+                        @field(result, field.name) = try RESP3.parse(field.field_type, &self.bufReadStream.stream);
+                    }
                 }
             }
+
             return result;
         }
     }

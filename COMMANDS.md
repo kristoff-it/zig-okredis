@@ -87,12 +87,12 @@ const fields = &[_]FV{ .{.field = "field1", .value = "value1"} };
 
 
 // Case 1: well-formed command
-var readCmd1 = cmds.streams.XADD.init("stream-key", "*", fields);
+var readCmd1 = cmds.streams.XADD.init("stream-key", "*", .NoMaxLen, fields);
 try readCmd1.validate(); // Validation will succeed
 
 
 // Case 2: invalid ID
-var readCmd2 = cmds.streams.XADD.init("stream-key", "INVALID_ID", fields);
+var readCmd2 = cmds.streams.XADD.init("stream-key", "INVALID_ID", .NoMaxLen, fields);
 try readCmd2.validate(); // -> error.InvalidID
 
 ```
@@ -132,6 +132,8 @@ const xadd_loris = XADDPerson.init("people-stream", "*", .{
     .name = "loris",
     .age = 29,
 });
+
+try client.send(void, xadd_loris);
 ```
 
 ## Creating new command builders
