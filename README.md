@@ -1,7 +1,7 @@
 
 <h1 align="center">OkRedis</h1>
 <p align="center">
-    <a href="LICENSE"><img src="https://badgen.net/github/license/kristoff-it/zig-heyredis" /></a>
+    <a href="LICENSE"><img src="https://badgen.net/github/license/kristoff-it/zig-okredis" /></a>
     <a href="https://twitter.com/croloris"><img src="https://badgen.net/badge/twitter/@croloris/1DA1F2?icon&label" /></a>
 </p>
 
@@ -23,7 +23,7 @@ can allocate dynamic memory, and only does so by using a user-provided allocator
 The way this is achieved is by making good use of RESP3's typed responses and 
 Zig's metaprogramming facilities.
 The library uses compile-time reflection to specialize down to the parser level, 
-allowing heyredis to decode whenever possible a reply directly into a function 
+allowing OkRedis to decode whenever possible a reply directly into a function 
 frame, **without any intermediate dynamic allocation**. If you want more 
 information about Zig's comptime:
 - [Official documentation](https://ziglang.org/documentation/master/#comptime)
@@ -66,11 +66,11 @@ pub fn main() !void {
 ```
 
 ## Available Documentation
-The reference documentation [is available here](https://kristoff.it/zig-okredis).
+The reference documentation [is available here](https://kristoff.it/zig-okredis#root).
 
-   * [Command Builder Interface](COMMANDS.md#command-builder-interface)
-      * [Introduction](COMMANDS.md#introduction)
-      * [Included command builders](COMMANDS.md#included-command-builders)
+   * [Sending commands](COMMANDS.md#sending-commands)
+      * [Base interface](COMMANDS.md#base-interface)
+      * [Command builder interface](COMMANDS.md#command-builder-interface)
       * [Validating command syntax](COMMANDS.md#validating-command-syntax)
       * [Optimized command builders](COMMANDS.md#optimized-command-builders)
       * [Creating new command builders](COMMANDS.md#creating-new-command-builders)
@@ -93,10 +93,19 @@ The reference documentation [is available here](https://kristoff.it/zig-okredis)
          * [Allocating Redis Error messages](REPLIES.md#allocating-redis-error-messages)
          * [Allocating structured types](REPLIES.md#allocating-structured-types)
       * [Parsing dynamic replies](REPLIES.md#parsing-dynamic-replies)
-      * [Bundled Types](REPLIES.md#bundled-types)
-      * [Decoding Types In The Standard Library](REPLIES.md#decoding-types-in-the-standard-library)
-      * [Implementing Decodable Types](REPLIES.md#implementing-decodable-types)
+      * [Bundled types](REPLIES.md#bundled-types)
+      * [Decoding types in the standard library](REPLIES.md#decoding-types-in-the-standard-library)
+      * [Implementing decodable types](REPLIES.md#implementing-decodable-types)
+         * [Adding types for custom commands (Lua scripts or Redis modules)](REPLIES.md#adding-types-for-custom-commands-lua-scripts-or-redis-modules)
+         * [Adding types used by a higher-level language](REPLIES.md#adding-types-used-by-a-higher-level-language)
 
+   * [Using the OkRedis client](CLIENT.md#using-the-okredis-client)
+      * [Connecting](CLIENT.md#connecting)
+      * [Buffering](CLIENT.md#buffering)
+      * [Evented vs blocking I/O](CLIENT.md#evented-vs-blocking-io)
+      * [Pipelining](CLIENT.md#pipelining)
+      * [Transactions](CLIENT.md#transactions)
+      * [Pub/Sub](CLIENT.md#pubsub)
 
 
 ## TODOS

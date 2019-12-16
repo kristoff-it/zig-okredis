@@ -1,24 +1,29 @@
-# Command Builder Interface
+# Sending commands
 
 ## Table of contents
-* [Introduction](#introduction)
-* [Included command builders](#included-command-builders)
-* [Validating command syntax](#validating-command-syntax)
-* [Optimized command builders](#optimized-command-builders)
-* [Creating new command builders](#creating-new-command-builders)
-* [An afterword on command builders vs methods](#an-afterword-on-command-builders-vs-methods)
+   * [Base interface](#base-interface)
+   * [Command builder interface](#command-builder-interface)
+   * [Validating command syntax](#validating-command-syntax)
+   * [Optimized command builders](#optimized-command-builders)
+   * [Creating new command builders](#creating-new-command-builders)
+   * [An afterword on command builders vs methods](#an-afterword-on-command-builders-vs-methods)
 
-## Introduction
+## Base interface
 The main way of sending commands using OkRedis is to just use an argument list
 or an array:
 
 ```zig
 // Using an argument list
-client.send(void, .{ "SET", "key", 42 });
+try client.send(void, .{ "SET", "key", 42 });
 
 // Using an array
 const cmd = [_][]const u8{ "SET", "key", "42" };
-client.send(void, &cmd);
+try client.send(void, &cmd);
+
+// You can also nest one level of slices/arrays,
+// useful when some arguments are dynamic in number.
+const args = [_][]const u8{ "field1", "val1", "field2", "val2"};
+try client.send(void, .{"HSET", "key", &args, "fixed-field", "fixed-val"});
 ```
 
 While simple and straightforward, this approach is prone to errors, as users 
@@ -41,7 +46,7 @@ to have to deal with a different way of doing things, but I'll show in this
 document how this pattern brings enough advantages to the table to make the 
 switch well worth.
 
-## Included command builders
+## Command builder interface
 OkRedis includes command builders for all the basic Redis commands.
 All commands are grouped by the type of key they operate on (e.g., `strings`, 
 `hashes`, `streams`), in the same way they are grouped on 
@@ -66,7 +71,7 @@ pub fn main() !void {
 ```
 
 For the full list of available command builders consult 
-[the documentation](https://kristoff.it/zig-okredis/).
+[the documentation](https://kristoff.it/zig-okredis/#root).
 
 ## Validating command syntax
 The `init` function of each type helps ensuring the command is properly formed,
@@ -176,12 +181,12 @@ you always have to do the same thing:
 ```zig
 try client.send(void, cmd);
 
-try client.pipe([2]void, .{
+try client.pipe([2]i64, .{
     INCR.init("key"),
     .{ "INCR", "key" },
 });
 
-try client.trans(OrErr([2]void), .{
+try client.trans(OrErr(void), .{
     INCRBY.init("key", 10),
     .{ "INCRBY", "key", 10 },
 });

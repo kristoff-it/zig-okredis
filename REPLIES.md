@@ -1,25 +1,27 @@
 # Decoding Redis Replies
 
 ## Table of contents
-  * [Introduction](#introduction)
-  * [The first and second rule of decoding replies](#the-first-and-second-rule-of-decoding-replies)
-  * [Decoding Zig types](#decoding-zig-types)
-     * [Void](#void)
-     * [Numbers](#numbers)
-     * [Optionals](#optionals)
-     * [Strings](#strings)
-     * [Structs](#structs)
-  * [Decoding Redis errors and nil replies as values](#decoding-redis-errors-and-nil-replies-as-values)
-     * [Redis OK replies](#redis-ok-replies)
-  * [Allocating memory dynamically](#allocating-memory-dynamically)
-     * [Allocating strings](#allocating-strings)
-     * [Freeing complex replies](#freeing-complex-replies)
-     * [Allocating Redis Error messages](#allocating-redis-error-messages)
-     * [Allocating structured types](#allocating-structured-types)
-  * [Parsing dynamic replies](#parsing-dynamic-replies)
-  * [Bundled Types](#bundled-types)
-  * [Decoding Types In The Standard Library](#decoding-types-in-the-standard-library)
-  * [Implementing Decodable Types](#implementing-decodable-types)
+   * [Introduction](#introduction)
+   * [The first and second rule of decoding replies](#the-first-and-second-rule-of-decoding-replies)
+   * [Decoding Zig types](#decoding-zig-types)
+      * [Void](#void)
+      * [Numbers](#numbers)
+      * [Optionals](#optionals)
+      * [Strings](#strings)
+      * [Structs](#structs)
+   * [Decoding Redis errors and nil replies as values](#decoding-redis-errors-and-nil-replies-as-values)
+      * [Redis OK replies](#redis-ok-replies)
+   * [Allocating memory dynamically](#allocating-memory-dynamically)
+      * [Allocating strings](#allocating-strings)
+      * [Freeing complex replies](#freeing-complex-replies)
+      * [Allocating Redis Error messages](#allocating-redis-error-messages)
+      * [Allocating structured types](#allocating-structured-types)
+   * [Parsing dynamic replies](#parsing-dynamic-replies)
+   * [Bundled types](#bundled-types)
+   * [Decoding types in the standard library](#decoding-types-in-the-standard-library)
+   * [Implementing decodable types](#implementing-decodable-types)
+      * [Adding types for custom commands (Lua scripts or Redis modules)]( #adding-types-for-custom-commands-lua-scripts-or-redis-modules)
+      * [Adding types used by a higher-level language](#adding-types-used-by-a-higher-level-language)
 
 ## Introduction
 One of the main features of OkRedis is the ability of decoding Redis replies 
@@ -357,12 +359,90 @@ The code above will print:
 [price] => '9.99'
 ```
 
-## Bundled Types
+## Bundled types
 For a full list of the types bundled with OkRedis, read 
-[the documentation](https://kristoff.it/zig-okredis).
+[the documentation](https://kristoff.it/zig-okredis#root).
 
-## Decoding Types In The Standard Library
+## Decoding types in the standard library
 TODO
 
-## Implementing Decodable Types
-TODO
+## Implementing decodable types
+The custom decodable types included in OkRedis should be enough for most users,
+but it's possible that in special cases one might want to decode a complex type
+using the parser's facilities to avoid intermediate representations.
+
+Two main cases for this need could be:
+1. Redis module authors that want to offer client-side tools to their users
+2. Somebody who might want to embed OkRedis in a higher-level language via the C ABI.
+
+Let's expand slightly on these two use cases.
+
+### Adding types for custom commands (Lua scripts or Redis modules)
+If you're adding a command to Redis (or implementing a Lua script) that has a 
+complex response type, it might make sense to provide a boiler-plate type for to
+your users.
+
+In this case you are probably fine by simply defining a struct that properly 
+represets the fixed parts of your responses.
+
+```zig
+// If replies are complex, but with a static structure
+const MyCommandReplyType = struct {
+    id: []u8,
+    query_exec_time: u64,
+    results: []Result,
+
+    pub const Result = struct {
+        partition_id: usize,
+        result: []u8,
+    };
+};
+
+// Usage is straightforward as usual
+_ = try client.sendAlloc(MyCommandReplyType, allocator, .{"CUSTOM_COMMAND"});
+
+// And the user will still be able to combine the type
+_ = try client.sendAlloc(OrErr(MyCommandReplyType), allocator, .{"CUSTOM_COMMAND"});
+
+
+// Some types might be best defined as generic to let the user customize it.
+// This type is a reasonable way of decoding a Redis stream entry letting the
+// user provide a type that decodes the entry's contents, for example
+pub fn StreamEntry(comptime T: type) type {
+    return struct {
+        id: []u8,
+        data: T,
+    };
+}
+
+// Continuing with the Redis streams example, the user might then do some
+// composition based on their needs.
+const Measurement = struct {
+    temperature: f64,
+    sensor_id: []u8,
+    room_name: []u8,
+};
+
+const ReadMeasurements = struct {
+    stream1: []StreamEntry(Measurement),
+    stream2: []StreamEntry(Measurement),
+    @"stream-remote": []StreamEntry(Measurement),
+};
+
+_ = try client.sendAlloc(ReadMeasurements, allocator, XREAD.init(.NoCount, .NoBlock, &[_][]const u8{
+    "stream1",
+    "stream2",
+    "stream-remote",
+}));
+
+```
+
+### Adding types used by a higher-level language
+Let's say that you want to embed OkRedis in Python using Python's CFFI 
+faclities. In that case you'd want to have the parser directly produce 
+`PyObject`s directly. 
+
+In this case you will probably have to deal more closely with the parsing 
+process. I recommend to read the implementation of 
+[`DynamicReply`](https://kristoff.it/zig-okredis#root;types.DynamicReply) 
+which does 90% of what you would need to do.
