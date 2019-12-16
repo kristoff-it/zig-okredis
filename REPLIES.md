@@ -21,7 +21,7 @@
   * [Decoding Types In The Standard Library](#decoding-types-in-the-standard-library)
   * [Implementing Decodable Types](#implementing-decodable-types)
 
-## Intro
+## Introduction
 One of the main features of OkRedis is the ability of decoding Redis replies 
 without having to resort to dynamic allocations when not stricly necessary.
 
@@ -83,8 +83,8 @@ an interactive client.
 ### Void
 By using `void`, we indicate that we're not interested in inspecting the reply, 
 so we don't even reserve memory on the stack for it. This will discard any reply 
-Redis might send, **except for error and nil replies**. Later we will see how to 
-parse Redis error replies as values.
+Redis might send, **except for error and nil replies**, which will reported as
+Zig errors, as mentioned in the previous section.
 
 ```zig
 try client.send(void, .{ "SET", "key", 42 });

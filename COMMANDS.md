@@ -149,7 +149,7 @@ OkRedis uses two traits to delegate serialization to a struct that implements
 a command: `RedisCommand` and `RedisArguments`.
 
 For now I recommend reading the source code of existing commands to get an idea
-of how they works, possibly starting with simple commands (e.g., avoid staring 
+of how they work, possibly starting with simple commands (e.g., avoid staring 
 with `SET` as the many options make it unexpectedly complex).
 
 
@@ -187,7 +187,8 @@ try client.trans(OrErr([2]void), .{
 
 This might seem a small detail, but it really helps users build a mental model 
 of the client that is simpler, but still equally useful.
+
 This choice also frees space in the `client` namespace to add methods that 
-instead do imply different communication behavior, like `pipe` and `trans`.
+instead **do** imply different communication behavior, like `pipe` and `trans`.
 It's easy to miss the implications behind calling `client.xadd()` vs 
-`client.subscribe()`.
+`client.subscribe()` in a method-based client.
