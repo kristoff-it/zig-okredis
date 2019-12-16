@@ -183,4 +183,57 @@ pub fn main() !void {
     for (try client.send([2]KV(FixBuf(100), f64), .{ "ZRANGE", "sset", "0", "1", "WITHSCORES" })) |kv| {
         std.debug.warn("\t[{}] => {}\n", .{ kv.key.toSlice(), kv.value });
     }
+
+    // Pipelining is a way of sending a batch of commands to Redis
+    // in a more performant way than sending them one by one.
+    // It's especially useful when using blocking I/O but, it can also
+    // give small boosts when doing evented I/O.
+    const r1 = try client.pipe(struct {
+        c1: void,
+        c2: u64,
+        c3: OrErr(FixBuf(10)),
+    }, .{
+        .{ "SET", "counter", 0 },
+        .{ "INCR", "counter" },
+        .{ "ECHO", "banana" },
+    });
+    std.debug.warn("\n\n[INCR => {}]\n", .{r1.c2});
+    std.debug.warn("[ECHO => {}]\n", .{r1.c3});
+
+    // You can also allocate when doing pipelining.
+    const r2 = try client.pipeAlloc(struct {
+        c1: void,
+        value: []u8,
+    }, allocator, .{
+        .{ "SET", "banana", "yes please" },
+        .{ "GET", "banana" },
+    });
+    defer freeReply(r1);
+
+    std.debug.warn("\n[banana] => '{}'\n", .{r2.value});
+
+    // Transactions are a way of providing isolation and all-or-nothing semantics to
+    // a group of Redis commands. The relative methods (`trans` and `transAlloc`) are
+    // included mostly for convenience as they implicitly apply pipelining to the
+    // commands passed, but the same result could be achieved by making explicit use
+    // of MULTI/EXEC and `pipe`/`pipeAlloc`.
+    switch (try client.trans(OrErr(struct {
+        c1: OrErr(FixBuf(10)),
+        c2: u64,
+        c3: OrErr(void),
+    }), .{
+        .{ "SET", "banana", "no, thanks" },
+        .{ "INCR", "counter" },
+        .{ "INCR", "banana" },
+    })) {
+        .Err => |e| @panic(e.getCode()),
+        .Nil => @panic("got nil"),
+        .Ok => |tx_reply| {
+            std.debug.warn("\n[SET = {}] [INCR = {}] [INCR (error) = {}]\n", .{
+                tx_reply.c1.Ok.toSlice(),
+                tx_reply.c2,
+                tx_reply.c3.Err.getCode(),
+            });
+        },
+    }
 }

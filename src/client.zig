@@ -75,9 +75,10 @@ pub const Client = struct {
         // TODO: this is not threadsafe.
         _ = try self.send(void, .{"MULTI"});
 
+        const len = comptime std.meta.fields(@TypeOf(cmds)).len;
         try self.pipe(void, cmds);
 
-        if (@hasDecl(@TypeOf(allocator), "ptr")) {
+        if (@hasField(@TypeOf(allocator), "ptr")) {
             return self.sendAlloc(Ts, allocator.ptr, .{"EXEC"});
         } else {
             return self.send(Ts, .{"EXEC"});
@@ -171,15 +172,52 @@ pub const Client = struct {
                 }
                 return;
             } else {
-                inline for (std.meta.fields(Ts)) |field| {
-                    if (@hasField(@TypeOf(allocator), "ptr")) {
-                        @field(result, field.name) = try RESP3.parseAlloc(field.field_type, allocator.ptr, &self.bufReadStream.stream);
-                    } else {
-                        @field(result, field.name) = try RESP3.parse(field.field_type, &self.bufReadStream.stream);
-                    }
+                switch (@typeInfo(Ts)) {
+                    .Struct => {
+                        inline for (std.meta.fields(Ts)) |field| {
+                            if (@hasField(@TypeOf(allocator), "ptr")) {
+                                @field(result, field.name) = try RESP3.parseAlloc(field.field_type, allocator.ptr, &self.bufReadStream.stream);
+                            } else {
+                                @field(result, field.name) = try RESP3.parse(field.field_type, &self.bufReadStream.stream);
+                            }
+                        }
+                    },
+                    .Array => {
+                        var i: usize = 0;
+                        while (i < Ts.len) : (i += 1) {
+                            if (@hasField(@TypeOf(allocator), "ptr")) {
+                                result[i] = try RESP3.parseAlloc(Ts.Child, allocator.ptr, &self.bufReadStream.stream);
+                            } else {
+                                result[i] = try RESP3.parse(Ts.Child, &self.bufReadStream.stream);
+                            }
+                        }
+                    },
+                    .Pointer => |ptr| {
+                        switch (ptr.size) {
+                            .One => {
+                                if (@hasField(@TypeOf(allocator), "ptr")) {
+                                    result = try RESP3.parseAlloc(Ts, allocator.ptr, &self.bufReadStream.stream);
+                                } else {
+                                    result = try RESP3.parse(Ts, &self.bufReadStream.stream);
+                                }
+                            },
+                            .Many => {
+                                if (@hasField(@TypeOf(allocator), "ptr")) {
+                                    result = try allocator.alloc(ptr.child, size);
+                                    errdefer allocator.free(result);
+
+                                    for (result) |*elem| {
+                                        elem.* = try RESP3.parseAlloc(Ts.Child, allocator.ptr, &self.bufReadStream.stream);
+                                    }
+                                } else {
+                                    @compileError("Use sendAlloc / pipeAlloc / transAlloc to decode pointer types.");
+                                }
+                            },
+                        }
+                    },
+                    else => @compileError("Unsupported type"),
                 }
             }
-
             return result;
         }
     }
