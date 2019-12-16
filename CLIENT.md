@@ -72,7 +72,7 @@ group of Redis commands. The concept of transactions is orthogonal to pipelines,
 but given the semantics of Redis transactions, it's often advantageous to apply
 pipelining to one.
 
-You can read more about Redis transactions here.
+You can [read more about Redis transactions here](https://redis.io/topics/transactions).
 
 OkRedis provides `trans` and `transAlloc` to perform transactions with automatic
 pipelining. It's mostly for convenience as the same result could be achieved by
