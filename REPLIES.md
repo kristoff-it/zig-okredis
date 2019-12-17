@@ -374,7 +374,7 @@ but it's possible that in special cases one might want to decode a complex type
 using the parser's facilities to avoid intermediate representations.
 
 Two main cases for this need could be:
-1. Redis module authors that want to offer client-side tools to their users
+1. Redis module ([or Lua script](https://redis.io/commands/eval#using-lua-scripting-in-resp3-mode)) authors that want to offer client-side tools to their users
 2. Somebody who might want to embed OkRedis in a higher-level language via the C ABI.
 
 Let's expand slightly on these two use cases.

@@ -77,7 +77,7 @@ pipelining. It's mostly for convenience as the same result could be achieved by
 making explicit use of `MULTI`, `EXEC` and (optionally) `pipe`/`pipeAlloc`.
 
 ```zig
-switch (try client.trans(OrErr(struct {
+const reply = try client.trans(OrErr(struct {
     c1: OrErr(FixBuf(10)),
     c2: u64,
     c3: OrErr(void),
@@ -85,14 +85,16 @@ switch (try client.trans(OrErr(struct {
     .{ "SET", "banana", "no, thanks" },
     .{ "INCR", "counter" },
     .{ "INCR", "banana" },
-})) {
+});
+
+switch (reply) {
     .Err => |e| @panic(e.getCode()),
     .Nil => @panic("got nil"),
-    .Ok => |reply| {
+    .Ok => |r| {
         std.debug.warn("\n[SET = {}] [INCR = {}] [INCR (error) = {}]\n", .{
-            reply.c1.Ok.toSlice(),
-            reply.c2,
-            reply.c3.Err.getCode(),
+            r.c1.Ok.toSlice(),
+            r.c2,
+            r.c3.Err.getCode(),
         });
     },
 }
