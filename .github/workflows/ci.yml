@@ -1,5 +1,8 @@
 name: CI
-on: [push]
+on: 
+  push:
+    paths:
+      - 'src/**'
 jobs:
 
   build:
