@@ -10,10 +10,13 @@
 </p>
 
 ## Handy and Efficient
-This client aims to offer an interface with great ergonomics without 
-compromising on performance or flexibility: if it makes sense, it's going to be 
-straightforward, and if it's possible at all, you're going to be able to do it.
+OkRedis aims to offer an interface with great ergonomics without 
+compromising on performance or flexibility.
 
+## Project status
+OkRedis is currently in alpha as some basic (and boring) connection-management 
+features need to be added, but it's definitely complete enough to try and build 
+something with it.
 
 ## Zero dynamic allocations, unless explicitly wanted
 The client has two main interfaces to send commands: `send` and `sendAlloc`. 
@@ -68,6 +71,14 @@ pub fn main() !void {
 ## Available Documentation
 The reference documentation [is available here](https://kristoff.it/zig-okredis#root).
 
+   * [Using the OkRedis client](CLIENT.md#using-the-okredis-client)
+      * [Connecting](CLIENT.md#connecting)
+      * [Buffering](CLIENT.md#buffering)
+      * [Evented vs blocking I/O](CLIENT.md#evented-vs-blocking-io)
+      * [Pipelining](CLIENT.md#pipelining)
+      * [Transactions](CLIENT.md#transactions)
+      * [Pub/Sub](CLIENT.md#pubsub)
+
    * [Sending commands](COMMANDS.md#sending-commands)
       * [Base interface](COMMANDS.md#base-interface)
       * [Command builder interface](COMMANDS.md#command-builder-interface)
@@ -99,14 +110,12 @@ The reference documentation [is available here](https://kristoff.it/zig-okredis#
          * [Adding types for custom commands (Lua scripts or Redis modules)](REPLIES.md#adding-types-for-custom-commands-lua-scripts-or-redis-modules)
          * [Adding types used by a higher-level language](REPLIES.md#adding-types-used-by-a-higher-level-language)
 
-   * [Using the OkRedis client](CLIENT.md#using-the-okredis-client)
-      * [Connecting](CLIENT.md#connecting)
-      * [Buffering](CLIENT.md#buffering)
-      * [Evented vs blocking I/O](CLIENT.md#evented-vs-blocking-io)
-      * [Pipelining](CLIENT.md#pipelining)
-      * [Transactions](CLIENT.md#transactions)
-      * [Pub/Sub](CLIENT.md#pubsub)
+## Extending OkRedis
+If you are a Lua script or Redis module author, you might be interestedd in 
+reading the final sections of `COMMANDS.md` and `REPLIES.md`.
 
+## Embedding OkRedis in a higher level language
+Take a look at the final section of `REPLIES.md`.
 
 ## TODOS
 - Design Zig errors

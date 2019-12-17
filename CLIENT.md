@@ -9,7 +9,25 @@
    * [Pub/Sub](#pubsub)
 
 ## Connecting
-TODO
+For now only IPv4 is supported, in the near future I'll add support for the 
+options commonly supported.
+
+```zig
+const std = @import("std");
+const okredis = @import("./src/okredis.zig");
+const Client = okredis.Client;
+
+pub fn main() !void {
+    var client: Client = undefined;
+    try client.initIp4("127.0.0.1", 6379);
+    defer client.close();
+
+    try client.send(void, .{ "SET", "key", "42" });
+
+    const reply = try client.send(i64, .{ "GET", "key" });
+    std.debug.warn("key = {}\n", .{reply});
+}
+```
 
 ## Buffering
 Currently the client uses a 4096 bytes long fixed buffer embedded in the 
@@ -138,7 +156,7 @@ switch (reply) {
 }
 ```
 
-This prints, as might have guessed:
+This prints, as you might have guessed:
 ```
 Do you want to build a client?
 ```
