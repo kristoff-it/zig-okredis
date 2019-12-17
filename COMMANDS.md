@@ -21,7 +21,7 @@ const cmd = [_][]const u8{ "SET", "key", "42" };
 try client.send(void, &cmd);
 
 // You can also nest one level of slices/arrays,
-// useful when some arguments are dynamic in number.
+// useful when some of the arguments are dynamic in number.
 const args = [_][]const u8{ "field1", "val1", "field2", "val2"};
 try client.send(void, .{"HSET", "key", &args, "fixed-field", "fixed-val"});
 ```
@@ -42,9 +42,10 @@ client.set("fruit", "banana")
 
 OkRedis doesn't provide any command-specific method and instead uses a different
 approach based on the idea of command builders. It might feel annoying at first
-to have to deal with a different way of doing things, but I'll show in this 
-document how this pattern brings enough advantages to the table to make the 
-switch well worth.
+to have to deal with a different way of doing things (and builders/factories are
+a huge turnoff -- believe me I get it), but I'll show in this document how this 
+pattern brings enough advantages to the table to make the switch well worth.
+
 
 ## Command builder interface
 OkRedis includes command builders for all the basic Redis commands.
@@ -54,20 +55,13 @@ All commands are grouped by the type of key they operate on (e.g., `strings`,
 
 Usage example:
 ```zig
-const okredis = @import("./src/okredis.zig");
 const cmds = okredis.commands;
 
-pub fn main() !void {
-    var client: Client = undefined;
-    try client.initIp4("127.0.0.1", 6379);
-    defer client.close();
+// SET key 42 NX
+try client.send(void, cmds.strings.SET.init("key", 42, .NoExpire, .IfNotExisting));
 
-    // SET key 42 NX
-    try client.send(void, cmds.strings.SET.init("key", 42, .NoExpire, .IfNotExisting));
-
-    // GET key
-    _ = try client.send(i64, cmds.strings.GET.init("key"));
-}
+// GET key
+_ = try client.send(i64, cmds.strings.GET.init("key"));
 ```
 
 For the full list of available command builders consult 

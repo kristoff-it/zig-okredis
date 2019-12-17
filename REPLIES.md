@@ -71,7 +71,7 @@ which brings us to the second rule:
 or a `nil` reply, the client will return `error.GotErrorReply` or 
 `error.GotNilReply` if any such event occurs.**
 
-At the moment triggering any of these errors will result in a corrupted 
+At the moment, triggering any of these errors will result in a corrupted 
 connection and will require you to close and reopen the client. *This might 
 change in the future.*
 
@@ -119,7 +119,9 @@ if (maybe) |val| {
 ### Strings
 Parsing strings without allocating is a bit trickier. It's possible to parse 
 a string inside an array, but the two lengths must match, as there is no way to 
-otherwise indicate the point up to which the array was filled.
+otherwise indicate the point up to which the array was filled using an array
+type alone (in Zig null-terminated arrays are supported but not the idiomatic
+way of representing strings).
 
 For your convenience the library bundles a generic type called `FixBuf(N)`. A 
 `FixBuf(N)` just an array of size `N` + a length, so it allows parsing strings 

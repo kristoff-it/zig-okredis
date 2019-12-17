@@ -22,19 +22,16 @@ to the user, once the I/O stream interface becomes more stable in Zig.
 Evented I/O is supported and the client will properly coordinate with the
 event loop when `pub const io_mode = .evented;` is defined in the main function.
 
-The implementation has only been tested lightly and preliminary benchmarks have 
-shown that OkRedis is roughly in line with `redis-cli` when in blocking I/O 
-mode, while evented I/O is not nearly as efficient.
-
-It's recommended to wait for the Zig ecosystem to stabilize more before relying
-on this feature.
+The implementation has only been tested lightly, so it's recommended to wait for 
+the Zig ecosystem to stabilize more before relying on this feature (which at the
+time of writing only works on Linux).
 
 ## Pipelining
 Redis supports pipelining, which, in short, consists of sending multiple 
 commands at once and only reading replies once all the commands are sent.
 [You can read more here](https://redis.io/topics/pipelining).
 
-The pipeline interface of OkRedis is straightforward:
+OkRedis exposes pipelining through `pipe` and `pipeAlloc`.
 
 ```zig
 const reply = try client.pipe(struct {
@@ -52,12 +49,13 @@ std.debug.warn("[ECHO => {}]\n", .{reply.c3});
 ```
 
 Let's break down the code above.
-The first argument to `pipe` is a struct that contains one field for each 
-command being sent through the pipeline. It's basically the same as with `send`, 
-except that, since we're sending multiple commands at once, the return type must 
-comprehend the return typea of all and each command.
+The first argument to `pipe` is a struct *definition* that contains one field 
+for each command being sent through the pipeline. It's basically the same as 
+with `send`, except that, since we're sending multiple commands at once, the 
+return type must comprehend the return types of all commands.
+
 You can define whatever field name you want when defining the return types.
-In the example above I chose (`c1`, `c2`, `c3`), but whichever name is fine.
+In the example above I chose (`c1`, `c2`, `c3`), but whichever is fine.
 
 The second argument to `pipe` is an argument list that contains all the commands
 that we want to send.
@@ -76,7 +74,7 @@ You can [read more about Redis transactions here](https://redis.io/topics/transa
 
 OkRedis provides `trans` and `transAlloc` to perform transactions with automatic
 pipelining. It's mostly for convenience as the same result could be achieved by
-making explicit use of `MULTI`, `EXEC` and `pipe`/`pipeAlloc`.
+making explicit use of `MULTI`, `EXEC` and (optionally) `pipe`/`pipeAlloc`.
 
 ```zig
 switch (try client.trans(OrErr(struct {
@@ -138,6 +136,10 @@ switch (reply) {
 }
 ```
 
+This prints, as might have guessed:
+```
+Do you want to build a client?
+```
 
 ## Pub/Sub
 Pub/Sub is not implemented yet. I'm currently waiting to see how the networking 
