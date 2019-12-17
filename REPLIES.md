@@ -385,10 +385,10 @@ complex response type, it might make sense to provide a boiler-plate type for to
 your users.
 
 In this case you are probably fine by simply defining a struct that properly 
-represets the fixed parts of your responses.
+represents the fixed parts of your responses.
 
 ```zig
-// If replies are complex, but with a static structure
+// If replies are complex, but with a static structure.
 const MyCommandReplyType = struct {
     id: []u8,
     query_exec_time: u64,
@@ -400,16 +400,17 @@ const MyCommandReplyType = struct {
     };
 };
 
-// Usage is straightforward as usual
+// Usage is straightforward as usual.
 _ = try client.sendAlloc(MyCommandReplyType, allocator, .{"CUSTOM_COMMAND"});
 
-// And the user will still be able to combine the type
+// And the user will still be able to combine the type.
 _ = try client.sendAlloc(OrErr(MyCommandReplyType), allocator, .{"CUSTOM_COMMAND"});
 
 
 // Some types might be best defined as generic to let the user customize it.
-// This type is a reasonable way of decoding a Redis stream entry letting the
-// user provide a type that decodes the entry's contents, for example
+// The following type is a reasonable way of decoding a Redis stream entry 
+// letting the user provide a type that decodes the entry's contents, 
+// for example.
 pub fn StreamEntry(comptime T: type) type {
     return struct {
         id: []u8,
@@ -441,15 +442,15 @@ _ = try client.sendAlloc(ReadMeasurements, allocator, XREAD.init(.NoCount, .NoBl
 
 ### Adding types used by a higher-level language
 Let's say that you want to embed OkRedis in Python using Python's CFFI 
-faclities. In that case you'd want to have the parser directly produce 
-`PyObject`s directly. 
+faclities. In that case you'd want to have the parser produce directly custom
+`PyObject` instances. 
 
 In this case you will probably have to deal more closely with the parsing 
 process. I recommend to read the implementation of 
-[`DynamicReply`](https://kristoff.it/zig-okredis#root;types.DynamicReply) 
+[`DynamicReply`](src/types/reply.zig) 
 which does 90% of what you would need to do.
 
-Zig will be able to provide the remaining things you will need through it's C 
+Zig will be able to provide the remaining tools you will need through it's C 
 ABI interoperability features. As an example you will probably want to define 
 your custom `PyObject`-like structs as 
 [`extern`](https://ziglang.org/documentation/master/#toc-extern-struct).

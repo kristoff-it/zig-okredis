@@ -15,8 +15,8 @@ compromising on performance or flexibility.
 
 ## Project status
 OkRedis is currently in alpha as some basic (and boring) connection-management 
-features need to be added, but it's definitely complete enough to try and build 
-something with it.
+features need to be added, but it's definitely complete enough to be taken for a
+spin.
 
 ## Zero dynamic allocations, unless explicitly wanted
 The client has two main interfaces to send commands: `send` and `sendAlloc`. 
