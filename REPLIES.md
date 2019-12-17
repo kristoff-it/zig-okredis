@@ -448,3 +448,8 @@ In this case you will probably have to deal more closely with the parsing
 process. I recommend to read the implementation of 
 [`DynamicReply`](https://kristoff.it/zig-okredis#root;types.DynamicReply) 
 which does 90% of what you would need to do.
+
+Zig will be able to provide the remaining things you will need through it's C 
+ABI interoperability features. As an example you will probably want to define 
+your custom `PyObject`-like structs as 
+[`extern`](https://ziglang.org/documentation/master/#toc-extern-struct).
