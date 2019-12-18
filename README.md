@@ -114,7 +114,7 @@ The reference documentation [is available here](https://kristoff.it/zig-okredis#
          * [Adding types used by a higher-level language](REPLIES.md#adding-types-used-by-a-higher-level-language)
 
 ## Extending OkRedis
-If you are a Lua script or Redis module author, you might be interestedd in 
+If you are a Lua script or Redis module author, you might be interested in 
 reading the final sections of `COMMANDS.md` and `REPLIES.md`.
 
 ## Embedding OkRedis in a higher level language
