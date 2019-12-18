@@ -159,31 +159,6 @@ pub fn main() !void {
         },
     }
 
-    // KV can also be used outside of DynamicReply.
-    const KV = okredis.types.KV;
-
-    // In the previous example we saw how a Redis hashmap can become
-    // a sequence of KV values. The same applies to lists containing
-    // an even number of elements (and with appropriate typing).
-    // A good example are sorted sets.
-    try client.send(void, .{ "DEL", "sset" });
-    try client.send(void, .{ "ZADD", "sset", "100", "elem1", "200", "elem2" });
-
-    std.debug.warn("\n\nSorted set to KV slice:\n", .{});
-    const sortSet = try client.sendAlloc([]KV([]u8, f64), allocator, .{ "ZRANGE", "sset", "0", "1", "WITHSCORES" });
-    defer freeReply(sortSet, allocator);
-
-    for (sortSet) |kv| {
-        std.debug.warn("\t[{}] => {}\n", .{ kv.key, kv.value });
-    }
-
-    // Combining the tools at our disposal we could run again the
-    // previous command without requiring dynamic allocations.
-    std.debug.warn("\n\nAgain, but no allocator this time:\n", .{});
-    for (try client.send([2]KV(FixBuf(100), f64), .{ "ZRANGE", "sset", "0", "1", "WITHSCORES" })) |kv| {
-        std.debug.warn("\t[{}] => {}\n", .{ kv.key.toSlice(), kv.value });
-    }
-
     // Pipelining is a way of sending a batch of commands to Redis
     // in a more performant way than sending them one by one.
     // It's especially useful when using blocking I/O but, it can also
