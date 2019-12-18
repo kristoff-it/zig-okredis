@@ -18,6 +18,9 @@ OkRedis is currently in alpha as some basic (and boring) connection-management
 features need to be added, but it's definitely complete enough to be taken for a
 spin.
 
+Everything mentioned in the docs is already implemented and you can just 
+`zig run example.zig` to quickly see what it can do.
+
 ## Zero dynamic allocations, unless explicitly wanted
 The client has two main interfaces to send commands: `send` and `sendAlloc`. 
 Following Zig's mantra of making dynamic allocations explicit, only `sendAlloc` 
