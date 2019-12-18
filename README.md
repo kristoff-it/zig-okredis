@@ -19,7 +19,8 @@ features need to be added, but it's definitely complete enough to be taken for a
 spin.
 
 Everything mentioned in the docs is already implemented and you can just 
-`zig run example.zig` to quickly see what it can do.
+`zig run example.zig` to quickly see what it can do, but don't forget that you 
+need a version of Redis that supports RESP3.
 
 ## Zero dynamic allocations, unless explicitly wanted
 The client has two main interfaces to send commands: `send` and `sendAlloc`. 
