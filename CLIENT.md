@@ -10,7 +10,7 @@
 
 ## Connecting
 For now only IPv4 is supported, in the near future I'll add support for the 
-options commonly supported.
+common options.
 
 ```zig
 const std = @import("std");
@@ -38,7 +38,7 @@ to the user, once the I/O stream interface becomes more stable in Zig.
 
 ## Evented vs blocking I/O
 Evented I/O is supported and the client will properly coordinate with the
-event loop when `pub const io_mode = .evented;` is defined in the main function.
+event loop when `pub const io_mode = .evented;` is defined in the root file.
 
 The implementation has only been tested lightly, so it's recommended to wait for 
 the Zig ecosystem to stabilize more before relying on this feature (which at the
