@@ -162,11 +162,9 @@ Do you want to build a client?
 ```
 
 ## Pub/Sub
-Pub/Sub is not implemented yet. I'm currently waiting to see how the networking 
-part of the Zig standard library will evolve, aswell as Zig's support for 
-evented I/O.
+Pub/Sub is not implemented yet. 
 
-Lastly, I'm still trying to figure out how the API should look like in order to 
+I'm still trying to figure out how the API should look like in order to 
 provide an allocation-free interface also for Pub/Sub.
 
 In case I can't make progress in the near future, I'll add some low-level 
