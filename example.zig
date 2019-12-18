@@ -208,7 +208,7 @@ pub fn main() !void {
         .{ "SET", "banana", "yes please" },
         .{ "GET", "banana" },
     });
-    defer freeReply(r1);
+    defer freeReply(r2, allocator);
 
     std.debug.warn("\n[banana] => '{}'\n", .{r2.value});
 

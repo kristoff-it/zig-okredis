@@ -63,7 +63,7 @@ pub fn FixBuf(comptime size: usize) type {
                     }
                 }
 
-                pub fn destroy(self: Self, comptime rootParser: type, allocator: *Allocator) void {}
+                pub fn destroy(self: Self, comptime rootParser: type, allocator: *std.mem.Allocator) void {}
                 pub fn parseAlloc(tag: u8, comptime _: type, msg: var) !Self {
                     return parse(tag, _, msg);
                 }
