@@ -121,8 +121,8 @@ reading the final sections of `COMMANDS.md` and `REPLIES.md`.
 Take a look at the final section of `REPLIES.md`.
 
 ## TODOS
-- Design Zig errors
-- Better connection handling (buffering, ...)
-- Refine support for async/await
-- Pub/Sub
+- Better connection management (ipv6, unixsockets, ...)
+- Streamline design of Zig errors
+- Refine support for async/await and think about connection pooling
 - Refine the Redis traits
+- Pub/Sub
