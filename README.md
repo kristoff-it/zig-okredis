@@ -121,6 +121,7 @@ reading the final sections of `COMMANDS.md` and `REPLIES.md`.
 Take a look at the final section of `REPLIES.md`.
 
 ## TODOS
+- Finish implementing command builders for all the remaining commands
 - Better connection management (ipv6, unixsockets, ...)
 - Streamline design of Zig errors
 - Refine support for async/await and think about connection pooling
