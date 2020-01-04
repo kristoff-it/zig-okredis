@@ -1,0 +1,20 @@
+// PFADD key element [element ...]
+
+pub const PFADD = struct {
+    key: []const u8,
+    elements: []const []const u8,
+
+    /// Instantiates a new PFADD command.
+    pub fn init(key: []const u8, elements: []const []const u8) PFADD {
+        return .{ .key = key, .elements = elements };
+    }
+
+    /// Validates if the command is syntactically correct.
+    pub fn validate(self: PFADD) !void {}
+
+    pub const RedisCommand = struct {
+        pub fn serialize(self: PFADD, comptime rootSerializer: type, msg: var) !void {
+            return rootSerializer.serializeCommand(msg, .{ "PFADD", self.key, self.elements });
+        }
+    };
+};

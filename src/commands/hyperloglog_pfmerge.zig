@@ -1,0 +1,20 @@
+// PFMERGE destkey sourcekey [sourcekey ...]
+
+pub const PFMERGE = struct {
+    destkey: []const u8,
+    sourcekeys: []const []const u8,
+
+    /// Instantiates a new PFMERGE command.
+    pub fn init(destkey: []const u8, sourcekeys: []const []const u8) PFMERGE {
+        return .{ .destkey = destkey, .sourcekeys = sourcekeys };
+    }
+
+    /// Validates if the command is syntactically correct.
+    pub fn validate(self: PFMERGE) !void {}
+
+    pub const RedisCommand = struct {
+        pub fn serialize(self: PFMERGE, comptime rootSerializer: type, msg: var) !void {
+            return rootSerializer.serializeCommand(msg, .{ "PFMERGE", self.destkey, self.sourcekeys });
+        }
+    };
+};
