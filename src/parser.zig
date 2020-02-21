@@ -266,11 +266,11 @@ test "evil indirection" {
     const allocator = std.heap.direct_allocator;
 
     {
-        const yes = try RESP3Parser.parseAlloc(?***f32, allocator, &MakeEvilFloat().stream);
+        const yes = try RESP3Parser.parseAlloc(?**?*f32, allocator, &MakeEvilFloat().stream);
         defer RESP3Parser.freeReply(yes, allocator);
 
         if (yes) |v| {
-            testing.expectEqual(@as(f32, 123.45), v.*.*.*);
+            testing.expectEqual(@as(f32, 123.45), v.*.*.?.*);
         } else {
             unreachable;
         }
