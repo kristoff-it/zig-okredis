@@ -17,285 +17,146 @@ const SetParser = @import("./parser/t_set.zig").SetParser;
 const MapParser = @import("./parser/t_map.zig").MapParser;
 const traits = @import("./traits.zig");
 
-/// This is the RESP3 parser. It reads an OutStream and returns redis replies.
-/// The user is required to specify how they want to decode each reply.
-///
-/// The parser supports all 1:1 translations (e.g. RESP Number -> Int) and
-/// a couple quality-of-life custom ones:
-///     - RESP Strings can be parsed to numbers (the parser will use fmt.parse{Int,Float})
-///     - RESP Maps can be parsed into std.HashMaps and Structs
-///     - RESP Lists can be parsed into structs (if # of fields and length match)
-///
-/// Additionally, the parser can be extented. If the type requested has a
-/// `Redis.Parser` declaration, then their .parse/.parseAlloc will be called.
-///
-/// There are two included types that implement the `Redis.Parser` trait
-///     - OrErr(T) is a union over a user type that parses Redis errors
-///     - FixBuf(N) is a fixed-length buffer used to decode strings
-///       without dynamic allocations.
-///
-/// Redis Errors are treated as special values, so they won't decode to
-/// strings ([]u8) or other generic types. Same with `void`: it will discard
-/// any reply *EXCEPT* for Redis errors. When the reply contains an error, the
-/// Zig `error.GorErrorReply` error will be returned. This makes it impossible
-/// to erroneusly ignore error replies, but discards the error message that
-/// Redis sent. To decode a Redis error reply as a value, in order to inspect
-/// the error code, for example, one must wrap the expected type with OrErr or a
-/// similar type. Asking for an incompatible type will return a Zig error and
-/// will leave the connection in a corrupted state.
-///
-/// If the return value of a command is not needed, it's also possible to use
-/// the `void` type. This will succesfully decode any type of response to a
-/// command _except_ for RedisErrors. Use OrErr(void) to ensure a command
-/// decode step never fails.
 pub const RESP3Parser = struct {
     const rootParser = @This();
 
-    /// This is the parsing interface that doesn't requre an allocator.
-    /// As such it doesn't support pointers, but it can still use types
-    /// that implement the `Redis.Parser` trait. The easiest way to decode strings
-    /// using this function is to use a FixBuf wherever a string is expected.
     pub fn parse(comptime T: type, msg: var) !T {
         const tag = try msg.readByte();
-        return parseFromTag(T, tag, msg);
+        return parseImpl(T, tag, .{}, msg);
     }
 
-    /// Used by the sub-parsers and `Redis.Parser` types to delegate parsing to another
-    /// parser. It's used for example by OrErr to continue parsing in the event
-    /// that the reply is not a Redis error (i.e. the tag is not '!' nor '-').
     pub fn parseFromTag(comptime T: type, tag: u8, msg: var) !T {
-        if (T == void) return VoidParser.discardOne(tag, msg);
-
-        comptime var UnwrappedType = T;
-        switch (@typeInfo(T)) {
-            .Pointer => @compileError("`parse` can't perform allocations so it can't handle pointers, use `parseAlloc` instead."),
-            .Optional => |opt| {
-                UnwrappedType = opt.child;
-
-                if (@typeId(opt.child) == .Optional) {
-                    @compileError("heyredis doesn't support double optionals: `" ++ @typeName(T) ++ "`.");
-                }
-                if (comptime traits.noOptionalWrapper(opt.child)) {
-                    @compileError("The type " ++
-                        @typeName(opt.child) ++
-                        " declares it is wrong to wrap it directly inside an optional. " ++
-                        "Types like `OrErr` and `WithAttribs` should not be optional. " ++
-                        "Make the type they wrap optional instead. For example: ?WithAttribs(i64) -> WithAttribs(?i64)");
-                }
-            },
-            else => {},
-        }
-
-        // At this point there might be an attribute in the stream. We default
-        // to discarding attributes, but some types might want access to them,
-        // like WithAttribs() for example. If there is an attribute and the
-        // type doesn't want it, we discard it and try consuming again a nil
-        // reply if the type is an optional.
-        if (tag == '|') {
-            if (comptime traits.handlesAttributes(UnwrappedType)) {
-                return UnwrappedType.Redis.Parser.parse(tag, rootParser, msg);
-            }
-
-            // Here we lie to the void parser and claim we want to discard one Map element.
-            try VoidParser.discardOne('%', msg);
-        }
-
-        // Try to decode a null if T was an optional.
-        if (@typeId(T) == .Optional) {
-            // Null micro-parser:
-            if (tag == '_') {
-                try msg.skipBytes(2);
-                return null;
-            }
-        }
-
-        // Here we check for the `Redis.Parser` trait, in order to delegate the parsing job.
-        if (comptime traits.isParserType(UnwrappedType)) {
-            return UnwrappedType.Redis.Parser.parse(tag, rootParser, msg);
-        }
-
-        // Call the right parser based on the tag we just read from the stream.
-        switch (tag) {
-            else => std.debug.panic("Found `{}` in the main parser's switch." ++
-                " Probably a bug in a type that implements `Redis.Parser`.", .{tag}),
-            '_' => return error.GotNilReply,
-            '-', '!' => return error.GotErrorReply,
-            ':' => return try ifSupported(NumberParser, UnwrappedType, msg),
-            ',' => return try ifSupported(DoubleParser, UnwrappedType, msg),
-            '#' => return try ifSupported(BoolParser, UnwrappedType, msg),
-            '$', '=' => return try ifSupported(BlobStringParser, UnwrappedType, msg),
-            '+' => return try ifSupported(SimpleStringParser, UnwrappedType, msg),
-            '*' => return try ifSupported(ListParser, UnwrappedType, msg),
-            '~' => return try ifSupported(SetParser, UnwrappedType, msg),
-            '%' => return try ifSupported(MapParser, UnwrappedType, msg),
-            // The bignum parser needs an allocator so it will refuse
-            // all types when calling .isSupported() on it.
-            '(' => return try ifSupported(BigNumParser, UnwrappedType, msg),
-        }
+        return parseImpl(T, tag, .{}, msg);
     }
 
-    // TODO: if no parser supports the type conversion, @compileError!
-    // The whole job of this function is to cut away calls to sub-parsers if we
-    // know that the Zig type is not supported.  It's a good way to report a
-    // comptime error if no parser supports a given type.
-    // We can't hard-code @compileErrors directly into each parser without
-    // `isSupported` because the various parsing switches depend on `tag` which
-    // is a runtime value, so we can't just keep the branches we are happy with.
-    fn ifSupported(comptime parser: type, comptime T: type, msg: var) !T {
-        return if (comptime parser.isSupported(T))
-            parser.parse(T, rootParser, msg)
-        else
-            return error.UnsupportedConversion;
-    }
-
-    /// This is the interface that accepts an allocator.
     pub fn parseAlloc(comptime T: type, allocator: *Allocator, msg: var) !T {
         const tag = try msg.readByte();
-        var x: T = try parseAllocFromTag(T, tag, allocator, msg);
+        var x: T = try parseImpl(T, tag, .{ .ptr = allocator }, msg);
         return x;
     }
-
     pub fn parseAllocFromTag(comptime T: type, tag: u8, allocator: *Allocator, msg: var) !T {
+        return parseImpl(T, tag, .{ .ptr = allocator }, msg);
+    }
+
+    pub fn parseImpl(comptime T: type, tag: u8, allocator: var, msg: var) !T {
+        // First we get out of the way the basic case where
+        // the return type is void and we just discard one full answer.
         if (T == void) return VoidParser.discardOne(tag, msg);
 
-        comptime var UnwrappedType = T;
+        // Here we need to deal with optionals and pointers.
+        // - Optionals imply the possibility of decoding a nil reply.
+        // - Single-item pointers require us to allocate the type and recur.
+        // - Slices are the only type of pointer that we want to delegate to sub-parsers.
         switch (@typeInfo(T)) {
             .Optional => |opt| {
-                UnwrappedType = opt.child;
-                if (@typeId(opt.child) == .Optional) {
-                    @compileError("heyredis doesn't support double optionals: `" ++ @typeName(T) ++ "`.");
+                var nextTag = tag;
+                if (tag == '|') {
+                    // If the type is an optional, we discard any potential attribute.
+                    try VoidParser.discardOne('%', msg);
+                    nextTag = try msg.readByte();
                 }
-                if (comptime traits.noOptionalWrapper(opt.child)) {
-                    @compileError("The type `" ++
-                        @typeName(T) ++
-                        "` declares it is wrong to wrap it directly inside an optional. " ++
-                        "Types like `OrErr` and `WithAttribs` should not be optional. " ++
-                        "Make the type they wrap optional instead. For example: ?WithAttribs(i64) -> WithAttribs(?i64)");
-                }
-                // Null micro-parser:
-                if (tag == '_') {
+
+                // If we found nil, return immediately.
+                if (nextTag == '_') {
                     try msg.skipBytes(2);
                     return null;
                 }
+
+                // Otherwise recur with the underlying type.
+                return try parseImpl(opt.child, nextTag, allocator, msg);
             },
-            else => {},
+            .Pointer => |ptr| {
+                if (!@hasField(@TypeOf(allocator), "ptr")) {
+                    @compileError("`parse` can't perform allocations so it can't handle pointers, use `parseAlloc` instead.");
+                }
+                switch (ptr.size) {
+                    .One => {
+                        // Single-item pointer, allocate it and recur.
+                        var res: *ptr.child = try allocator.ptr.create(ptr.child);
+                        errdefer allocator.ptr.destroy(res);
+                        res.* = try parseImpl(ptr.child, tag, allocator, msg);
+                        return res;
+                    },
+                    .Many, .C => @compileError("Pointers to unknown size or C-type are not supported."),
+                    .Slice => {
+                        // Slices are ok. We continue.
+                    },
+                }
+            },
+            else => {
+                // Main case: no optionals, no single-item/unknown-size pointers.
+                // We continue.
+            },
         }
 
-        // We now are in one of three main situations:
-        // - The type is not a pointer.
-        // - The type is a pointer to many items (slice).
-        // - The type is a pointer to a single item.
-        //
-        // The first case is trivial, we just pass it around and all works just
-        // like with `parse`, with the only difference being that we are
-        // passing around an allocator, to let all sub-parsers allocate memory
-        // as they see fit.
-        //
-        // The second case is slightly more complex: A slice might mean a
-        // string or a sequence of more complex elements ([]u8 vs []u32 vs
-        // []KV([]u8, f32)).  The main parser doesn't really care which case it
-        // is because the actual resolution will be handled by `t_list`,
-        // `t_set`, `t_map`, or `t_string_*`.
-        //
-        // The last case is similar to the first, but since the type is a
-        // pointer, we must allocate it dynamically. In this case we hide to
-        // sub-parsers the fact that the type requested is a pointer and not a
-        // "concrete" type, by just writing the result of their invocation into
-        // dyn memory allocated by us. It was a bit confusing in the beginning
-        // to decide what should sub-parsers know or not, but this seems a good
-        // balance.
-        switch (@typeInfo(UnwrappedType)) {
-            .Pointer => |ptr| switch (ptr.size) {
-                .Many => @compileError("Pointers to unknown size of elements " ++
-                    "are not supported, use a slice or, for C-compatible strings, a c-pointer."),
-                .One => {
-                    // If we have to chase a ptr-to-ptr chain AND the top type
-                    // is an optional, we must carry the optionality down the
-                    // recursive chain. Attributes make it impossible to check
-                    // reliably for nil from the top-level, so we cannot simplify
-                    // this admiteddly weird way of recursing.
-                    if (@typeId(T) == .Optional) {
-                        // We allocate the real type...
-                        var res: *ptr.child = try allocator.create(ptr.child);
-                        errdefer allocator.destroy(res);
-
-                        // ...but we ask for an optional when recurring
-                        if (try parseAllocFromTag(?ptr.child, tag, allocator, msg)) |val| {
-                            res.* = val;
-                        } else {
-                            // We found a nil, the whole gig is up, clean up and let
-                            // null bubble up.
-                            allocator.destroy(res);
-                            return null;
-                        }
-
-                        return res;
-                    } else {
-                        var res: *ptr.child = try allocator.create(ptr.child);
-                        errdefer allocator.destroy(res);
-                        res.* = try parseAllocFromTag(ptr.child, tag, allocator, msg);
-                        return res;
-                    }
-                },
-                else => {},
-            },
-            else => {},
-        }
-
-        // Same as with `parseFromTag`, we might have an attribute in the
-        // stream. We need to decide wether to discard it or let the underlying
-        // type decode it. Recursion is necessary to let the nil parser try
-        // again to decode a nil value, as it would have been obscured by the
-        // interleaved attribute. Read the corresponding comment in
-        // `parseFromTag` for more information.
-        var itemTag = tag;
+        var nextTag = tag;
         if (tag == '|') {
-            if (comptime traits.handlesAttributes(UnwrappedType)) {
-                var x: UnwrappedType = try UnwrappedType.Redis.Parser.parseAlloc(tag, rootParser, allocator, msg);
+            // If the type declares to be able to decode attributes, we delegate immediately.
+            if (comptime traits.handlesAttributes(T)) {
+                var x: T = if (@hasField(@TypeOf(allocator), "ptr"))
+                    try T.Redis.Parser.parseAlloc(tag, rootParser, allocator.ptr, msg)
+                else
+                    try T.Redis.Parser.parse(tag, rootParser, msg);
                 return x;
             }
+            // If we reached here, the type doesn't handle attributes so we must discard them.
 
             // Here we lie to the void parser and claim we want to discard one Map element.
+            // We lie because attributes are not counted when consuming a reply with the
+            // void parser. If we were to be truthful about the element type, the void
+            // parser would also discard the actual reply.
             try VoidParser.discardOne('%', msg);
-            itemTag = try msg.readByte();
+            nextTag = try msg.readByte();
         }
 
-        // Try to decode a null if T was an optional.
-        if (@typeId(T) == .Optional) {
-            // Null micro-parser:
-            if (itemTag == '_') {
-                try msg.skipBytes(2);
-                return null;
-            }
-        }
-
-        if (comptime traits.isParserType(UnwrappedType)) {
-            var x: UnwrappedType = try UnwrappedType.Redis.Parser.parseAlloc(itemTag, rootParser, allocator, msg);
+        // If the type implement its own decoding procedure, we delegate the job to it.
+        if (comptime traits.isParserType(T)) {
+            var x: T = if (@hasField(@TypeOf(allocator), "ptr"))
+                try T.Redis.Parser.parseAlloc(tag, rootParser, allocator.ptr, msg)
+            else
+                try T.Redis.Parser.parse(nextTag, rootParser, msg);
             return x;
         }
 
-        switch (itemTag) {
+        switch (nextTag) {
             else => std.debug.panic("Found `{c}` in the main parser's switch." ++
-                " Probably a bug in a type that implements `Redis.Parser`.", .{itemTag}),
-            '_' => return error.GotNilReply,
-            '-', '!' => return error.GotErrorReply,
-            ':' => return try ifSupportedAlloc(NumberParser, UnwrappedType, allocator, msg),
-            ',' => return try ifSupportedAlloc(DoubleParser, UnwrappedType, allocator, msg),
-            '#' => return try ifSupportedAlloc(BoolParser, UnwrappedType, allocator, msg),
-            '$', '=' => return try ifSupportedAlloc(BlobStringParser, UnwrappedType, allocator, msg),
-            '+' => return try ifSupportedAlloc(SimpleStringParser, UnwrappedType, allocator, msg),
-            '*' => return try ifSupportedAlloc(ListParser, UnwrappedType, allocator, msg),
-            '~' => return try ifSupportedAlloc(SetParser, UnwrappedType, allocator, msg),
-            '%' => return try ifSupportedAlloc(MapParser, UnwrappedType, allocator, msg),
-            '(' => return try ifSupportedAlloc(BigNumParser, UnwrappedType, allocator, msg),
+                " Probably a bug in a type that implements `Redis.Parser`.", .{nextTag}),
+            '_' => {
+                try msg.skipBytes(2);
+                return error.GotNilReply;
+            },
+            '-' => {
+                try VoidParser.discardOne('+', msg);
+                return error.GotErrorReply;
+            },
+            '!' => {
+                try VoidParser.discardOne('$', msg);
+                return error.GotErrorReply;
+            },
+            ':' => return try ifSupported(NumberParser, T, allocator, msg),
+            ',' => return try ifSupported(DoubleParser, T, allocator, msg),
+            '#' => return try ifSupported(BoolParser, T, allocator, msg),
+            '$', '=' => return try ifSupported(BlobStringParser, T, allocator, msg),
+            '+' => return try ifSupported(SimpleStringParser, T, allocator, msg),
+            '*' => return try ifSupported(ListParser, T, allocator, msg),
+            '~' => return try ifSupported(SetParser, T, allocator, msg),
+            '%' => return try ifSupported(MapParser, T, allocator, msg),
+            '(' => return try ifSupported(BigNumParser, T, allocator, msg),
         }
     }
 
-    fn ifSupportedAlloc(comptime parser: type, comptime T: type, allocator: *Allocator, msg: var) !T {
-        return if (comptime parser.isSupportedAlloc(T))
-            parser.parseAlloc(T, rootParser, allocator, msg)
-        else
-            error.UnsupportedConversion;
+    fn ifSupported(comptime parser: type, comptime T: type, allocator: var, msg: var) !T {
+        if (@hasField(@TypeOf(allocator), "ptr")) {
+            return if (comptime parser.isSupportedAlloc(T))
+                parser.parseAlloc(T, rootParser, allocator.ptr, msg)
+            else
+                error.UnsupportedConversion;
+        } else {
+            return if (comptime parser.isSupported(T))
+                parser.parse(T, rootParser, msg)
+            else
+                return error.UnsupportedConversion;
+        }
     }
 
     // Frees values created by `sendAlloc`.
@@ -556,4 +417,64 @@ fn MakeFloatMap() std.io.SliceInStream {
 }
 fn MakeMap() std.io.SliceInStream {
     return std.io.SliceInStream.init("%3\r\n$5\r\nfirst\r\n,12.34\r\n$6\r\nsecond\r\n#t\r\n$5\r\nthird\r\n$11\r\nHello World\r\n"[0..]);
+}
+
+test "consume right amount" {
+    const FixBuf = @import("./types/fixbuf.zig").FixBuf;
+
+    {
+        var msg_err = std.io.SliceInStream.init("-ERR banana\r\n"[0..]);
+        testing.expectError(error.GotErrorReply, RESP3Parser.parse(void, &msg_err.stream));
+        testing.expectError(error.EndOfStream, (&msg_err.stream).readByte());
+
+        msg_err.pos = 0;
+        testing.expectError(error.GotErrorReply, RESP3Parser.parse(i64, &msg_err.stream));
+        testing.expectError(error.EndOfStream, (&msg_err.stream).readByte());
+
+        msg_err.pos = 0;
+        testing.expectError(error.GotErrorReply, RESP3Parser.parse(FixBuf(100), &msg_err.stream));
+        testing.expectError(error.EndOfStream, (&msg_err.stream).readByte());
+    }
+
+    {
+        var msg_err = std.io.SliceInStream.init("!10\r\nERR banana\r\n"[0..]);
+        testing.expectError(error.GotErrorReply, RESP3Parser.parse(void, &msg_err.stream));
+        testing.expectError(error.EndOfStream, (&msg_err.stream).readByte());
+
+        msg_err.pos = 0;
+        testing.expectError(error.GotErrorReply, RESP3Parser.parse(u64, &msg_err.stream));
+        testing.expectError(error.EndOfStream, (&msg_err.stream).readByte());
+
+        msg_err.pos = 0;
+        testing.expectError(error.GotErrorReply, RESP3Parser.parse([10]u8, &msg_err.stream));
+        testing.expectError(error.EndOfStream, (&msg_err.stream).readByte());
+    }
+
+    {
+        var msg_err = std.io.SliceInStream.init("*2\r\n:123\r\n!10\r\nERR banana\r\n"[0..]);
+        testing.expectError(error.GotErrorReply, RESP3Parser.parse([2]u64, &msg_err.stream));
+        testing.expectError(error.EndOfStream, (&msg_err.stream).readByte());
+
+        const MyStruct = struct {
+            a: u8,
+            b: u8,
+        };
+        msg_err.pos = 0;
+        testing.expectError(error.GotErrorReply, RESP3Parser.parse(MyStruct, &msg_err.stream));
+        testing.expectError(error.EndOfStream, (&msg_err.stream).readByte());
+    }
+
+    {
+        var msg_err = std.io.SliceInStream.init("*2\r\n:123\r\n!10\r\nERR banana\r\n"[0..]);
+        testing.expectError(error.GotErrorReply, RESP3Parser.parse([2]u64, &msg_err.stream));
+        testing.expectError(error.EndOfStream, (&msg_err.stream).readByte());
+
+        const MyStruct = struct {
+            a: u8,
+            b: u8,
+        };
+        msg_err.pos = 0;
+        testing.expectError(error.GotErrorReply, RESP3Parser.parse(MyStruct, &msg_err.stream));
+        testing.expectError(error.EndOfStream, (&msg_err.stream).readByte());
+    }
 }

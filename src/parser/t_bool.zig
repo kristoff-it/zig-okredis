@@ -3,7 +3,6 @@ const std = @import("std");
 const fmt = std.fmt;
 const testing = std.testing;
 
-/// Parses RedisBoolean values (#t and #f)
 pub const BoolParser = struct {
     pub fn isSupported(comptime T: type) bool {
         return switch (@typeId(T)) {
@@ -47,15 +46,15 @@ pub const BoolParser = struct {
 };
 
 fn check_bool(ch: u8) bool {
-    if (builtin.mode == .ReleaseFast) {
-        return ch == 't';
-    } else {
-        return switch (ch) {
-            't' => true,
-            'f' => false,
-            else => unreachable, // TODO: should this be a crash or just an error?
-        };
-    }
+    // if (builtin.mode == .ReleaseFast) {
+    return ch == 't';
+    // } else {
+    //     return switch (ch) {
+    //         't' => true,
+    //         'f' => false,
+    //         else => unreachable, // TODO: should this be a crash or just an error?
+    //     };
+    // }
 }
 
 test "parses bools" {

@@ -47,13 +47,14 @@ pub const MapParser = struct {
                     return error.DecodeError;
                 }
 
+                // TODO: this is a decoding error, requires recovery
                 const fragNum = try std.math.divExact(usize, size, arr.child.Redis.Parser.TokensPerFragment);
 
                 if (arr.len != fragNum) {
                     return error.LengthMismatch;
                 }
-                var res: T = undefined;
 
+                var res: T = undefined;
                 for (res) |*elem| {
                     elem.* = try arr.child.Redis.Parser.parseFragment(rootParser, msg);
                 }

@@ -17,9 +17,13 @@ pub fn FixBuf(comptime size: usize) type {
 
         pub const Redis = struct {
             pub const Parser = struct {
-                pub fn parse(tag: u8, comptime _: type, msg: var) !Self {
+                pub fn parse(tag: u8, comptime rootParser: type, msg: var) !Self {
                     switch (tag) {
                         else => return error.UnsupportedConversion,
+                        '-', '!' => {
+                            try rootParser.parseFromTag(void, tag, msg);
+                            return error.GotErrorReply;
+                        },
                         '+', '(' => {
                             var res: Self = undefined;
                             var ch = try msg.readByte();

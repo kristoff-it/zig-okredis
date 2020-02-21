@@ -13,6 +13,8 @@ pub const VoidParser = struct {
         // When we start, we have one item to consume.
         // As we inspect it, we might discover that it's a container, requiring
         // us to increase our items count.
+        var foundError = false;
+
         var itemTag = tag;
         var itemsToConsume: usize = 1;
         while (itemsToConsume > 0) {
@@ -20,12 +22,15 @@ pub const VoidParser = struct {
             switch (itemTag) {
                 else => std.debug.panic("Found `{c}` in the *VOID* parser's switch." ++
                     " Probably a bug in a type that implements `Redis.Parser`.", .{itemTag}),
-                '-', '!' => return error.GotErrorReply,
                 '_' => try msg.skipBytes(2), // `_\r\n`
                 '#' => try msg.skipBytes(3), // `#t\r\n`, `#t\r\n`
-                '$', '=' => {
+                '$', '=', '!' => {
                     // Lenght-prefixed string
                     // TODO: write real implementation
+                    if (itemTag == '!') {
+                        foundError = true;
+                    }
+
                     var buf: [100]u8 = undefined;
                     var end: usize = 0;
                     for (buf) |*elem, i| {
@@ -39,8 +44,11 @@ pub const VoidParser = struct {
                     var size = try fmt.parseInt(usize, buf[0..end], 10);
                     try msg.skipBytes(1 + size + 2);
                 },
-                ':', ',', '+' => {
+                ':', ',', '+', '-' => {
                     // Simple element with final `\r\n`
+                    if (itemTag == '-') {
+                        foundError = true;
+                    }
                     var ch = try msg.readByte();
                     while (ch != '\n') ch = try msg.readByte();
                 },
@@ -72,7 +80,6 @@ pub const VoidParser = struct {
                 },
                 '*', '%' => {
                     // Lists, Maps
-
                     // TODO: write real implementation
                     var buf: [100]u8 = undefined;
                     var end: usize = 0;
@@ -87,7 +94,8 @@ pub const VoidParser = struct {
                     try msg.skipBytes(1);
                     var size = try fmt.parseInt(usize, buf[0..end], 10);
 
-                    // the '|' case is handled in the beginning
+                    // Maps advertize the number of field-value pairs,
+                    // so we double the amount in that case.
                     if (tag == '%') size *= 2;
                     itemsToConsume += size;
                 },
@@ -96,6 +104,6 @@ pub const VoidParser = struct {
             // If we still have items to consume, read the tag.
             if (itemsToConsume > 0) itemTag = try msg.readByte();
         }
-        return;
+        if (foundError) return error.GotErrorReply;
     }
 };

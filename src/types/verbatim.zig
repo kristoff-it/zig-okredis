@@ -32,6 +32,10 @@ pub const Verbatim = struct {
             pub fn parseAlloc(tag: u8, comptime rootParser: type, allocator: *Allocator, msg: var) !Verbatim {
                 switch (tag) {
                     else => return error.DecodingError,
+                    '-', '!' => {
+                        try rootParser.parseFromTag(void, tag, msg);
+                        return error.GotErrorReply;
+                    },
                     '$', '+' => return Verbatim{
                         .format = Format{ .Simple = {} },
                         .string = try rootParser.parseAllocFromTag([]u8, tag, allocator, msg),

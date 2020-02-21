@@ -68,7 +68,7 @@ pub fn main() !void {
     switch (try client.send(OrErr(MyHash), .{ "HGETALL", "myhash" })) {
         .Nil, .Err => unreachable,
         .Ok => |val| {
-            std.debug.warn("myhash = \n\t{?}\n", .{val});
+            std.debug.warn("myhash = \n\t{}\n", .{val});
         },
     }
 
@@ -133,7 +133,7 @@ pub fn main() !void {
     switch (dynHash) {
         .Nil, .Err => unreachable,
         .Ok => |val| {
-            std.debug.warn("mydynhash = \n\t{?}\n", .{val});
+            std.debug.warn("mydynhash = \n\t{}\n", .{val});
         },
     }
     //   -

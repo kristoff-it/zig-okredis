@@ -1,10 +1,12 @@
 const std = @import("std");
 const os = std.os;
+const net = std.net;
 const Allocator = std.mem.Allocator;
 const RESP3 = @import("./parser.zig").RESP3Parser;
 const CommandSerializer = @import("./serializer.zig").CommandSerializer;
 const OrErr = @import("./types/error.zig").OrErr;
 
+/// Struct representing a Redis client
 pub const Client = struct {
     broken: bool = false,
     fd: os.fd_t,
@@ -22,13 +24,9 @@ pub const Client = struct {
 
     /// Initializes a Client and connects it to the specified IPv4 address and port.
     pub fn initIp4(self: *Client, addr: []const u8, port: u16) !void {
-        self.fd = try os.socket(os.AF_INET, os.SOCK_STREAM, 0);
-        errdefer os.close(self.fd);
+        self.sock = try net.tcpConnectToAddress(try net.Address.parseIp4(addr, port));
+        errdefer self.sock.close();
 
-        self.sock_addr = (try std.net.Address.parseIp4(addr, port)).any;
-        try os.connect(self.fd, &self.sock_addr, @sizeOf(os.sockaddr_in));
-
-        self.sock = std.fs.File.openHandle(self.fd);
         self.readStream = self.sock.inStream();
         self.writeStream = self.sock.outStream();
         self.bufReadStream = InBuff.init(&self.readStream.stream);
@@ -46,7 +44,7 @@ pub const Client = struct {
     }
 
     pub fn close(self: Client) void {
-        os.close(self.fd);
+        self.sock.close();
     }
 
     /// Sends a command to Redis and tries to parse the response as the specified type.
