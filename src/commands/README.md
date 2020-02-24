@@ -10,9 +10,9 @@ respective `_utils.zig`.
 Elements shared by multiple groups are declared in `_common_utils.zig`.
 
 Integration tests with `serializer.zig` are scattered across the various files.
-This is the only dependency outside of this sub-tree and I decided that adding 
-this extraneous dependency was better than the alternatives. Long story short, 
-I like having those tests close to where the command implementation is, they 
-really do depend on how the command serializer works, and I  know that 
-`serializer.zig` is never going to depend on any of the content in `commands`, 
-so it will never cause a circular dependency.
+This is the only extraneous dependency outside of this sub-tree and I decided 
+that adding it was better than the alternatives. Long story short, I like having 
+those tests close to where the command implementation is, they really do depend 
+on how the command serializer works, and I  know that `serializer.zig` is never 
+going to depend on any of the content in `commands`, so it will never cause a 
+circular dependency.
