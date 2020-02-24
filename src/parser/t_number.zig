@@ -33,25 +33,10 @@ pub const NumberParser = struct {
     }
 
     pub fn isSupportedAlloc(comptime T: type) bool {
-        return switch (@typeInfo(T)) {
-            .Pointer => |ptr| isSupported(ptr.child),
-            else => isSupported(T),
-        };
+        return isSupported(T);
     }
 
     pub fn parseAlloc(comptime T: type, comptime _: type, allocator: *std.mem.Allocator, msg: var) !T {
-        switch (@typeInfo(T)) {
-            .Pointer => |ptr| {
-                var res = try allocator.alignedAlloc(ptr.child, @alignOf(T), 1);
-                errdefer allocator.free(res);
-                res[0] = try parse(ptr.child, struct {}, msg);
-                return switch (ptr.size) {
-                    .One, .Many => @compileError("Only Slices and C pointers should reach sub-parsers"),
-                    .Slice => res,
-                    .C => @ptrCast(T, res.ptr),
-                };
-            },
-            else => return parse(T, struct {}, msg),
-        }
+        return parse(T, struct {}, msg);
     }
 };

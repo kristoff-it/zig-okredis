@@ -131,11 +131,7 @@ pub const ListParser = struct {
                     elem.* = try rootParser.parseAlloc(ptr.child, allocator, msg);
                 }
 
-                return switch (ptr.size) {
-                    .One, .Many => @compileError("Only Slices and C pointers should reach sub-parsers"),
-                    .Slice => res,
-                    .C => @ptrCast(T, res.ptr),
-                };
+                return res;
             },
             .Array => |arr| {
                 if (arr.len != size) {

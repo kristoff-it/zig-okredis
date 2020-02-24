@@ -58,3 +58,31 @@ const Bounds = struct {
 test "basic usage" {
     const cmd = BITPOS.init("test", .Zero, -3, null);
 }
+
+test "serializer" {
+    const std = @import("std");
+    const serializer = @import("../../serializer.zig").CommandSerializer;
+
+    var correctBuf: [1000]u8 = undefined;
+    var correctMsg = std.io.SliceOutStream.init(correctBuf[0..]);
+
+    var testBuf: [1000]u8 = undefined;
+    var testMsg = std.io.SliceOutStream.init(testBuf[0..]);
+
+    {
+        correctMsg.reset();
+        testMsg.reset();
+
+        var cmd = BITPOS.init("test", .Zero, -3, null);
+        try serializer.serializeCommand(
+            &testMsg.stream,
+            cmd,
+        );
+        try serializer.serializeCommand(
+            &correctMsg.stream,
+            .{ "BITPOS", "test", "0", "-3" },
+        );
+
+        std.testing.expectEqualSlices(u8, correctMsg.getWritten(), testMsg.getWritten());
+    }
+}

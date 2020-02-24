@@ -49,3 +49,30 @@ pub const BITCOUNT = struct {
 test "example" {
     const cmd = BITCOUNT.init("test", BITCOUNT.Bounds{ .Slice = .{ .start = -2, .end = -1 } });
 }
+
+test "serializer" {
+    const std = @import("std");
+    const serializer = @import("../../serializer.zig").CommandSerializer;
+
+    var correctBuf: [1000]u8 = undefined;
+    var correctMsg = std.io.SliceOutStream.init(correctBuf[0..]);
+
+    var testBuf: [1000]u8 = undefined;
+    var testMsg = std.io.SliceOutStream.init(testBuf[0..]);
+
+    {
+        correctMsg.reset();
+        testMsg.reset();
+
+        try serializer.serializeCommand(
+            &testMsg.stream,
+            BITCOUNT.init("mykey", BITCOUNT.Bounds{ .Slice = .{ .start = 1, .end = 10 } }),
+        );
+        try serializer.serializeCommand(
+            &correctMsg.stream,
+            .{ "BITCOUNT", "mykey", 1, 10 },
+        );
+
+        std.testing.expectEqualSlices(u8, correctMsg.getWritten(), testMsg.getWritten());
+    }
+}

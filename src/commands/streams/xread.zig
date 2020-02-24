@@ -1,4 +1,4 @@
-const utils = @import("./utils/streams.zig");
+const utils = @import("./_utils.zig");
 
 /// XREAD [COUNT count] [BLOCK milliseconds] STREAMS key [key ...] ID [id ...]
 pub const XREAD = struct {
@@ -114,4 +114,36 @@ test "basic usage" {
     );
 
     try cmd.validate();
+}
+
+test "serializer" {
+    const std = @import("std");
+    const serializer = @import("../../serializer.zig").CommandSerializer;
+
+    var correctBuf: [1000]u8 = undefined;
+    var correctMsg = std.io.SliceOutStream.init(correctBuf[0..]);
+
+    var testBuf: [1000]u8 = undefined;
+    var testMsg = std.io.SliceOutStream.init(testBuf[0..]);
+
+    {
+        correctMsg.reset();
+        testMsg.reset();
+
+        try serializer.serializeCommand(
+            &testMsg.stream,
+            XREAD.init(
+                .NoCount,
+                .NoBlock,
+                &[_][]const u8{ "key1", "key2" },
+                &[_][]const u8{ "$", "$" },
+            ),
+        );
+        try serializer.serializeCommand(
+            &correctMsg.stream,
+            .{ "XREAD", "STREAMS", "key1", "key2", "$", "$" },
+        );
+
+        std.testing.expectEqualSlices(u8, correctMsg.getWritten(), testMsg.getWritten());
+    }
 }

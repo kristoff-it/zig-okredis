@@ -1,12 +1,11 @@
-// GEORADIUS key longitude latitude radius m|km|ft|mi [WITHCOORD] [WITHDIST] [WITHHASH] [COUNT count] [ASC|DESC] [STORE key] [STOREDIST key]
+// GEORADIUSBYMEMBER key member radius m|km|ft|mi [WITHCOORD] [WITHDIST] [WITHHASH] [COUNT count] [ASC|DESC] [STORE key] [STOREDIST key]
 
-const common = @import("./utils/common.zig");
-const Unit = @import("./utils/geo.zig").Unit;
+const common = @import("../utils/common.zig");
+const Unit = @import("../utils/geo.zig").Unit;
 
-pub const GEORADIUS = struct {
+pub const GEORADIUSBYMEMBER = struct {
     key: []const u8,
-    longitude: f64,
-    latitude: f64,
+    member: []const u8,
     radius: f64,
     unit: Unit,
     withcoord: bool,
@@ -25,8 +24,7 @@ pub const GEORADIUS = struct {
 
     pub fn init(
         key: []const u8,
-        longitude: f64,
-        latitude: f64,
+        member: []const u8,
         radius: f64,
         unit: Unit,
         withcoord: bool,
@@ -36,11 +34,10 @@ pub const GEORADIUS = struct {
         ordering: ?Ordering,
         store: ?[]const u8,
         storedist: ?[]const u8,
-    ) GEORADIUS {
+    ) GEORADIUSBYMEMBER {
         return .{
             .key = key,
-            .longitude = longitude,
-            .latitude = latitude,
+            .member = member,
             .radius = radius,
             .unit = unit,
             .withcoord = withcoord,
@@ -53,15 +50,14 @@ pub const GEORADIUS = struct {
         };
     }
 
-    pub fn validate(self: GEORADIUS) !void {}
+    pub fn validate(self: GEORADIUSBYMEMBER) !void {}
 
     pub const RedisCommand = struct {
-        pub fn serialize(self: GEORADIUS, comptime rootSerializer: type, msg: var) !void {
+        pub fn serialize(self: GEORADIUSBYMEMBER, comptime rootSerializer: type, msg: var) !void {
             return rootSerializer.serializeCommand(msg, .{
-                "GEORADIUS",
+                "GEORADIUSBYMEMBER",
                 self.key,
-                self.longitude,
-                self.latitude,
+                self.member,
                 self.radius,
                 self.unit,
                 self.withcoord,
@@ -73,7 +69,7 @@ pub const GEORADIUS = struct {
     };
 
     pub const RedisArguments = struct {
-        pub fn count(self: GEORADIUS) usize {
+        pub fn count(self: GEORADIUSBYMEMBER) usize {
             var total = 0;
             if (self.count) |_| total += 2;
             if (self.ordering) |_| total += 1;
@@ -82,7 +78,7 @@ pub const GEORADIUS = struct {
             return total;
         }
 
-        pub fn serialize(self: GEORADIUS, comptime rootSerializer: type, msg: var) !void {
+        pub fn serialize(self: GEORADIUSBYMEMBER, comptime rootSerializer: type, msg: var) !void {
             if (self.count) |c| {
                 try rootSerializer.serializeArgument(msg, []const u8, "COUNT");
                 try rootSerializer.serializeArgument(msg, u64, c);

@@ -39,3 +39,29 @@ pub const BITOP = struct {
 test "basic usage" {
     const cmd = BITOP.init(.AND, "result", &[_][]const u8{ "key1", "key2" });
 }
+
+test "serializer" {
+    const std = @import("std");
+    const serializer = @import("../../serializer.zig").CommandSerializer;
+
+    var correctBuf: [1000]u8 = undefined;
+    var correctMsg = std.io.SliceOutStream.init(correctBuf[0..]);
+
+    var testBuf: [1000]u8 = undefined;
+    var testMsg = std.io.SliceOutStream.init(testBuf[0..]);
+
+    {
+        correctMsg.reset();
+        testMsg.reset();
+
+        try serializer.serializeCommand(
+            &testMsg.stream,
+            BITOP.init(.AND, "mykey", &[_][]const u8{ "key1", "key2" }),
+        );
+        try serializer.serializeCommand(
+            &correctMsg.stream,
+            .{ "BITOP", "AND", "mykey", "key1", "key2" },
+        );
+        std.testing.expectEqualSlices(u8, correctMsg.getWritten(), testMsg.getWritten());
+    }
+}

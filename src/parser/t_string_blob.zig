@@ -65,10 +65,7 @@ pub const BlobStringParser = struct {
 
     pub fn isSupportedAlloc(comptime T: type) bool {
         return switch (@typeInfo(T)) {
-            .Pointer => |ptr| switch (ptr.size) {
-                .One, .Slice, .C => true,
-                .Many => false,
-            },
+            .Pointer => true,
             else => isSupported(T),
         };
     }
@@ -76,14 +73,6 @@ pub const BlobStringParser = struct {
     pub fn parseAlloc(comptime T: type, comptime rootParser: type, allocator: *std.mem.Allocator, msg: var) !T {
         switch (@typeInfo(T)) {
             .Pointer => |ptr| {
-                // If pointer to only one element,
-                // allocate it and recur.
-                if (ptr.size == .One) {
-                    var res = try allocator.create(ptr.child);
-                    res.* = try rootParser.parseAllocFromTag(ptr.child, '$', allocator, msg);
-                    return res;
-                }
-
                 // TODO: write real implementation
                 var buf: [100]u8 = undefined;
                 var end: usize = 0;

@@ -53,3 +53,30 @@ pub const XTRIM = struct {
 test "basic usage" {
     const cmd = XTRIM.init("mykey", XTRIM.Strategy{ .MaxLen = .{ .count = 10 } });
 }
+
+test "serializer" {
+    const std = @import("std");
+    const serializer = @import("../../serializer.zig").CommandSerializer;
+
+    var correctBuf: [1000]u8 = undefined;
+    var correctMsg = std.io.SliceOutStream.init(correctBuf[0..]);
+
+    var testBuf: [1000]u8 = undefined;
+    var testMsg = std.io.SliceOutStream.init(testBuf[0..]);
+
+    {
+        correctMsg.reset();
+        testMsg.reset();
+
+        try serializer.serializeCommand(
+            &testMsg.stream,
+            XTRIM.init("mykey", XTRIM.Strategy{ .MaxLen = .{ .count = 30 } }),
+        );
+        try serializer.serializeCommand(
+            &correctMsg.stream,
+            .{ "XTRIM", "mykey", "MAXLEN", "~", 30 },
+        );
+
+        std.testing.expectEqualSlices(u8, correctMsg.getWritten(), testMsg.getWritten());
+    }
+}

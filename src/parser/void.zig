@@ -26,11 +26,11 @@ pub const VoidParser = struct {
                 '#' => try msg.skipBytes(3), // `#t\r\n`, `#t\r\n`
                 '$', '=', '!' => {
                     // Lenght-prefixed string
-                    // TODO: write real implementation
                     if (itemTag == '!') {
                         foundError = true;
                     }
 
+                    // TODO: write real implementation
                     var buf: [100]u8 = undefined;
                     var end: usize = 0;
                     for (buf) |*elem, i| {
@@ -101,7 +101,7 @@ pub const VoidParser = struct {
                 },
             }
 
-            // If we still have items to consume, read the tag.
+            // If we still have items to consume, read the next tag.
             if (itemsToConsume > 0) itemTag = try msg.readByte();
         }
         if (foundError) return error.GotErrorReply;

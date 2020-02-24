@@ -1,6 +1,6 @@
 // GEODIST key member1 member2 [m|km|ft|mi]
 
-const Unit = @import("./utils/geo.zig").Unit;
+const Unit = @import("../utils/geo.zig").Unit;
 
 pub const GEODIST = struct {
     key: []const u8,

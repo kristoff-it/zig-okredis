@@ -1,4 +1,4 @@
-const Value = @import("./utils/common.zig").Value;
+const Value = @import("../_common_utils.zig").Value;
 
 /// SET key value [EX seconds|PX milliseconds] [NX|XX]
 pub const SET = struct {
@@ -101,4 +101,65 @@ test "basic usage" {
     var cmd = SET.init("mykey", 42, .NoExpire, .NoConditions);
     cmd = SET.init("mykey", "banana", .NoExpire, .IfNotExisting);
     try cmd.validate();
+}
+
+test "serializer" {
+    const std = @import("std");
+    const serializer = @import("../../serializer.zig").CommandSerializer;
+
+    var correctBuf: [1000]u8 = undefined;
+    var correctMsg = std.io.SliceOutStream.init(correctBuf[0..]);
+
+    var testBuf: [1000]u8 = undefined;
+    var testMsg = std.io.SliceOutStream.init(testBuf[0..]);
+
+    {
+        {
+            correctMsg.reset();
+            testMsg.reset();
+
+            try serializer.serializeCommand(
+                &testMsg.stream,
+                SET.init("mykey", 42, .NoExpire, .NoConditions),
+            );
+            try serializer.serializeCommand(
+                &correctMsg.stream,
+                .{ "SET", "mykey", "42" },
+            );
+
+            std.testing.expectEqualSlices(u8, correctMsg.getWritten(), testMsg.getWritten());
+        }
+
+        {
+            correctMsg.reset();
+            testMsg.reset();
+
+            try serializer.serializeCommand(
+                &testMsg.stream,
+                SET.init("mykey", "banana", .NoExpire, .IfNotExisting),
+            );
+            try serializer.serializeCommand(
+                &correctMsg.stream,
+                .{ "SET", "mykey", "banana", "NX" },
+            );
+
+            std.testing.expectEqualSlices(u8, correctMsg.getWritten(), testMsg.getWritten());
+        }
+
+        {
+            correctMsg.reset();
+            testMsg.reset();
+
+            try serializer.serializeCommand(
+                &testMsg.stream,
+                SET.init("mykey", "banana", SET.Expire{ .Seconds = 20 }, .IfAlreadyExisting),
+            );
+            try serializer.serializeCommand(
+                &correctMsg.stream,
+                .{ "SET", "mykey", "banana", "EX", "20", "XX" },
+            );
+
+            std.testing.expectEqualSlices(u8, correctMsg.getWritten(), testMsg.getWritten());
+        }
+    }
 }

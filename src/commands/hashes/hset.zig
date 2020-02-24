@@ -1,6 +1,6 @@
 // HSET key field value [field value ...]
 const std = @import("std");
-const common = @import("./utils/common.zig");
+const common = @import("../_common_utils.zig");
 const FV = common.FV;
 
 pub const HSET = struct {
@@ -116,4 +116,60 @@ test "basic usage" {
 
     const cmd1 = HSET.forStruct(ExampleStruct).init("mykey", example);
     try cmd1.validate();
+}
+
+test "serializer" {
+    const serializer = @import("../../serializer.zig").CommandSerializer;
+
+    var correctBuf: [1000]u8 = undefined;
+    var correctMsg = std.io.SliceOutStream.init(correctBuf[0..]);
+
+    var testBuf: [1000]u8 = undefined;
+    var testMsg = std.io.SliceOutStream.init(testBuf[0..]);
+
+    {
+        {
+            correctMsg.reset();
+            testMsg.reset();
+
+            try serializer.serializeCommand(
+                &testMsg.stream,
+                HSET.init("k1", &[_]FV{.{ .field = "f1", .value = "v1" }}),
+            );
+            try serializer.serializeCommand(
+                &correctMsg.stream,
+                .{ "HSET", "k1", "f1", "v1" },
+            );
+
+            // std.debug.warn("{}\n\n\n{}\n", .{ correctMsg.getWritten(), testMsg.getWritten() });
+            std.testing.expectEqualSlices(u8, correctMsg.getWritten(), testMsg.getWritten());
+        }
+
+        {
+            correctMsg.reset();
+            testMsg.reset();
+
+            const MyStruct = struct {
+                field1: []const u8,
+                field2: u8,
+                field3: usize,
+            };
+
+            const MyHSET = HSET.forStruct(MyStruct);
+
+            try serializer.serializeCommand(
+                &testMsg.stream,
+                MyHSET.init(
+                    "k1",
+                    .{ .field1 = "nice!", .field2 = 'a', .field3 = 42 },
+                ),
+            );
+            try serializer.serializeCommand(
+                &correctMsg.stream,
+                .{ "HSET", "k1", "field1", "nice!", "field2", 'a', "field3", 42 },
+            );
+
+            std.testing.expectEqualSlices(u8, correctMsg.getWritten(), testMsg.getWritten());
+        }
+    }
 }

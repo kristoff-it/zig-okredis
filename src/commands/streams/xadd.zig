@@ -1,7 +1,7 @@
 /// XADD key id [MAXLEN [~] count] field value [field value ...]
 const std = @import("std");
-const utils = @import("./utils/streams.zig");
-const common = @import("./utils/common.zig");
+const utils = @import("./_utils.zig");
+const common = @import("../_common_utils.zig");
 const FV = common.FV;
 
 pub const XADD = struct {
@@ -147,4 +147,86 @@ test "basic usage" {
 
     const cmd1 = XADD.forStruct(ExampleStruct).init("mykey", "*", .NoMaxLen, example);
     try cmd1.validate();
+}
+
+test "serializer" {
+    const serializer = @import("../../serializer.zig").CommandSerializer;
+
+    var correctBuf: [1000]u8 = undefined;
+    var correctMsg = std.io.SliceOutStream.init(correctBuf[0..]);
+
+    var testBuf: [1000]u8 = undefined;
+    var testMsg = std.io.SliceOutStream.init(testBuf[0..]);
+
+    {
+        {
+            correctMsg.reset();
+            testMsg.reset();
+
+            try serializer.serializeCommand(
+                &testMsg.stream,
+                XADD.init("k1", "1-1", .NoMaxLen, &[_]FV{.{ .field = "f1", .value = "v1" }}),
+            );
+            try serializer.serializeCommand(
+                &correctMsg.stream,
+                .{ "XADD", "k1", "1-1", "f1", "v1" },
+            );
+
+            // std.debug.warn("{}\n\n\n{}\n", .{ correctMsg.getWritten(), testMsg.getWritten() });
+            // std.testing.expectEqualSlices(u8, correctMsg.getWritten(), testMsg.getWritten());
+        }
+
+        {
+            correctMsg.reset();
+            testMsg.reset();
+
+            const MyStruct = struct {
+                field1: []const u8,
+                field2: u8,
+                field3: usize,
+            };
+
+            const MyXADD = XADD.forStruct(MyStruct);
+
+            try serializer.serializeCommand(
+                &testMsg.stream,
+                MyXADD.init("k1", "1-1", .NoMaxLen, .{ .field1 = "nice!", .field2 = 'a', .field3 = 42 }),
+            );
+            try serializer.serializeCommand(
+                &correctMsg.stream,
+                .{ "XADD", "k1", "1-1", "field1", "nice!", "field2", 'a', "field3", 42 },
+            );
+
+            std.testing.expectEqualSlices(u8, correctMsg.getWritten(), testMsg.getWritten());
+        }
+
+        {
+            correctMsg.reset();
+            testMsg.reset();
+
+            const MyStruct = struct {
+                field1: []const u8,
+                field2: u8,
+                field3: usize,
+            };
+
+            const MyXADD = XADD.forStruct(MyStruct);
+
+            try serializer.serializeCommand(
+                &testMsg.stream,
+                MyXADD.init(
+                    "k1",
+                    "1-1",
+                    XADD.MaxLen{ .PreciseMaxLen = 40 },
+                    .{ .field1 = "nice!", .field2 = 'a', .field3 = 42 },
+                ),
+            );
+            try serializer.serializeCommand(
+                &correctMsg.stream,
+                .{ "XADD", "k1", "1-1", "MAXLEN", 40, "field1", "nice!", "field2", 'a', "field3", 42 },
+            );
+
+            std.testing.expectEqualSlices(u8, correctMsg.getWritten(), testMsg.getWritten());
+        }
+    }
 }

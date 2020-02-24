@@ -1,7 +1,7 @@
 // HMGET key field [field ...]
 
 const std = @import("std");
-const common = @import("./utils/common.zig");
+const common = @import("../utils/common.zig");
 const FV = common.FV;
 
 pub const HMGET = struct {
@@ -90,4 +90,57 @@ test "basic usage" {
 
     const cmd1 = HMGET.forStruct(ExampleStruct).init("mykey");
     try cmd1.validate();
+}
+
+test "serializer" {
+    const serializer = @import("../../serializer.zig").CommandSerializer;
+
+    var correctBuf: [1000]u8 = undefined;
+    var correctMsg = std.io.SliceOutStream.init(correctBuf[0..]);
+
+    var testBuf: [1000]u8 = undefined;
+    var testMsg = std.io.SliceOutStream.init(testBuf[0..]);
+
+    {
+        {
+            correctMsg.reset();
+            testMsg.reset();
+
+            try serializer.serializeCommand(
+                &testMsg.stream,
+                HMGET.init("k1", &[_][]const u8{"f1"}),
+            );
+            try serializer.serializeCommand(
+                &correctMsg.stream,
+                .{ "HMGET", "k1", "f1" },
+            );
+
+            // std.debug.warn("{}\n\n\n{}\n", .{ correctMsg.getWritten(), testMsg.getWritten() });
+            std.testing.expectEqualSlices(u8, correctMsg.getWritten(), testMsg.getWritten());
+        }
+
+        {
+            correctMsg.reset();
+            testMsg.reset();
+
+            const MyStruct = struct {
+                field1: []const u8,
+                field2: u8,
+                field3: usize,
+            };
+
+            const MyHMGET = HMGET.forStruct(MyStruct);
+
+            try serializer.serializeCommand(
+                &testMsg.stream,
+                MyHMGET.init("k1"),
+            );
+            try serializer.serializeCommand(
+                &correctMsg.stream,
+                .{ "HMGET", "k1", "field1", "field2", "field3" },
+            );
+
+            std.testing.expectEqualSlices(u8, correctMsg.getWritten(), testMsg.getWritten());
+        }
+    }
 }

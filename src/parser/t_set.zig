@@ -84,8 +84,8 @@ pub const SetParser = struct {
     }
 
     pub fn parseAlloc(comptime T: type, comptime rootParser: type, allocator: *std.mem.Allocator, msg: var) !T {
-        // HASHMAP
         if (@typeId(T) == .Struct and @hasDecl(T, "KV")) {
+            // HASHMAP
             // TODO: write real implementation
             var buf: [100]u8 = undefined;
             var end: usize = 0;
@@ -134,11 +134,7 @@ pub const SetParser = struct {
                         elem.* = try rootParser.parseAlloc(ptr.child, allocator, msg);
                     }
 
-                    return switch (ptr.size) {
-                        .One, .Many => @compileError("Only Slices and C pointers should reach sub-parsers"),
-                        .Slice => res,
-                        .C => @ptrCast(T, res.ptr),
-                    };
+                    return res;
                 },
                 .Array => |arr| {
                     if (arr.len != size) {

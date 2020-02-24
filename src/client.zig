@@ -39,7 +39,7 @@ pub const Client = struct {
 
         self.send(void, .{ "HELLO", "3" }) catch |err| switch (err) {
             else => return err,
-            error.GotErrorReply => @panic("Sorry, heyredis is RESP3 only and requires a Redis server built from the unstable branch."),
+            error.GotErrorReply => @panic("Sorry, okredis is RESP3 only and requires a Redis 6+ server."),
         };
     }
 

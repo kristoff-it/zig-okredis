@@ -31,9 +31,9 @@ pub const RESP3Parser = struct {
 
     pub fn parseAlloc(comptime T: type, allocator: *Allocator, msg: var) !T {
         const tag = try msg.readByte();
-        var x: T = try parseImpl(T, tag, .{ .ptr = allocator }, msg);
-        return x;
+        return try parseImpl(T, tag, .{ .ptr = allocator }, msg);
     }
+
     pub fn parseAllocFromTag(comptime T: type, tag: u8, allocator: *Allocator, msg: var) !T {
         return parseImpl(T, tag, .{ .ptr = allocator }, msg);
     }
@@ -294,6 +294,7 @@ test "evil indirection" {
         // }
     }
 }
+
 //zig fmt: off
 fn MakeEvilFloat() std.io.SliceInStream {
     return std.io.SliceInStream.init(
