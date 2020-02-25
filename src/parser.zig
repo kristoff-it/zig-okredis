@@ -38,7 +38,45 @@ pub const RESP3Parser = struct {
         return parseImpl(T, tag, .{ .ptr = allocator }, msg);
     }
 
-    pub fn parseImpl(comptime T: type, tag: u8, allocator: var, msg: var) !T {
+    // TODO: should the errorset really be anyerror? Should it be explicit?
+    const errorset = error{
+        GotErrorReply,
+        GotNilReply,
+        LengthMismatch,
+        UnsupportedConversion,
+
+        SystemResources,
+        InvalidCharacter,
+        Overflow,
+        InputOutput,
+        IsDir,
+        OperationAborted,
+        BrokenPipe,
+        ConnectionResetByPeer,
+        WouldBlock,
+        Unexpected,
+        EndOfStream,
+        OutOfMemory,
+        GraveProtocolError,
+        SorryBadImplementation,
+        InvalidCharForDigit,
+        DigitTooLargeForBase,
+        InvalidBase,
+        StreamTooLong,
+        DecodeError,
+        DecodingError,
+        DivisionByZero,
+        UnexpectedRemainder,
+    };
+
+    // fn computeErrorSet(comptime T: type) type {
+    //     if (comptime traits.isParserType(T)) {
+    //         @compileLog("TYPE", @typeName(T), T.Redis.Parser.Errors);
+    //         return errorset || T.Redis.Parser.Errors;
+    //     }
+    //     return errorset;
+    // }
+    pub fn parseImpl(comptime T: type, tag: u8, allocator: var, msg: var) anyerror!T {
         // First we get out of the way the basic case where
         // the return type is void and we just discard one full answer.
         if (T == void) return VoidParser.discardOne(tag, msg);

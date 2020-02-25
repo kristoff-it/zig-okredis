@@ -15,13 +15,19 @@ inline fn isFragmentType(comptime T: type) bool {
 /// Parses RedisMap values.
 /// Uses RESP3Parser to delegate parsing of the list contents recursively.
 pub const MapParser = struct {
-    pub const IsContainer = true;
 
     // TODO: add support for [_][2]T
     pub fn isSupported(comptime T: type) bool {
         return switch (@typeId(T)) {
-            .Struct => true,
+            .Array, .Struct => true,
             else => false,
+        };
+    }
+
+    pub fn isSupportedAlloc(comptime T: type) bool {
+        return switch (@typeInfo(T)) {
+            .Pointer => |ptr| isFragmentType(ptr.child),
+            else => isSupported(T),
         };
     }
 
@@ -111,14 +117,6 @@ pub const MapParser = struct {
             }
         }
         return false;
-    }
-
-    pub fn isSupportedAlloc(comptime T: type) bool {
-        return switch (@typeInfo(T)) {
-            .Array, .Struct => true,
-            .Pointer => |ptr| isFragmentType(ptr.child),
-            else => false,
-        };
     }
 
     pub fn parseAlloc(comptime T: type, comptime rootParser: type, allocator: *std.mem.Allocator, msg: var) !T {

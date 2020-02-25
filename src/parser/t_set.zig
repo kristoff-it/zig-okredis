@@ -12,65 +12,6 @@ pub const SetParser = struct {
         };
     }
 
-    pub fn parse(comptime T: type, comptime rootParser: type, msg: var) !T {
-        // Make ListParser deal with this by lying to the rootParser.
-        // return rootParser.parseFromTag(T, '*', msg);
-
-        // TODO: write real implementation
-        var buf: [100]u8 = undefined;
-        var end: usize = 0;
-        for (buf) |*elem, i| {
-            const ch = try msg.readByte();
-            elem.* = ch;
-            if (ch == '\r') {
-                end = i;
-                break;
-            }
-        }
-        try msg.skipBytes(1);
-        const size = try fmt.parseInt(usize, buf[0..end], 10);
-
-        switch (@typeInfo(T)) {
-            // TODO: deduplicate the work done for array in parse and parsealloc
-            .Array => |arr| {
-                if (arr.len != size) {
-                    return error.LengthMismatch;
-                }
-                var result: T = undefined;
-                var foundNil = false;
-                var foundErr = false;
-                for (result) |*elem| {
-                    if (foundNil or foundErr) {
-                        rootParser.parse(void, msg) catch |err| switch (err) {
-                            // Void is not part of the errorset because
-                            // .parse redirects us immediately to the void parser.
-                            // error.GotNilReply => {},
-                            error.GotErrorReply => {
-                                foundErr = true;
-                            },
-                            else => return err,
-                        };
-                    } else {
-                        elem.* = rootParser.parse(arr.child, msg) catch |err| switch (err) {
-                            else => return err,
-                            // TODO
-                            // error.GotNilReply => {
-                            //     foundNil = true;
-                            //     continue;
-                            // },
-                            error.GotErrorReply => {
-                                foundErr = true;
-                                continue;
-                            },
-                        };
-                    }
-                }
-                return result;
-            },
-            else => @compileError("Unhandled Conversion"),
-        }
-    }
-
     pub fn isSupportedAlloc(comptime T: type) bool {
         // HashMap
         if (@typeId(T) == .Struct and @hasDecl(T, "KV")) {
@@ -78,14 +19,17 @@ pub const SetParser = struct {
         }
 
         return switch (@typeInfo(T)) {
-            .Array, .Pointer => true,
-            else => false,
+            .Pointer => true,
+            else => isSupported(T),
         };
     }
 
+    pub fn parse(comptime T: type, comptime rootParser: type, msg: var) !T {
+        return parseImpl(T, rootParser, .{}, msg);
+    }
     pub fn parseAlloc(comptime T: type, comptime rootParser: type, allocator: *std.mem.Allocator, msg: var) !T {
+        // HASHMAP
         if (@typeId(T) == .Struct and @hasDecl(T, "KV")) {
-            // HASHMAP
             // TODO: write real implementation
             var buf: [100]u8 = undefined;
             var end: usize = 0;
@@ -101,54 +45,57 @@ pub const SetParser = struct {
             try msg.skipBytes(1);
             const size = try fmt.parseInt(usize, buf[0..end], 10);
 
-            var hmap = T.init(allocator);
+            var hmap = T.init(allocator.ptr);
+            const KeyType = std.meta.fieldInfo(T.KV, "key").field_type;
+
+            var foundNil = false;
+            var foundErr = false;
+            var hashMapError = hmap.put.ErrorSet;
             var i: usize = 0;
             while (i < size) : (i += 1) {
-                var key = try rootParser.parseAlloc(std.meta.fieldInfo(T.KV, "key").field_type, allocator, msg);
-                try hmap.putNoClobber(key, {});
-            }
-            return hmap;
-        } else {
-            // return rootParser.parseAllocFromTag(T, '*', allocator, msg);
-            // TODO: write real implementation
-            var buf: [100]u8 = undefined;
-            var end: usize = 0;
-            for (buf) |*elem, i| {
-                const ch = try msg.readByte();
-                elem.* = ch;
-                if (ch == '\r') {
-                    end = i;
-                    break;
+                if (foundNil or foundErr or hashMapError) {
+                    rootParser.parse(void, msg) catch |err| switch (err) {
+                        error.GotErrorReply => {
+                            foundErr = true;
+                        },
+                        else => return err,
+                    };
+                } else {
+                    var key = rootParser.parseAlloc(KeyType, allocator.ptr, msg) catch |err| switch (err) {
+                        error.GotNilReply => {
+                            foundNil = true;
+                            continue;
+                        },
+                        error.GotErrorReply => {
+                            foundErr = true;
+                            continue;
+                        },
+                        else => return err,
+                    };
+
+                    // If we got here then no error occurred and we can add the key.
+                    hmap.put(key, {}) catch |err| {
+                        hashMapError = true;
+                        continue;
+                    };
                 }
             }
 
-            try msg.skipBytes(1);
-            const size = try fmt.parseInt(usize, buf[0..end], 10);
-
-            switch (@typeInfo(T)) {
-                .Pointer => |ptr| {
-                    var res = try allocator.alloc(ptr.child, size);
-                    errdefer allocator.free(res);
-
-                    for (res) |*elem| {
-                        elem.* = try rootParser.parseAlloc(ptr.child, allocator, msg);
-                    }
-
-                    return res;
-                },
-                .Array => |arr| {
-                    if (arr.len != size) {
-                        return error.LengthMismatch;
-                    }
-                    var result: T = undefined;
-                    for (result) |*elem| {
-                        elem.* = try rootParser.parseAlloc(arr.child, allocator, msg);
-                    }
-                    return result;
-                },
-                else => @compileError("Unhandled Conversion"),
-            }
+            if (foundErr) return error.GotErrorReply;
+            if (foundNil) return error.GotNilReply;
+            if (hashMapError) return error.DecodeError; // TODO: find a way to save and return the precise error?
+            return hmap;
         }
+
+        return parseImpl(T, rootParser, .{ .ptr = allocator }, msg);
+    }
+
+    pub fn parseImpl(comptime T: type, comptime rootParser: type, allocator: var, msg: var) !T {
+        // Indirectly delegate all cases to the list parser.
+        return if (@hasField(@TypeOf(allocator), "ptr"))
+            rootParser.parseAllocFromTag(T, '*', allocator.ptr, msg)
+        else
+            rootParser.parseFromTag(T, '*', msg);
     }
 };
 

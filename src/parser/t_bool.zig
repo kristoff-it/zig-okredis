@@ -15,8 +15,8 @@ pub const BoolParser = struct {
         const ch = try msg.readByte();
         try msg.skipBytes(2);
         return switch (@typeId(T)) {
-            .Bool => check_bool(ch),
-            .Int, .Float => if (check_bool(ch)) @as(T, 1) else @as(T, 0),
+            .Bool => ch == 't',
+            .Int, .Float => if (ch == 't') @as(T, 1) else @as(T, 0),
             else => @compileError("Unhandled Conversion"),
         };
     }
@@ -29,18 +29,6 @@ pub const BoolParser = struct {
         return parse(T, struct {}, msg);
     }
 };
-
-fn check_bool(ch: u8) bool {
-    // if (builtin.mode == .ReleaseFast) {
-    return ch == 't';
-    // } else {
-    //     return switch (ch) {
-    //         't' => true,
-    //         'f' => false,
-    //         else => unreachable, // TODO: should this be a crash or just an error?
-    //     };
-    // }
-}
 
 test "parses bools" {
     testing.expect(true == try BoolParser.parse(bool, struct {}, &TrueMSG().stream));
