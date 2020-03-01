@@ -11,7 +11,7 @@ pub const E = error.DynamicReplyError;
 /// attributes. By using DynamicReply you will be able to parse any possible
 /// Redis reply. It even supports non-toplevel errors.
 pub const DynamicReply = struct {
-    attribs: []KV(DynamicReply, DynamicReply),
+    attribs: [][2]*DynamicReply,
     data: Data,
 
     pub const Data = union(enum) {
@@ -23,7 +23,7 @@ pub const DynamicReply = struct {
         String: Verbatim,
         List: []DynamicReply,
         Set: []DynamicReply,
-        Map: []KV(DynamicReply, DynamicReply),
+        Map: [][2]*DynamicReply,
     };
 
     pub const Redis = struct {
@@ -63,10 +63,10 @@ pub const DynamicReply = struct {
                 var res: DynamicReply = undefined;
                 if (itemTag == '|') {
                     // Here we lie to the root parser and claim we encountered a map type >:3
-                    res.attribs = rootParser.parseAllocFromTag([]KV(DynamicReply, DynamicReply), '%', allocator, msg) catch return E;
+                    res.attribs = rootParser.parseAllocFromTag([][2]*DynamicReply, '%', allocator, msg) catch return E;
                     itemTag = msg.readByte() catch return E;
                 } else {
-                    res.attribs = &[0]KV(DynamicReply, DynamicReply){};
+                    res.attribs = &[0][2]*DynamicReply{};
                 }
 
                 res.data = switch (itemTag) {
@@ -76,7 +76,7 @@ pub const DynamicReply = struct {
                     ':' => Data{ .Number = rootParser.parseFromTag(i64, ':', msg) catch return E },
                     ',' => Data{ .Double = rootParser.parseFromTag(f64, ',', msg) catch return E },
                     '+', '$', '=' => Data{ .String = rootParser.parseAllocFromTag(Verbatim, itemTag, allocator, msg) catch return E },
-                    '%' => Data{ .Map = rootParser.parseAllocFromTag([]KV(DynamicReply, DynamicReply), '%', allocator, msg) catch return E },
+                    '%' => Data{ .Map = rootParser.parseAllocFromTag([][2]*DynamicReply, '%', allocator, msg) catch return E },
                     '*' => Data{ .List = rootParser.parseAllocFromTag([]DynamicReply, '*', allocator, msg) catch return E },
                     '~' => Data{ .Set = rootParser.parseAllocFromTag([]DynamicReply, '~', allocator, msg) catch return E },
                     '(' => Data{ .Bignum = rootParser.parseAllocFromTag(std.math.big.Int, '(', allocator, msg) catch return E },
@@ -118,25 +118,25 @@ test "dynamic replies" {
     {
         const reply = try DynamicReply.Redis.Parser.parseAlloc('|', parser, allocator, &MakeComplexListWithAttributes().stream);
         testing.expectEqual(@as(usize, 2), reply.attribs.len);
-        testing.expectEqualSlices(u8, "Ciao", reply.attribs[0].key.data.String.string);
-        testing.expectEqualSlices(u8, "World", reply.attribs[0].value.data.String.string);
-        testing.expectEqualSlices(u8, "Peach", reply.attribs[1].key.data.String.string);
-        testing.expectEqual(@as(f64, 9.99), reply.attribs[1].value.data.Double);
+        testing.expectEqualSlices(u8, "Ciao", reply.attribs[0][0].data.String.string);
+        testing.expectEqualSlices(u8, "World", reply.attribs[0][1].data.String.string);
+        testing.expectEqualSlices(u8, "Peach", reply.attribs[1][0].data.String.string);
+        testing.expectEqual(@as(f64, 9.99), reply.attribs[1][1].data.Double);
 
         testing.expectEqualSlices(u8, "Hello", reply.data.List[0].data.String.string);
         testing.expectEqual(@as(usize, 0), reply.data.List[0].attribs.len);
 
         testing.expectEqual(true, reply.data.List[1].data.Bool);
         testing.expectEqual(@as(usize, 1), reply.data.List[1].attribs.len);
-        testing.expectEqualSlices(u8, "ttl", reply.data.List[1].attribs[0].key.data.String.string);
-        testing.expectEqual(@as(i64, 100), reply.data.List[1].attribs[0].value.data.Number);
+        testing.expectEqualSlices(u8, "ttl", reply.data.List[1].attribs[0][0].data.String.string);
+        testing.expectEqual(@as(i64, 100), reply.data.List[1].attribs[0][1].data.Number);
 
         testing.expectEqual(@as(usize, 0), reply.data.List[2].attribs.len);
 
         testing.expectEqual(@as(i64, 123), reply.data.List[2].data.List[0].data.Number);
         testing.expectEqual(@as(usize, 1), reply.data.List[2].data.List[0].attribs.len);
-        testing.expectEqualSlices(u8, "Banana", reply.data.List[2].data.List[0].attribs[0].key.data.String.string);
-        testing.expectEqual(true, reply.data.List[2].data.List[0].attribs[0].value.data.Bool);
+        testing.expectEqualSlices(u8, "Banana", reply.data.List[2].data.List[0].attribs[0][0].data.String.string);
+        testing.expectEqual(true, reply.data.List[2].data.List[0].attribs[0][1].data.Bool);
 
         testing.expectEqual(@as(i64, 424242), try reply.data.List[2].data.List[1].data.Bignum.to(i64));
         testing.expectEqual(@as(usize, 0), reply.data.List[2].data.List[1].attribs.len);

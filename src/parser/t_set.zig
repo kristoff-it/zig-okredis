@@ -45,12 +45,14 @@ pub const SetParser = struct {
             try msg.skipBytes(1);
             const size = try fmt.parseInt(usize, buf[0..end], 10);
 
-            var hmap = T.init(allocator.ptr);
+            var hmap = T.init(allocator);
+            errdefer hmap.deinit();
+
             const KeyType = std.meta.fieldInfo(T.KV, "key").field_type;
 
             var foundNil = false;
             var foundErr = false;
-            var hashMapError = hmap.put.ErrorSet;
+            var hashMapError = false;
             var i: usize = 0;
             while (i < size) : (i += 1) {
                 if (foundNil or foundErr or hashMapError) {
@@ -61,7 +63,7 @@ pub const SetParser = struct {
                         else => return err,
                     };
                 } else {
-                    var key = rootParser.parseAlloc(KeyType, allocator.ptr, msg) catch |err| switch (err) {
+                    var key = rootParser.parseAlloc(KeyType, allocator, msg) catch |err| switch (err) {
                         error.GotNilReply => {
                             foundNil = true;
                             continue;
@@ -74,7 +76,7 @@ pub const SetParser = struct {
                     };
 
                     // If we got here then no error occurred and we can add the key.
-                    hmap.put(key, {}) catch |err| {
+                    _ = hmap.put(key, {}) catch |err| {
                         hashMapError = true;
                         continue;
                     };

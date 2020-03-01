@@ -26,8 +26,8 @@ pub const DoubleParser = struct {
         }
         try msg.skipBytes(1);
         return switch (@typeInfo(T)) {
+            else => unreachable,
             .Float => try fmt.parseFloat(T, buf[0..end]),
-            else => @compileError("Unhandled Conversion"),
         };
     }
 

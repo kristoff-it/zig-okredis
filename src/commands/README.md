@@ -21,8 +21,8 @@ respective `_utils.zig`.
 
 Elements shared by multiple groups are declared in `_common_utils.zig`.
 
-Shared elements are made available to the user through each group that uses, 
-regardless whether they are unique to the group or in `_common_utils.zig`.
+Shared elements are made available to the user through each group that uses 
+them, regardless whether they are unique to the group or in `_common_utils.zig`.
 
 ```zig
 const Value = okredis.commands.strings.utils.Value;

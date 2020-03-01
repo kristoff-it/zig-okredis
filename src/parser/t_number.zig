@@ -26,9 +26,9 @@ pub const NumberParser = struct {
         }
         try msg.skipBytes(1);
         return switch (@typeInfo(T)) {
+            else => unreachable,
             .Int => try fmt.parseInt(T, buf[0..end], 10),
             .Float => try fmt.parseFloat(T, buf[0..end]),
-            else => @compileError("Unhandled Conversion"),
         };
     }
 

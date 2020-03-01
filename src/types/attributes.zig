@@ -1,6 +1,5 @@
 const std = @import("std");
 const Allocator = std.mem.Allocator;
-const KV = @import("./kv.zig").KV;
 const FixBuf = @import("./fixbuf.zig").FixBuf;
 const DynamicReply = @import("./reply.zig").DynamicReply;
 const testing = std.testing;
@@ -10,7 +9,7 @@ pub fn WithAttribs(comptime T: type) type {
     return struct {
         /// Attributes are stored as an array of key-value pairs.
         /// Each element of a pair is a DynamicReply.
-        attribs: []KV(DynamicReply, DynamicReply),
+        attribs: [][2]DynamicReply,
         data: T,
 
         const Self = @This();
@@ -34,14 +33,14 @@ pub fn WithAttribs(comptime T: type) type {
                     if (itemTag == '|') {
                         // Here we lie to the root parser and claim we encountered a map type >:3
                         res.attribs = try rootParser.parseAllocFromTag(
-                            []KV(DynamicReply, DynamicReply),
+                            [][2]DynamicReply,
                             '%',
                             allocator,
                             msg,
                         );
                         itemTag = try msg.readByte();
                     } else {
-                        res.attribs = &[0]KV(DynamicReply, DynamicReply){};
+                        res.attribs = &[0][2]DynamicReply{};
                     }
 
                     res.data = try rootParser.parseAllocFromTag(T, itemTag, allocator, msg);
@@ -62,23 +61,23 @@ test "WithAttribs" {
         &MakeComplexListWithAttributes().stream,
     );
     testing.expectEqual(@as(usize, 2), res.attribs.len);
-    testing.expectEqualSlices(u8, "Ciao", res.attribs[0].key.data.String.string);
-    testing.expectEqualSlices(u8, "World", res.attribs[0].value.data.String.string);
-    testing.expectEqualSlices(u8, "Peach", res.attribs[1].key.data.String.string);
-    testing.expectEqual(@as(f64, 9.99), res.attribs[1].value.data.Double);
+    testing.expectEqualSlices(u8, "Ciao", res.attribs[0][0].data.String.string);
+    testing.expectEqualSlices(u8, "World", res.attribs[0][1].data.String.string);
+    testing.expectEqualSlices(u8, "Peach", res.attribs[1][0].data.String.string);
+    testing.expectEqual(@as(f64, 9.99), res.attribs[1][1].data.Double);
 
     testing.expectEqual(@as(usize, 0), res.data[0].data[0].attribs.len);
     testing.expectEqual(@as(i64, 20), res.data[0].data[0].data);
 
     testing.expectEqual(@as(usize, 1), res.data[0].data[1].attribs.len);
-    testing.expectEqualSlices(u8, "ttl", res.data[0].data[1].attribs[0].key.data.String.string);
-    testing.expectEqual(@as(i64, 128), res.data[0].data[1].attribs[0].value.data.Number);
+    testing.expectEqualSlices(u8, "ttl", res.data[0].data[1].attribs[0][0].data.String.string);
+    testing.expectEqual(@as(i64, 128), res.data[0].data[1].attribs[0][1].data.Number);
     testing.expectEqual(@as(i64, 100), res.data[0].data[1].data);
 
     testing.expectEqual(@as(usize, 0), res.data[1].attribs.len);
     testing.expectEqual(@as(usize, 1), res.data[1].data[0].attribs.len);
-    testing.expectEqualSlices(u8, "Banana", res.data[1].data[0].attribs[0].key.data.String.string);
-    testing.expectEqual(true, res.data[1].data[0].attribs[0].value.data.Bool);
+    testing.expectEqualSlices(u8, "Banana", res.data[1].data[0].attribs[0][0].data.String.string);
+    testing.expectEqual(true, res.data[1].data[0].attribs[0][1].data.Bool);
     testing.expectEqual(@as(i64, 123), res.data[1].data[0].data);
 
     testing.expectEqual(@as(usize, 0), res.data[1].data[1].attribs.len);

@@ -28,6 +28,7 @@ pub const BlobStringParser = struct {
         const size = try fmt.parseInt(usize, buf[0..end], 10);
 
         switch (@typeInfo(T)) {
+            else => unreachable,
             .Int => {
                 // Try to parse an int from the string.
                 // TODO: write real implementation
@@ -59,7 +60,6 @@ pub const BlobStringParser = struct {
                 try msg.skipBytes(2);
                 return res;
             },
-            else => @compileError("Unhandled Conversion"),
         }
     }
 

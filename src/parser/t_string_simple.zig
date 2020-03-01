@@ -14,6 +14,7 @@ pub const SimpleStringParser = struct {
 
     pub fn parse(comptime T: type, comptime _: type, msg: var) !T {
         switch (@typeInfo(T)) {
+            else => unreachable,
             .Int => {
                 var buf: [100]u8 = undefined;
                 var end: usize = 0;
@@ -59,7 +60,6 @@ pub const SimpleStringParser = struct {
                 try msg.skipBytes(1);
                 return res;
             },
-            else => @compileError("Unhandled Conversion"),
         }
     }
 

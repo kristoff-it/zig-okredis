@@ -27,6 +27,41 @@ pub const ListParser = struct {
         return parseImpl(T, rootParser, .{ .ptr = allocator }, msg);
     }
 
+    fn decodeArray(comptime T: type, result: []T, rootParser: var, allocator: var, msg: var) !void {
+        var foundNil = false;
+        var foundErr = false;
+        for (result) |*elem| {
+            if (foundNil or foundErr) {
+                rootParser.parse(void, msg) catch |err| switch (err) {
+                    error.GotErrorReply => {
+                        foundErr = true;
+                    },
+                    else => return err,
+                };
+            } else {
+                elem.* = (if (@hasField(@TypeOf(allocator), "ptr"))
+                    rootParser.parseAlloc(T, allocator.ptr, msg)
+                else
+                    rootParser.parse(T, msg)) catch |err| switch (err) {
+                    error.GotNilReply => {
+                        foundNil = true;
+                        continue;
+                    },
+                    error.GotErrorReply => {
+                        foundErr = true;
+                        continue;
+                    },
+                    else => return err,
+                };
+            }
+        }
+
+        // Error takes precedence over Nil
+        if (foundErr) return error.GotErrorReply;
+        if (foundNil) return error.GotNilReply;
+        return;
+    }
+
     pub fn parseImpl(comptime T: type, comptime rootParser: type, allocator: var, msg: var) !T {
         // TODO: write real implementation
         var buf: [100]u8 = undefined;
@@ -43,54 +78,22 @@ pub const ListParser = struct {
         const size = try fmt.parseInt(usize, buf[0..end], 10);
 
         switch (@typeInfo(T)) {
+            else => unreachable,
             .Pointer => |ptr| {
                 if (!@hasField(@TypeOf(allocator), "ptr")) {
                     @compileError("To decode a slice you need to use sendAlloc / pipeAlloc / transAlloc!");
                 }
 
-                var foundNil = false;
-                var foundErr = false;
-
                 var result = try allocator.ptr.alloc(ptr.child, size);
                 errdefer allocator.ptr.free(result);
-
-                for (result) |*elem| {
-                    if (foundNil or foundErr) {
-                        rootParser.parse(void, msg) catch |err| switch (err) {
-                            error.GotErrorReply => {
-                                foundErr = true;
-                            },
-                            else => return err,
-                        };
-                    } else {
-                        elem.* = (if (@hasField(@TypeOf(allocator), "ptr"))
-                            rootParser.parseAlloc(ptr.child, allocator.ptr, msg)
-                        else
-                            rootParser.parse(ptr.child, msg)) catch |err| switch (err) {
-                            error.GotNilReply => {
-                                foundNil = true;
-                                continue;
-                            },
-                            error.GotErrorReply => {
-                                foundErr = true;
-                                continue;
-                            },
-                            else => return err,
-                        };
-                    }
-                }
-
-                // Error takes precedence over Nil
-                if (foundErr) return error.GotErrorReply;
-                if (foundNil) return error.GotNilReply;
+                try decodeArray(ptr.child, result, rootParser, allocator, msg);
                 return result;
             },
             .Array => |arr| {
-                var foundNil = false;
-                var foundErr = false;
                 if (arr.len != size) {
                     // The user requested an array but the list reply from Redis
                     // contains a different amount of items.
+                    var foundErr = false;
                     var i: usize = 0;
                     while (i < size) : (i += 1) {
                         // Discard all the items
@@ -108,35 +111,7 @@ pub const ListParser = struct {
                 }
 
                 var result: T = undefined;
-                for (result) |*elem| {
-                    if (foundNil or foundErr) {
-                        rootParser.parse(void, msg) catch |err| switch (err) {
-                            error.GotErrorReply => {
-                                foundErr = true;
-                            },
-                            else => return err,
-                        };
-                    } else {
-                        elem.* = (if (@hasField(@TypeOf(allocator), "ptr"))
-                            rootParser.parseAlloc(arr.child, allocator.ptr, msg)
-                        else
-                            rootParser.parse(arr.child, msg)) catch |err| switch (err) {
-                            error.GotNilReply => {
-                                foundNil = true;
-                                continue;
-                            },
-                            error.GotErrorReply => {
-                                foundErr = true;
-                                continue;
-                            },
-                            else => return err,
-                        };
-                    }
-                }
-
-                // Error takes precedence over Nil
-                if (foundErr) return error.GotErrorReply;
-                if (foundNil) return error.GotNilReply;
+                try decodeArray(arr.child, result[0..], rootParser, allocator, msg);
                 return result;
             },
             .Struct => |stc| {
@@ -191,7 +166,6 @@ pub const ListParser = struct {
                 if (foundNil) return error.GotNilReply;
                 return result;
             },
-            else => @compileError("Unhandled Conversion"),
         }
     }
 };
