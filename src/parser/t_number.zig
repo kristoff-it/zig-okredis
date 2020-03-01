@@ -6,7 +6,7 @@ const InStream = std.io.InStream;
 /// Parses RedisNumber values
 pub const NumberParser = struct {
     pub fn isSupported(comptime T: type) bool {
-        return switch (@typeId(T)) {
+        return switch (@typeInfo(T)) {
             .Float, .Int => true,
             else => false,
         };

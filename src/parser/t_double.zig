@@ -6,7 +6,7 @@ const InStream = std.io.InStream;
 /// Parses RedisDouble values (e.g. ,123.45)
 pub const DoubleParser = struct {
     pub fn isSupported(comptime T: type) bool {
-        return switch (@typeId(T)) {
+        return switch (@typeInfo(T)) {
             .Float => true,
             else => false,
         };

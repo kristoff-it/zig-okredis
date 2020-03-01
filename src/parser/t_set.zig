@@ -6,7 +6,7 @@ const testing = std.testing;
 pub const SetParser = struct {
     // TODO: prevent users from unmarshaling structs out of strings
     pub fn isSupported(comptime T: type) bool {
-        return switch (@typeId(T)) {
+        return switch (@typeInfo(T)) {
             .Array => true,
             else => false,
         };
@@ -14,7 +14,7 @@ pub const SetParser = struct {
 
     pub fn isSupportedAlloc(comptime T: type) bool {
         // HashMap
-        if (@typeId(T) == .Struct and @hasDecl(T, "KV")) {
+        if (@typeInfo(T) == .Struct and @hasDecl(T, "KV")) {
             return void == std.meta.fieldInfo(T.KV, "value").field_type;
         }
 
@@ -29,7 +29,7 @@ pub const SetParser = struct {
     }
     pub fn parseAlloc(comptime T: type, comptime rootParser: type, allocator: *std.mem.Allocator, msg: var) !T {
         // HASHMAP
-        if (@typeId(T) == .Struct and @hasDecl(T, "KV")) {
+        if (@typeInfo(T) == .Struct and @hasDecl(T, "KV")) {
             // TODO: write real implementation
             var buf: [100]u8 = undefined;
             var end: usize = 0;

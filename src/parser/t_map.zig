@@ -7,7 +7,7 @@ const perfectHash = @import("../lib/perfect_hash.zig").perfectHash;
 
 // // TODO: decide what tho do with this weird trait.
 // inline fn isFragmentType(comptime T: type) bool {
-//     const tid = @typeId(T);
+//     const tid = @typeInfo(T);
 //     return (tid == .Struct or tid == .Enum or tid == .Union) and
 //         @hasDecl(T, "Redis") and @hasDecl(T.Redis, "Parser") and @hasDecl(T.Redis.Parser, "TokensPerFragment");
 // }
@@ -65,7 +65,7 @@ pub const MapParser = struct {
 
         // HASHMAP
         if (@hasField(@TypeOf(allocator), "ptr")) {
-            if (@typeId(T) == .Struct and @hasDecl(T, "KV")) {
+            if (@typeInfo(T) == .Struct and @hasDecl(T, "KV")) {
                 var hmap = T.init(allocator.ptr);
                 errdefer hmap.deinit();
 

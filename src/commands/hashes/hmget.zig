@@ -38,7 +38,7 @@ pub const HMGET = struct {
 
 fn _forStruct(comptime T: type) type {
     // TODO: there is some duplicated code with xread. Values should be a dedicated generic type.
-    if (@typeId(T) != .Struct) @compileError("Only Struct types allowed.");
+    if (@typeInfo(T) != .Struct) @compileError("Only Struct types allowed.");
     return struct {
         key: []const u8,
 

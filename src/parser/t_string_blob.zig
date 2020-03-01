@@ -1,6 +1,7 @@
 const builtin = @import("builtin");
 const std = @import("std");
 const fmt = std.fmt;
+const mem = std.mem;
 const testing = std.testing;
 
 /// Parses RedisBlobString values
@@ -51,7 +52,7 @@ pub const BlobStringParser = struct {
             },
             .Array => |arr| {
                 var res: [arr.len]arr.child = undefined;
-                var bytesSlice = @sliceToBytes(res[0..]);
+                var bytesSlice = mem.sliceAsBytes(res[0..]);
                 if (bytesSlice.len != size) {
                     return error.LengthMismatch;
                 }
@@ -94,7 +95,7 @@ pub const BlobStringParser = struct {
                 var res = try allocator.alignedAlloc(ptr.child, @alignOf(T), elemSize);
                 errdefer allocator.free(res);
 
-                var bytes = @sliceToBytes(res);
+                var bytes = mem.sliceAsBytes(res);
                 if (ptr.size == .C) {
                     msg.readNoEof(bytes[0 .. size - @sizeOf(ptr.child)]) catch return error.GraveProtocolError;
                     if (ptr.size == .C) {

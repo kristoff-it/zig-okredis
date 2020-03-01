@@ -7,7 +7,7 @@ const fmt = std.fmt;
 pub const ListParser = struct {
     // TODO: prevent users from unmarshaling structs out of strings
     pub fn isSupported(comptime T: type) bool {
-        return switch (@typeId(T)) {
+        return switch (@typeInfo(T)) {
             .Array, .Struct => true,
             else => false,
         };

@@ -79,7 +79,7 @@ pub const XADD = struct {
 
 fn _forStruct(comptime T: type) type {
     // TODO: support pointers to struct, check that the struct is serializable (strings and numbers).
-    if (@typeId(T) != .Struct) @compileError("Only Struct types allowed.");
+    if (@typeInfo(T) != .Struct) @compileError("Only Struct types allowed.");
     return struct {
         key: []const u8,
         id: []const u8,

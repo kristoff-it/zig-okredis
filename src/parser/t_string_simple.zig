@@ -1,6 +1,7 @@
 const builtin = @import("builtin");
 const std = @import("std");
 const fmt = std.fmt;
+const mem = std.mem;
 const testing = std.testing;
 
 /// Parses RedisSimpleString values
@@ -45,7 +46,7 @@ pub const SimpleStringParser = struct {
             },
             .Array => |arr| {
                 var res: [arr.len]arr.child = undefined;
-                var bytesSlice = @sliceToBytes(res[0..]);
+                var bytesSlice = mem.sliceAsBytes(res[0..]);
                 var end: usize = 0;
                 var ch = try msg.readByte();
                 for (bytesSlice) |*elem, i| {

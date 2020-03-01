@@ -16,7 +16,7 @@
 /// proper amount of stream data. It's expected that decoding errors always
 /// result in a broken connection state.
 pub fn isParserType(comptime T: type) bool {
-    const tid = @typeId(T);
+    const tid = @typeInfo(T);
     if ((tid == .Struct or tid == .Enum or tid == .Union) and
         @hasDecl(T, "Redis") and @hasDecl(T.Redis, "Parser"))
     {
@@ -82,12 +82,12 @@ pub fn noOptionalWrapper(comptime T: type) bool {
 /// used with XADD or HMSET:
 ///     HMSET mystruct field1 val1 field2 val2 ...
 pub fn isArguments(comptime T: type) bool {
-    const tid = @typeId(T);
+    const tid = @typeInfo(T);
     return (tid == .Struct or tid == .Enum or tid == .Union) and @hasDecl(T, "RedisArguments");
 }
 
 pub fn isCommand(comptime T: type) bool {
-    const tid = @typeId(T);
+    const tid = @typeInfo(T);
     return (tid == .Struct or tid == .Enum or tid == .Union) and @hasDecl(T, "RedisCommand");
 }
 // test "trait error message" {
