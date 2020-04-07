@@ -31,7 +31,12 @@ pub fn WithAttribs(comptime T: type) type {
 
                     var res: Self = undefined;
                     if (itemTag == '|') {
-                        // Here we lie to the root parser and claim we encountered a map type >:3
+                        // Here we lie to the root parser and claim we encountered a map type,
+                        // otherwise the parser would also try to parse the actual reply along
+                        // side the attribute.
+
+                        // No error catching is done because DynamicReply parses correctly
+                        // both errors and nil values, and it can't incur in a DecodingError.
                         res.attribs = try rootParser.parseAllocFromTag(
                             [][2]DynamicReply,
                             '%',
@@ -53,12 +58,12 @@ pub fn WithAttribs(comptime T: type) type {
 
 test "WithAttribs" {
     const parser = @import("../parser.zig").RESP3Parser;
-    const allocator = std.heap.direct_allocator;
+    const allocator = std.heap.page_allocator;
 
     const res = try parser.parseAlloc(
         WithAttribs([2]WithAttribs([]WithAttribs(i64))),
         allocator,
-        &MakeComplexListWithAttributes().stream,
+        MakeComplexListWithAttributes().inStream(),
     );
     testing.expectEqual(@as(usize, 2), res.attribs.len);
     testing.expectEqualSlices(u8, "Ciao", res.attribs[0][0].data.String.string);
@@ -84,8 +89,8 @@ test "WithAttribs" {
     testing.expectEqual(@as(i64, 99), res.data[1].data[1].data);
 }
 //zig fmt: off
-fn MakeComplexListWithAttributes() std.io.SliceInStream {
-    return std.io.SliceInStream.init(
+fn MakeComplexListWithAttributes() std.io.FixedBufferStream([]const u8) {
+    return std.io.fixedBufferStream((
         "|2\r\n" ++
             "+Ciao\r\n" ++
             "+World\r\n" ++
@@ -104,7 +109,7 @@ fn MakeComplexListWithAttributes() std.io.SliceInStream {
                     "#t\r\n" ++ 
                 ":123\r\n" ++
                 ":99\r\n"
-    [0..]);
+    )[0..]);
 }
 //zig fmt: on
 

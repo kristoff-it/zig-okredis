@@ -31,18 +31,18 @@ pub const BoolParser = struct {
 };
 
 test "parses bools" {
-    testing.expect(true == try BoolParser.parse(bool, struct {}, &TrueMSG().stream));
-    testing.expect(false == try BoolParser.parse(bool, struct {}, &FalseMSG().stream));
-    testing.expect(1 == try BoolParser.parse(i64, struct {}, &TrueMSG().stream));
-    testing.expect(0 == try BoolParser.parse(u32, struct {}, &FalseMSG().stream));
-    testing.expect(1.0 == try BoolParser.parse(f32, struct {}, &TrueMSG().stream));
-    testing.expect(0.0 == try BoolParser.parse(f64, struct {}, &FalseMSG().stream));
+    testing.expect(true == try BoolParser.parse(bool, struct {}, TrueMSG().inStream()));
+    testing.expect(false == try BoolParser.parse(bool, struct {}, FalseMSG().inStream()));
+    testing.expect(1 == try BoolParser.parse(i64, struct {}, TrueMSG().inStream()));
+    testing.expect(0 == try BoolParser.parse(u32, struct {}, FalseMSG().inStream()));
+    testing.expect(1.0 == try BoolParser.parse(f32, struct {}, TrueMSG().inStream()));
+    testing.expect(0.0 == try BoolParser.parse(f64, struct {}, FalseMSG().inStream()));
 }
 
-fn TrueMSG() std.io.SliceInStream {
-    return std.io.SliceInStream.init("#t\r\n"[1..]);
+fn TrueMSG() std.io.FixedBufferStream([]const u8) {
+    return std.io.fixedBufferStream("#t\r\n"[1..]);
 }
 
-fn FalseMSG() std.io.SliceInStream {
-    return std.io.SliceInStream.init("#f\r\n"[1..]);
+fn FalseMSG() std.io.FixedBufferStream([]const u8) {
+    return std.io.fixedBufferStream("#f\r\n"[1..]);
 }

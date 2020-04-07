@@ -39,35 +39,35 @@ pub const RESP3Parser = struct {
     }
 
     // TODO: should the errorset really be anyerror? Should it be explicit?
-    const errorset = error{
-        GotErrorReply,
-        GotNilReply,
-        LengthMismatch,
-        UnsupportedConversion,
+    // const errorset = error{
+    //     GotErrorReply,
+    //     GotNilReply,
+    //     LengthMismatch,
+    //     UnsupportedConversion,
 
-        SystemResources,
-        InvalidCharacter,
-        Overflow,
-        InputOutput,
-        IsDir,
-        OperationAborted,
-        BrokenPipe,
-        ConnectionResetByPeer,
-        WouldBlock,
-        Unexpected,
-        EndOfStream,
-        OutOfMemory,
-        GraveProtocolError,
-        SorryBadImplementation,
-        InvalidCharForDigit,
-        DigitTooLargeForBase,
-        InvalidBase,
-        StreamTooLong,
-        DecodeError,
-        DecodingError,
-        DivisionByZero,
-        UnexpectedRemainder,
-    };
+    //     SystemResources,
+    //     InvalidCharacter,
+    //     Overflow,
+    //     InputOutput,
+    //     IsDir,
+    //     OperationAborted,
+    //     BrokenPipe,
+    //     ConnectionResetByPeer,
+    //     WouldBlock,
+    //     Unexpected,
+    //     EndOfStream,
+    //     OutOfMemory,
+    //     GraveProtocolError,
+    //     SorryBadImplementation,
+    //     InvalidCharForDigit,
+    //     DigitTooLargeForBase,
+    //     InvalidBase,
+    //     StreamTooLong,
+    //     DecodeError,
+    //     DecodingError,
+    //     DivisionByZero,
+    //     UnexpectedRemainder,
+    // };
 
     // fn computeErrorSet(comptime T: type) type {
     //     if (comptime traits.isParserType(T)) {
@@ -193,7 +193,7 @@ pub const RESP3Parser = struct {
             return if (comptime parser.isSupported(T))
                 parser.parse(T, rootParser, msg)
             else
-                return error.UnsupportedConversion;
+                error.UnsupportedConversion;
         }
     }
 
@@ -207,7 +207,7 @@ pub const RESP3Parser = struct {
             else => return,
             .Optional => if (val) |v| freeReply(v, allocator),
             .Array => |arr| {
-                switch (arr.child) {
+                switch (@typeInfo(arr.child)) {
                     else => {},
                     .Enum,
                     .Union,
@@ -220,7 +220,7 @@ pub const RESP3Parser = struct {
                         }
                     },
                 }
-                allocator.free(val);
+                // allocator.free(val);
             },
             .Pointer => |ptr| switch (ptr.size) {
                 .Many => @compileError("sendAlloc is incapable of generating [*] pointers. " ++
@@ -301,10 +301,10 @@ test "parser" {
 
 test "evil indirection" {
     const WithAttribs = @import("./types/attributes.zig").WithAttribs;
-    const allocator = std.heap.direct_allocator;
+    const allocator = std.heap.page_allocator;
 
     {
-        const yes = try RESP3Parser.parseAlloc(?**?*f32, allocator, &MakeEvilFloat().stream);
+        const yes = try RESP3Parser.parseAlloc(?**?*f32, allocator, MakeEvilFloat().inStream());
         defer RESP3Parser.freeReply(yes, allocator);
 
         if (yes) |v| {
@@ -315,7 +315,7 @@ test "evil indirection" {
     }
 
     {
-        const no = try RESP3Parser.parseAlloc(?***f32, allocator, &MakeEvilNil().stream);
+        const no = try RESP3Parser.parseAlloc(?***f32, allocator, MakeEvilNil().inStream());
         if (no) |v| unreachable;
     }
 
@@ -334,8 +334,8 @@ test "evil indirection" {
 }
 
 //zig fmt: off
-fn MakeEvilFloat() std.io.SliceInStream {
-    return std.io.SliceInStream.init(
+fn MakeEvilFloat() std.io.FixedBufferStream([]const u8) {
+    return std.io.fixedBufferStream(
         ("|2\r\n" ++
             "+Ciao\r\n" ++
             "+World\r\n" ++
@@ -345,8 +345,8 @@ fn MakeEvilFloat() std.io.SliceInStream {
     [0..]);
 }
 
-fn MakeEvilNil() std.io.SliceInStream {
-    return std.io.SliceInStream.init(
+fn MakeEvilNil() std.io.FixedBufferStream([]const u8) {
+    return std.io.fixedBufferStream(
         ("|2\r\n" ++
             "+Ciao\r\n" ++
             "+World\r\n" ++
@@ -361,73 +361,73 @@ test "float" {
 
     // No alloc
     {
-        var input = std.io.SliceInStream.init(",120.23\r\n"[0..]);
-        const p1 = RESP3Parser.parse(f32, &input.stream) catch unreachable;
+        var input = std.io.fixedBufferStream(",120.23\r\n"[0..]);
+        const p1 = RESP3Parser.parse(f32, input.inStream()) catch unreachable;
         testing.expect(p1 == 120.23);
     }
 
     //Alloc
-    const allocator = std.heap.direct_allocator;
+    const allocator = std.heap.page_allocator;
     {
         {
-            const f = try RESP3Parser.parseAlloc(*f32, allocator, &Make1Float().stream);
+            const f = try RESP3Parser.parseAlloc(*f32, allocator, Make1Float().inStream());
             defer allocator.destroy(f);
             testing.expect(f.* == 120.23);
         }
         {
-            const f = try RESP3Parser.parseAlloc([]f32, allocator, &Make2Float().stream);
+            const f = try RESP3Parser.parseAlloc([]f32, allocator, Make2Float().inStream());
             defer allocator.free(f);
             testing.expectEqualSlices(f32, &[_]f32{ 1.1, 2.2 }, f);
         }
     }
 }
 
-fn Make1Float() std.io.SliceInStream {
-    return std.io.SliceInStream.init(",120.23\r\n"[0..]);
+fn Make1Float() std.io.FixedBufferStream([]const u8) {
+    return std.io.fixedBufferStream(",120.23\r\n"[0..]);
 }
 
-fn Make2Float() std.io.SliceInStream {
-    return std.io.SliceInStream.init("*2\r\n,1.1\r\n,2.2\r\n"[0..]);
+fn Make2Float() std.io.FixedBufferStream([]const u8) {
+    return std.io.fixedBufferStream("*2\r\n,1.1\r\n,2.2\r\n"[0..]);
 }
 
 test "optional" {
     const maybeInt: ?i64 = null;
     const maybeBool: ?bool = null;
     const maybeArr: ?[4]bool = null;
-    testing.expectEqual(maybeInt, try RESP3Parser.parse(?i64, &MakeNull().stream));
-    testing.expectEqual(maybeBool, try RESP3Parser.parse(?bool, &MakeNull().stream));
-    testing.expectEqual(maybeArr, try RESP3Parser.parse(?[4]bool, &MakeNull().stream));
+    testing.expectEqual(maybeInt, try RESP3Parser.parse(?i64, MakeNull().inStream()));
+    testing.expectEqual(maybeBool, try RESP3Parser.parse(?bool, MakeNull().inStream()));
+    testing.expectEqual(maybeArr, try RESP3Parser.parse(?[4]bool, MakeNull().inStream()));
 }
-fn MakeNull() std.io.SliceInStream {
-    return std.io.SliceInStream.init("_\r\n"[0..]);
+fn MakeNull() std.io.FixedBufferStream([]const u8) {
+    return std.io.fixedBufferStream("_\r\n"[0..]);
 }
 
 test "array" {
-    testing.expectError(error.LengthMismatch, RESP3Parser.parse([5]i64, &MakeArray().stream));
-    testing.expectError(error.LengthMismatch, RESP3Parser.parse([0]i64, &MakeArray().stream));
-    testing.expectError(error.UnsupportedConversion, RESP3Parser.parse([2]i64, &MakeArray().stream));
-    testing.expectEqual([2]f32{ 1.2, 3.4 }, try RESP3Parser.parse([2]f32, &MakeArray().stream));
+    testing.expectError(error.LengthMismatch, RESP3Parser.parse([5]i64, MakeArray().inStream()));
+    // testing.expectError(error.LengthMismatch, RESP3Parser.parse([0]i64, MakeArray().inStream()));
+    testing.expectError(error.UnsupportedConversion, RESP3Parser.parse([2]i64, MakeArray().inStream()));
+    testing.expectEqual([2]f32{ 1.2, 3.4 }, try RESP3Parser.parse([2]f32, MakeArray().inStream()));
 }
-fn MakeArray() std.io.SliceInStream {
-    return std.io.SliceInStream.init("*2\r\n,1.2\r\n,3.4\r\n"[0..]);
+fn MakeArray() std.io.FixedBufferStream([]const u8) {
+    return std.io.fixedBufferStream("*2\r\n,1.2\r\n,3.4\r\n"[0..]);
 }
 
 test "string" {
-    testing.expectError(error.LengthMismatch, RESP3Parser.parse([5]u8, &MakeString().stream));
-    testing.expectError(error.LengthMismatch, RESP3Parser.parse([2]u16, &MakeString().stream));
-    testing.expectEqualSlices(u8, "Hello World!", &try RESP3Parser.parse([12]u8, &MakeSimpleString().stream));
-    testing.expectError(error.LengthMismatch, RESP3Parser.parse([11]u8, &MakeSimpleString().stream));
-    testing.expectError(error.LengthMismatch, RESP3Parser.parse([13]u8, &MakeSimpleString().stream));
+    testing.expectError(error.LengthMismatch, RESP3Parser.parse([5]u8, MakeString().inStream()));
+    testing.expectError(error.LengthMismatch, RESP3Parser.parse([2]u16, MakeString().inStream()));
+    testing.expectEqualSlices(u8, "Hello World!", &try RESP3Parser.parse([12]u8, MakeSimpleString().inStream()));
+    testing.expectError(error.LengthMismatch, RESP3Parser.parse([11]u8, MakeSimpleString().inStream()));
+    testing.expectError(error.LengthMismatch, RESP3Parser.parse([13]u8, MakeSimpleString().inStream()));
 
-    const allocator = std.heap.direct_allocator;
-    testing.expectEqualSlices(u8, "Banana", try RESP3Parser.parseAlloc([]u8, allocator, &MakeString().stream));
-    testing.expectEqualSlices(u8, "Hello World!", try RESP3Parser.parseAlloc([]u8, allocator, &MakeSimpleString().stream));
+    const allocator = std.heap.page_allocator;
+    testing.expectEqualSlices(u8, "Banana", try RESP3Parser.parseAlloc([]u8, allocator, MakeString().inStream()));
+    testing.expectEqualSlices(u8, "Hello World!", try RESP3Parser.parseAlloc([]u8, allocator, MakeSimpleString().inStream()));
 }
-fn MakeString() std.io.SliceInStream {
-    return std.io.SliceInStream.init("$6\r\nBanana\r\n"[0..]);
+fn MakeString() std.io.FixedBufferStream([]const u8) {
+    return std.io.fixedBufferStream("$6\r\nBanana\r\n"[0..]);
 }
-fn MakeSimpleString() std.io.SliceInStream {
-    return std.io.SliceInStream.init("+Hello World!\r\n"[0..]);
+fn MakeSimpleString() std.io.FixedBufferStream([]const u8) {
+    return std.io.fixedBufferStream("+Hello World!\r\n"[0..]);
 }
 
 test "map2struct" {
@@ -438,82 +438,82 @@ test "map2struct" {
         third: FixBuf(11),
     };
 
-    const res = try RESP3Parser.parse(MyStruct, &MakeMap().stream);
+    const res = try RESP3Parser.parse(MyStruct, MakeMap().inStream());
     testing.expect(res.first == 12.34);
     testing.expect(res.second == true);
     testing.expectEqualSlices(u8, "Hello World", res.third.toSlice());
 }
 test "hashmap" {
-    const allocator = std.heap.direct_allocator;
+    const allocator = std.heap.page_allocator;
     const FloatDict = std.StringHashMap(f64);
-    const res = try RESP3Parser.parseAlloc(FloatDict, allocator, &MakeFloatMap().stream);
+    const res = try RESP3Parser.parseAlloc(FloatDict, allocator, MakeFloatMap().inStream());
     testing.expect(12.34 == res.getValue("aaa").?);
     testing.expect(56.78 == res.getValue("bbb").?);
     testing.expect(99.99 == res.getValue("ccc").?);
 }
-fn MakeFloatMap() std.io.SliceInStream {
-    return std.io.SliceInStream.init("%3\r\n$3\r\naaa\r\n,12.34\r\n$3\r\nbbb\r\n,56.78\r\n$3\r\nccc\r\n,99.99\r\n"[0..]);
+fn MakeFloatMap() std.io.FixedBufferStream([]const u8) {
+    return std.io.fixedBufferStream("%3\r\n$3\r\naaa\r\n,12.34\r\n$3\r\nbbb\r\n,56.78\r\n$3\r\nccc\r\n,99.99\r\n"[0..]);
 }
-fn MakeMap() std.io.SliceInStream {
-    return std.io.SliceInStream.init("%3\r\n$5\r\nfirst\r\n,12.34\r\n$6\r\nsecond\r\n#t\r\n$5\r\nthird\r\n$11\r\nHello World\r\n"[0..]);
+fn MakeMap() std.io.FixedBufferStream([]const u8) {
+    return std.io.fixedBufferStream("%3\r\n$5\r\nfirst\r\n,12.34\r\n$6\r\nsecond\r\n#t\r\n$5\r\nthird\r\n$11\r\nHello World\r\n"[0..]);
 }
 
 test "consume right amount" {
     const FixBuf = @import("./types/fixbuf.zig").FixBuf;
 
     {
-        var msg_err = std.io.SliceInStream.init("-ERR banana\r\n"[0..]);
-        testing.expectError(error.GotErrorReply, RESP3Parser.parse(void, &msg_err.stream));
-        testing.expectError(error.EndOfStream, (&msg_err.stream).readByte());
+        var msg_err = std.io.fixedBufferStream("-ERR banana\r\n"[0..]);
+        testing.expectError(error.GotErrorReply, RESP3Parser.parse(void, msg_err.inStream()));
+        testing.expectError(error.EndOfStream, (msg_err.inStream()).readByte());
 
         msg_err.pos = 0;
-        testing.expectError(error.GotErrorReply, RESP3Parser.parse(i64, &msg_err.stream));
-        testing.expectError(error.EndOfStream, (&msg_err.stream).readByte());
+        testing.expectError(error.GotErrorReply, RESP3Parser.parse(i64, msg_err.inStream()));
+        testing.expectError(error.EndOfStream, (msg_err.inStream()).readByte());
 
         msg_err.pos = 0;
-        testing.expectError(error.GotErrorReply, RESP3Parser.parse(FixBuf(100), &msg_err.stream));
-        testing.expectError(error.EndOfStream, (&msg_err.stream).readByte());
+        testing.expectError(error.GotErrorReply, RESP3Parser.parse(FixBuf(100), msg_err.inStream()));
+        testing.expectError(error.EndOfStream, (msg_err.inStream()).readByte());
     }
 
     {
-        var msg_err = std.io.SliceInStream.init("!10\r\nERR banana\r\n"[0..]);
-        testing.expectError(error.GotErrorReply, RESP3Parser.parse(void, &msg_err.stream));
-        testing.expectError(error.EndOfStream, (&msg_err.stream).readByte());
+        var msg_err = std.io.fixedBufferStream("!10\r\nERR banana\r\n"[0..]);
+        testing.expectError(error.GotErrorReply, RESP3Parser.parse(void, msg_err.inStream()));
+        testing.expectError(error.EndOfStream, (msg_err.inStream()).readByte());
 
         msg_err.pos = 0;
-        testing.expectError(error.GotErrorReply, RESP3Parser.parse(u64, &msg_err.stream));
-        testing.expectError(error.EndOfStream, (&msg_err.stream).readByte());
+        testing.expectError(error.GotErrorReply, RESP3Parser.parse(u64, msg_err.inStream()));
+        testing.expectError(error.EndOfStream, (msg_err.inStream()).readByte());
 
         msg_err.pos = 0;
-        testing.expectError(error.GotErrorReply, RESP3Parser.parse([10]u8, &msg_err.stream));
-        testing.expectError(error.EndOfStream, (&msg_err.stream).readByte());
+        testing.expectError(error.GotErrorReply, RESP3Parser.parse([10]u8, msg_err.inStream()));
+        testing.expectError(error.EndOfStream, (msg_err.inStream()).readByte());
     }
 
     {
-        var msg_err = std.io.SliceInStream.init("*2\r\n:123\r\n!10\r\nERR banana\r\n"[0..]);
-        testing.expectError(error.GotErrorReply, RESP3Parser.parse([2]u64, &msg_err.stream));
-        testing.expectError(error.EndOfStream, (&msg_err.stream).readByte());
+        var msg_err = std.io.fixedBufferStream("*2\r\n:123\r\n!10\r\nERR banana\r\n"[0..]);
+        testing.expectError(error.GotErrorReply, RESP3Parser.parse([2]u64, msg_err.inStream()));
+        testing.expectError(error.EndOfStream, (msg_err.inStream()).readByte());
 
         const MyStruct = struct {
             a: u8,
             b: u8,
         };
         msg_err.pos = 0;
-        testing.expectError(error.GotErrorReply, RESP3Parser.parse(MyStruct, &msg_err.stream));
-        testing.expectError(error.EndOfStream, (&msg_err.stream).readByte());
+        testing.expectError(error.GotErrorReply, RESP3Parser.parse(MyStruct, msg_err.inStream()));
+        testing.expectError(error.EndOfStream, (msg_err.inStream()).readByte());
     }
 
     {
-        var msg_err = std.io.SliceInStream.init("*2\r\n:123\r\n!10\r\nERR banana\r\n"[0..]);
-        testing.expectError(error.GotErrorReply, RESP3Parser.parse([2]u64, &msg_err.stream));
-        testing.expectError(error.EndOfStream, (&msg_err.stream).readByte());
+        var msg_err = std.io.fixedBufferStream("*2\r\n:123\r\n!10\r\nERR banana\r\n"[0..]);
+        testing.expectError(error.GotErrorReply, RESP3Parser.parse([2]u64, msg_err.inStream()));
+        testing.expectError(error.EndOfStream, (msg_err.inStream()).readByte());
 
         const MyStruct = struct {
             a: u8,
             b: u8,
         };
         msg_err.pos = 0;
-        testing.expectError(error.GotErrorReply, RESP3Parser.parse(MyStruct, &msg_err.stream));
-        testing.expectError(error.EndOfStream, (&msg_err.stream).readByte());
+        testing.expectError(error.GotErrorReply, RESP3Parser.parse(MyStruct, msg_err.inStream()));
+        testing.expectError(error.EndOfStream, (msg_err.inStream()).readByte());
     }
 }

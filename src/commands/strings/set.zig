@@ -108,10 +108,10 @@ test "serializer" {
     const serializer = @import("../../serializer.zig").CommandSerializer;
 
     var correctBuf: [1000]u8 = undefined;
-    var correctMsg = std.io.SliceOutStream.init(correctBuf[0..]);
+    var correctMsg = std.io.fixedBufferStream(correctBuf[0..]);
 
     var testBuf: [1000]u8 = undefined;
-    var testMsg = std.io.SliceOutStream.init(testBuf[0..]);
+    var testMsg = std.io.fixedBufferStream(testBuf[0..]);
 
     {
         {
@@ -119,11 +119,11 @@ test "serializer" {
             testMsg.reset();
 
             try serializer.serializeCommand(
-                &testMsg.stream,
+                testMsg.outStream(),
                 SET.init("mykey", 42, .NoExpire, .NoConditions),
             );
             try serializer.serializeCommand(
-                &correctMsg.stream,
+                correctMsg.outStream(),
                 .{ "SET", "mykey", "42" },
             );
 
@@ -135,11 +135,11 @@ test "serializer" {
             testMsg.reset();
 
             try serializer.serializeCommand(
-                &testMsg.stream,
+                testMsg.outStream(),
                 SET.init("mykey", "banana", .NoExpire, .IfNotExisting),
             );
             try serializer.serializeCommand(
-                &correctMsg.stream,
+                correctMsg.outStream(),
                 .{ "SET", "mykey", "banana", "NX" },
             );
 
@@ -151,11 +151,11 @@ test "serializer" {
             testMsg.reset();
 
             try serializer.serializeCommand(
-                &testMsg.stream,
+                testMsg.outStream(),
                 SET.init("mykey", "banana", SET.Expire{ .Seconds = 20 }, .IfAlreadyExisting),
             );
             try serializer.serializeCommand(
-                &correctMsg.stream,
+                correctMsg.outStream(),
                 .{ "SET", "mykey", "banana", "EX", "20", "XX" },
             );
 

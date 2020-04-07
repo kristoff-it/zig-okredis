@@ -120,57 +120,57 @@ pub const BlobStringParser = struct {
 
 test "string" {
     {
-        testing.expect(1337 == try BlobStringParser.parse(u32, struct {}, &MakeInt().stream));
-        testing.expectError(error.InvalidCharacter, BlobStringParser.parse(u32, struct {}, &MakeString().stream));
-        testing.expect(1337.0 == try BlobStringParser.parse(f32, struct {}, &MakeInt().stream));
-        testing.expect(12.34 == try BlobStringParser.parse(f64, struct {}, &MakeFloat().stream));
+        testing.expect(1337 == try BlobStringParser.parse(u32, struct {}, MakeInt().inStream()));
+        testing.expectError(error.InvalidCharacter, BlobStringParser.parse(u32, struct {}, MakeString().inStream()));
+        testing.expect(1337.0 == try BlobStringParser.parse(f32, struct {}, MakeInt().inStream()));
+        testing.expect(12.34 == try BlobStringParser.parse(f64, struct {}, MakeFloat().inStream()));
 
-        testing.expectEqualSlices(u8, "Hello World!", &try BlobStringParser.parse([12]u8, struct {}, &MakeString().stream));
+        testing.expectEqualSlices(u8, "Hello World!", &try BlobStringParser.parse([12]u8, struct {}, MakeString().inStream()));
 
-        const res = try BlobStringParser.parse([2][4]u8, struct {}, &MakeEmoji2().stream);
+        const res = try BlobStringParser.parse([2][4]u8, struct {}, MakeEmoji2().inStream());
         testing.expectEqualSlices(u8, "😈", &res[0]);
         testing.expectEqualSlices(u8, "👿", &res[1]);
     }
 
     {
-        const allocator = std.heap.direct_allocator;
+        const allocator = std.heap.page_allocator;
         {
-            const s = try BlobStringParser.parseAlloc([]u8, struct {}, allocator, &MakeString().stream);
+            const s = try BlobStringParser.parseAlloc([]u8, struct {}, allocator, MakeString().inStream());
             defer allocator.free(s);
             testing.expectEqualSlices(u8, s, "Hello World!");
         }
         {
-            const s = try BlobStringParser.parseAlloc([*c]u8, struct {}, allocator, &MakeString().stream);
+            const s = try BlobStringParser.parseAlloc([*c]u8, struct {}, allocator, MakeString().inStream());
             defer allocator.free(s[0..12]);
             testing.expectEqualSlices(u8, s[0..13], "Hello World!\x00");
         }
         {
-            const s = try BlobStringParser.parseAlloc([][4]u8, struct {}, allocator, &MakeEmoji2().stream);
+            const s = try BlobStringParser.parseAlloc([][4]u8, struct {}, allocator, MakeEmoji2().inStream());
             defer allocator.free(s);
             testing.expectEqualSlices(u8, "😈", &s[0]);
             testing.expectEqualSlices(u8, "👿", &s[1]);
         }
         {
-            const s = try BlobStringParser.parseAlloc([*c][4]u8, struct {}, allocator, &MakeEmoji2().stream);
+            const s = try BlobStringParser.parseAlloc([*c][4]u8, struct {}, allocator, MakeEmoji2().inStream());
             defer allocator.free(s[0..3]);
             testing.expectEqualSlices(u8, "😈", &s[0]);
             testing.expectEqualSlices(u8, "👿", &s[1]);
             testing.expectEqualSlices(u8, &[4]u8{ 0, 0, 0, 0 }, &s[3]);
         }
         {
-            testing.expectError(error.LengthMismatch, BlobStringParser.parseAlloc([][5]u8, struct {}, allocator, &MakeString().stream));
+            testing.expectError(error.LengthMismatch, BlobStringParser.parseAlloc([][5]u8, struct {}, allocator, MakeString().inStream()));
         }
     }
 }
-fn MakeEmoji2() std.io.SliceInStream {
-    return std.io.SliceInStream.init("$8\r\n😈👿\r\n"[1..]);
+fn MakeEmoji2() std.io.FixedBufferStream([]const u8) {
+    return std.io.fixedBufferStream("$8\r\n😈👿\r\n"[1..]);
 }
-fn MakeString() std.io.SliceInStream {
-    return std.io.SliceInStream.init("$12\r\nHello World!\r\n"[1..]);
+fn MakeString() std.io.FixedBufferStream([]const u8) {
+    return std.io.fixedBufferStream("$12\r\nHello World!\r\n"[1..]);
 }
-fn MakeInt() std.io.SliceInStream {
-    return std.io.SliceInStream.init("$4\r\n1337\r\n"[1..]);
+fn MakeInt() std.io.FixedBufferStream([]const u8) {
+    return std.io.fixedBufferStream("$4\r\n1337\r\n"[1..]);
 }
-fn MakeFloat() std.io.SliceInStream {
-    return std.io.SliceInStream.init("$5\r\n12.34\r\n"[1..]);
+fn MakeFloat() std.io.FixedBufferStream([]const u8) {
+    return std.io.fixedBufferStream("$5\r\n12.34\r\n"[1..]);
 }

@@ -1,6 +1,5 @@
 const std = @import("std");
 const Allocator = std.mem.Allocator;
-const KV = @import("./kv.zig").KV;
 const Verbatim = @import("./verbatim.zig").Verbatim;
 const testing = std.testing;
 
@@ -63,6 +62,9 @@ pub const DynamicReply = struct {
                 var res: DynamicReply = undefined;
                 if (itemTag == '|') {
                     // Here we lie to the root parser and claim we encountered a map type >:3
+
+                    // No error catching is done because DynamicReply parses correctly
+                    // both errors and nil values.
                     res.attribs = rootParser.parseAllocFromTag([][2]*DynamicReply, '%', allocator, msg) catch return E;
                     itemTag = msg.readByte() catch return E;
                 } else {
@@ -90,15 +92,15 @@ pub const DynamicReply = struct {
 
 test "dynamic replies" {
     const parser = @import("../parser.zig").RESP3Parser;
-    const allocator = std.heap.direct_allocator;
+    const allocator = std.heap.page_allocator;
 
     {
-        const reply = try DynamicReply.Redis.Parser.parseAlloc('+', parser, allocator, &MakeSimpleString().stream);
+        const reply = try DynamicReply.Redis.Parser.parseAlloc('+', parser, allocator, MakeSimpleString().inStream());
         testing.expectEqualSlices(u8, "Yayyyy I'm a string!", reply.data.String.string);
     }
 
     {
-        const reply = try DynamicReply.Redis.Parser.parseAlloc('*', parser, allocator, &MakeComplexList().stream);
+        const reply = try DynamicReply.Redis.Parser.parseAlloc('*', parser, allocator, MakeComplexList().inStream());
         testing.expectEqual(@as(usize, 0), reply.attribs.len);
 
         testing.expectEqualSlices(u8, "Hello", reply.data.List[0].data.String.string);
@@ -116,7 +118,7 @@ test "dynamic replies" {
     }
 
     {
-        const reply = try DynamicReply.Redis.Parser.parseAlloc('|', parser, allocator, &MakeComplexListWithAttributes().stream);
+        const reply = try DynamicReply.Redis.Parser.parseAlloc('|', parser, allocator, MakeComplexListWithAttributes().inStream());
         testing.expectEqual(@as(usize, 2), reply.attribs.len);
         testing.expectEqualSlices(u8, "Ciao", reply.attribs[0][0].data.String.string);
         testing.expectEqualSlices(u8, "World", reply.attribs[0][1].data.String.string);
@@ -146,16 +148,16 @@ test "dynamic replies" {
     }
 }
 
-fn MakeSimpleString() std.io.SliceInStream {
-    return std.io.SliceInStream.init("+Yayyyy I'm a string!\r\n"[1..]);
+fn MakeSimpleString() std.io.FixedBufferStream([]const u8) {
+    return std.io.fixedBufferStream("+Yayyyy I'm a string!\r\n"[1..]);
 }
-fn MakeComplexList() std.io.SliceInStream {
-    return std.io.SliceInStream.init("*3\r\n+Hello\r\n#t\r\n*2\r\n:123\r\n,12.34\r\n"[1..]);
+fn MakeComplexList() std.io.FixedBufferStream([]const u8) {
+    return std.io.fixedBufferStream("*3\r\n+Hello\r\n#t\r\n*2\r\n:123\r\n,12.34\r\n"[1..]);
 }
 
 //zig fmt: off
-fn MakeComplexListWithAttributes() std.io.SliceInStream {
-    return std.io.SliceInStream.init(
+fn MakeComplexListWithAttributes() std.io.FixedBufferStream([]const u8) {
+    return std.io.fixedBufferStream(
         ("|2\r\n" ++
             "+Ciao\r\n" ++
             "+World\r\n" ++

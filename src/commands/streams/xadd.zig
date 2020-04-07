@@ -153,10 +153,10 @@ test "serializer" {
     const serializer = @import("../../serializer.zig").CommandSerializer;
 
     var correctBuf: [1000]u8 = undefined;
-    var correctMsg = std.io.SliceOutStream.init(correctBuf[0..]);
+    var correctMsg = std.io.fixedBufferStream(correctBuf[0..]);
 
     var testBuf: [1000]u8 = undefined;
-    var testMsg = std.io.SliceOutStream.init(testBuf[0..]);
+    var testMsg = std.io.fixedBufferStream(testBuf[0..]);
 
     {
         {
@@ -164,11 +164,11 @@ test "serializer" {
             testMsg.reset();
 
             try serializer.serializeCommand(
-                &testMsg.stream,
+                testMsg.outStream(),
                 XADD.init("k1", "1-1", .NoMaxLen, &[_]FV{.{ .field = "f1", .value = "v1" }}),
             );
             try serializer.serializeCommand(
-                &correctMsg.stream,
+                correctMsg.outStream(),
                 .{ "XADD", "k1", "1-1", "f1", "v1" },
             );
 
@@ -189,11 +189,11 @@ test "serializer" {
             const MyXADD = XADD.forStruct(MyStruct);
 
             try serializer.serializeCommand(
-                &testMsg.stream,
+                testMsg.outStream(),
                 MyXADD.init("k1", "1-1", .NoMaxLen, .{ .field1 = "nice!", .field2 = 'a', .field3 = 42 }),
             );
             try serializer.serializeCommand(
-                &correctMsg.stream,
+                correctMsg.outStream(),
                 .{ "XADD", "k1", "1-1", "field1", "nice!", "field2", 'a', "field3", 42 },
             );
 
@@ -213,7 +213,7 @@ test "serializer" {
             const MyXADD = XADD.forStruct(MyStruct);
 
             try serializer.serializeCommand(
-                &testMsg.stream,
+                testMsg.outStream(),
                 MyXADD.init(
                     "k1",
                     "1-1",
@@ -222,7 +222,7 @@ test "serializer" {
                 ),
             );
             try serializer.serializeCommand(
-                &correctMsg.stream,
+                correctMsg.outStream(),
                 .{ "XADD", "k1", "1-1", "MAXLEN", 40, "field1", "nice!", "field2", 'a', "field3", 42 },
             );
 

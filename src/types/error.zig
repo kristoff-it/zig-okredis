@@ -283,41 +283,41 @@ pub fn OrFullErr(comptime T: type) type {
     };
 }
 test "parse simple errors" {
-    switch (try OrErr(u8).Redis.Parser.parse('_', fakeParser, &MakeNil().stream)) {
+    switch (try OrErr(u8).Redis.Parser.parse('_', fakeParser, MakeNil().inStream())) {
         .Ok, .Err => unreachable,
         .Nil => testing.expect(true),
     }
-    switch (try OrErr(u8).Redis.Parser.parse('!', fakeParser, &MakeBlobErr().stream)) {
+    switch (try OrErr(u8).Redis.Parser.parse('!', fakeParser, MakeBlobErr().inStream())) {
         .Ok, .Nil => unreachable,
         .Err => |err| testing.expectEqualSlices(u8, "ERRN\r\nOGOODFOOD", err.getCode()),
     }
 
-    switch (try OrErr(u8).Redis.Parser.parse('-', fakeParser, &MakeErr().stream)) {
+    switch (try OrErr(u8).Redis.Parser.parse('-', fakeParser, MakeErr().inStream())) {
         .Ok, .Nil => unreachable,
         .Err => |err| testing.expectEqualSlices(u8, "ERRNOGOODFOOD", err.getCode()),
     }
 
-    switch (try OrErr(u8).Redis.Parser.parse('-', fakeParser, &MakeErroji().stream)) {
+    switch (try OrErr(u8).Redis.Parser.parse('-', fakeParser, MakeErroji().inStream())) {
         .Ok, .Nil => unreachable,
         .Err => |err| testing.expectEqualSlices(u8, "😈", err.getCode()),
     }
 
-    switch (try OrErr(u8).Redis.Parser.parse('-', fakeParser, &MakeShortErr().stream)) {
+    switch (try OrErr(u8).Redis.Parser.parse('-', fakeParser, MakeShortErr().inStream())) {
         .Ok, .Nil => unreachable,
         .Err => |err| testing.expectEqualSlices(u8, "ABC", err.getCode()),
     }
 
-    testing.expectError(error.ErrorCodeBufTooSmall, OrErr(u8).Redis.Parser.parse('-', fakeParser, &MakeBadErr().stream));
+    testing.expectError(error.ErrorCodeBufTooSmall, OrErr(u8).Redis.Parser.parse('-', fakeParser, MakeBadErr().inStream()));
 
-    const allocator = std.heap.direct_allocator;
-    switch (try OrFullErr(u8).Redis.Parser.parseAlloc('-', fakeParser, allocator, &MakeErroji().stream)) {
+    const allocator = std.heap.page_allocator;
+    switch (try OrFullErr(u8).Redis.Parser.parseAlloc('-', fakeParser, allocator, MakeErroji().inStream())) {
         .Ok, .Nil => unreachable,
         .Err => |err| {
             testing.expectEqualSlices(u8, "😈", err.getCode());
             testing.expectEqualSlices(u8, "your Redis belongs to us", err.message);
         },
     }
-    switch (try OrFullErr(u8).Redis.Parser.parseAlloc('!', fakeParser, allocator, &MakeBlobErr().stream)) {
+    switch (try OrFullErr(u8).Redis.Parser.parseAlloc('!', fakeParser, allocator, MakeBlobErr().inStream())) {
         .Ok, .Nil => unreachable,
         .Err => |err| {
             testing.expectEqualSlices(u8, "ERRN\r\nOGOODFOOD", err.getCode());
@@ -337,23 +337,23 @@ const fakeParser = struct {
     }
 };
 
-fn MakeErroji() std.io.SliceInStream {
-    return std.io.SliceInStream.init("-😈 your Redis belongs to us\r\n"[1..]);
+fn MakeErroji() std.io.FixedBufferStream([]const u8) {
+    return std.io.fixedBufferStream("-😈 your Redis belongs to us\r\n"[1..]);
 }
-fn MakeErr() std.io.SliceInStream {
-    return std.io.SliceInStream.init("-ERRNOGOODFOOD redis could not find any good food\r\n"[1..]);
+fn MakeErr() std.io.FixedBufferStream([]const u8) {
+    return std.io.fixedBufferStream("-ERRNOGOODFOOD redis could not find any good food\r\n"[1..]);
 }
-fn MakeBadErr() std.io.SliceInStream {
-    return std.io.SliceInStream.init("-ARIARIARIARIARIARIARIARIARIARRIVEDERCI *golden wind music starts*\r\n"[1..]);
+fn MakeBadErr() std.io.FixedBufferStream([]const u8) {
+    return std.io.fixedBufferStream("-ARIARIARIARIARIARIARIARIARIARRIVEDERCI *golden wind music starts*\r\n"[1..]);
 }
-fn MakeShortErr() std.io.SliceInStream {
-    return std.io.SliceInStream.init("-ABC\r\n"[1..]);
+fn MakeShortErr() std.io.FixedBufferStream([]const u8) {
+    return std.io.fixedBufferStream("-ABC\r\n"[1..]);
 }
-fn MakeBlobErr() std.io.SliceInStream {
-    return std.io.SliceInStream.init("!55\r\nERRN\r\nOGOODFOOD redis \r\n\r\ncould not find any\r\n good food\r\n"[1..]);
+fn MakeBlobErr() std.io.FixedBufferStream([]const u8) {
+    return std.io.fixedBufferStream("!55\r\nERRN\r\nOGOODFOOD redis \r\n\r\ncould not find any\r\n good food\r\n"[1..]);
 }
-fn MakeNil() std.io.SliceInStream {
-    return std.io.SliceInStream.init("_\r\n"[1..]);
+fn MakeNil() std.io.FixedBufferStream([]const u8) {
+    return std.io.fixedBufferStream("_\r\n"[1..]);
 }
 
 test "docs" {

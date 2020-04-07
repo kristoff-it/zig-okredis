@@ -96,10 +96,10 @@ test "serializer" {
     const serializer = @import("../../serializer.zig").CommandSerializer;
 
     var correctBuf: [1000]u8 = undefined;
-    var correctMsg = std.io.SliceOutStream.init(correctBuf[0..]);
+    var correctMsg = std.io.fixedBufferStream(correctBuf[0..]);
 
     var testBuf: [1000]u8 = undefined;
-    var testMsg = std.io.SliceOutStream.init(testBuf[0..]);
+    var testMsg = std.io.fixedBufferStream(testBuf[0..]);
 
     {
         {
@@ -107,11 +107,11 @@ test "serializer" {
             testMsg.reset();
 
             try serializer.serializeCommand(
-                &testMsg.stream,
+                testMsg.outStream(),
                 HMGET.init("k1", &[_][]const u8{"f1"}),
             );
             try serializer.serializeCommand(
-                &correctMsg.stream,
+                correctMsg.outStream(),
                 .{ "HMGET", "k1", "f1" },
             );
 
@@ -132,11 +132,11 @@ test "serializer" {
             const MyHMGET = HMGET.forStruct(MyStruct);
 
             try serializer.serializeCommand(
-                &testMsg.stream,
+                testMsg.outStream(),
                 MyHMGET.init("k1"),
             );
             try serializer.serializeCommand(
-                &correctMsg.stream,
+                correctMsg.outStream(),
                 .{ "HMGET", "k1", "field1", "field2", "field3" },
             );
 

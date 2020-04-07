@@ -19,18 +19,18 @@ pub const Client = struct {
     readLock: if (std.io.is_async) std.event.Lock else void,
     writeLock: if (std.io.is_async) std.event.Lock else void,
 
-    const InBuff = std.io.BufferedInStream(std.fs.File.InStream.Error);
-    const OutBuff = std.io.BufferedOutStream(std.fs.File.OutStream.Error);
+    const InBuff = std.io.BufferedInStream(4096, std.fs.File.InStream);
+    const OutBuff = std.io.BufferedOutStream(4096, std.fs.File.OutStream);
 
     /// Initializes a Client and connects it to the specified IPv4 address and port.
     pub fn initIp4(self: *Client, addr: []const u8, port: u16) !void {
-        // self.sock = try net.tcpConnectToAddress(try net.Address.parseIp4(addr, port));
+        self.sock = try net.tcpConnectToAddress(try net.Address.parseIp4(addr, port));
         errdefer self.sock.close();
 
         self.readStream = self.sock.inStream();
         self.writeStream = self.sock.outStream();
-        self.bufReadStream = InBuff.init(&self.readStream.stream);
-        self.bufWriteStream = OutBuff.init(&self.writeStream.stream);
+        self.bufReadStream = std.io.bufferedInStream(self.readStream);
+        self.bufWriteStream = std.io.bufferedOutStream(self.writeStream);
 
         if (std.io.is_async) {
             self.readLock = std.event.Lock.init();
@@ -126,12 +126,12 @@ pub const Client = struct {
 
             // Serialize all the commands
             if (@hasField(@TypeOf(allocator), "one")) {
-                try CommandSerializer.serializeCommand(&self.bufWriteStream.stream, cmds);
+                try CommandSerializer.serializeCommand(self.bufWriteStream.outStream(), cmds);
             } else {
                 inline for (std.meta.fields(@TypeOf(cmds))) |field| {
                     const cmd = @field(cmds, field.name);
                     // try ArgSerializer.serialize(&self.out.stream, args);
-                    try CommandSerializer.serializeCommand(&self.bufWriteStream.stream, cmd);
+                    try CommandSerializer.serializeCommand(self.bufWriteStream.outStream(), cmd);
                 }
             } // Here is where the write lock gets released by the `defer` statement.
 
@@ -155,9 +155,9 @@ pub const Client = struct {
         // TODO: error procedure
         if (@hasField(@TypeOf(allocator), "one")) {
             if (@hasField(@TypeOf(allocator), "ptr")) {
-                return RESP3.parseAlloc(Ts, allocator.ptr, &self.bufReadStream.stream);
+                return RESP3.parseAlloc(Ts, allocator.ptr, self.bufReadStream.inStream());
             } else {
-                return RESP3.parse(Ts, &self.bufReadStream.stream);
+                return RESP3.parse(Ts, self.bufReadStream.inStream());
             }
         } else {
             var result: Ts = undefined;
@@ -166,7 +166,7 @@ pub const Client = struct {
                 const cmd_num = std.meta.fields(@TypeOf(cmds)).len;
                 comptime var i: usize = 0;
                 inline while (i < cmd_num) : (i += 1) {
-                    try RESP3.parse(void, &self.bufReadStream.stream);
+                    try RESP3.parse(void, self.bufReadStream.inStream());
                 }
                 return;
             } else {
@@ -174,9 +174,9 @@ pub const Client = struct {
                     .Struct => {
                         inline for (std.meta.fields(Ts)) |field| {
                             if (@hasField(@TypeOf(allocator), "ptr")) {
-                                @field(result, field.name) = try RESP3.parseAlloc(field.field_type, allocator.ptr, &self.bufReadStream.stream);
+                                @field(result, field.name) = try RESP3.parseAlloc(field.field_type, allocator.ptr, self.bufReadStream.inStream());
                             } else {
-                                @field(result, field.name) = try RESP3.parse(field.field_type, &self.bufReadStream.stream);
+                                @field(result, field.name) = try RESP3.parse(field.field_type, self.bufReadStream.inStream());
                             }
                         }
                     },
@@ -184,9 +184,9 @@ pub const Client = struct {
                         var i: usize = 0;
                         while (i < Ts.len) : (i += 1) {
                             if (@hasField(@TypeOf(allocator), "ptr")) {
-                                result[i] = try RESP3.parseAlloc(Ts.Child, allocator.ptr, &self.bufReadStream.stream);
+                                result[i] = try RESP3.parseAlloc(Ts.Child, allocator.ptr, self.bufReadStream.inStream());
                             } else {
-                                result[i] = try RESP3.parse(Ts.Child, &self.bufReadStream.stream);
+                                result[i] = try RESP3.parse(Ts.Child, self.bufReadStream.inStream());
                             }
                         }
                     },
@@ -194,9 +194,9 @@ pub const Client = struct {
                         switch (ptr.size) {
                             .One => {
                                 if (@hasField(@TypeOf(allocator), "ptr")) {
-                                    result = try RESP3.parseAlloc(Ts, allocator.ptr, &self.bufReadStream.stream);
+                                    result = try RESP3.parseAlloc(Ts, allocator.ptr, self.bufReadStream.inStream());
                                 } else {
-                                    result = try RESP3.parse(Ts, &self.bufReadStream.stream);
+                                    result = try RESP3.parse(Ts, self.bufReadStream.inStream());
                                 }
                             },
                             .Many => {
@@ -205,7 +205,7 @@ pub const Client = struct {
                                     errdefer allocator.free(result);
 
                                     for (result) |*elem| {
-                                        elem.* = try RESP3.parseAlloc(Ts.Child, allocator.ptr, &self.bufReadStream.stream);
+                                        elem.* = try RESP3.parseAlloc(Ts.Child, allocator.ptr, self.bufReadStream.inStream());
                                     }
                                 } else {
                                     @compileError("Use sendAlloc / pipeAlloc / transAlloc to decode pointer types.");

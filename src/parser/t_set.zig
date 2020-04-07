@@ -103,16 +103,16 @@ pub const SetParser = struct {
 
 test "set" {
     const parser = @import("../parser.zig").RESP3Parser;
-    const allocator = std.heap.direct_allocator;
+    const allocator = std.heap.page_allocator;
 
-    const arr = try SetParser.parse([3]i32, parser, &MakeSet().stream);
+    const arr = try SetParser.parse([3]i32, parser, MakeSet().inStream());
     testing.expectEqualSlices(i32, &[3]i32{ 1, 2, 3 }, &arr);
 
-    const sli = try SetParser.parseAlloc([]i64, parser, allocator, &MakeSet().stream);
+    const sli = try SetParser.parseAlloc([]i64, parser, allocator, MakeSet().inStream());
     defer allocator.free(sli);
     testing.expectEqualSlices(i64, &[3]i64{ 1, 2, 3 }, sli);
 
-    var hmap = try SetParser.parseAlloc(std.AutoHashMap(i64, void), parser, allocator, &MakeSet().stream);
+    var hmap = try SetParser.parseAlloc(std.AutoHashMap(i64, void), parser, allocator, MakeSet().inStream());
     defer hmap.deinit();
 
     if (hmap.remove(1)) |_| {} else unreachable;
@@ -122,6 +122,6 @@ test "set" {
     testing.expectEqual(@as(usize, 0), hmap.count());
 }
 
-fn MakeSet() std.io.SliceInStream {
-    return std.io.SliceInStream.init("~3\r\n:1\r\n:2\r\n:3\r\n"[1..]);
+fn MakeSet() std.io.FixedBufferStream([]const u8) {
+    return std.io.fixedBufferStream("~3\r\n:1\r\n:2\r\n:3\r\n"[1..]);
 }

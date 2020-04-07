@@ -95,10 +95,10 @@ pub const Verbatim = struct {
 
 test "verbatim" {
     const parser = @import("../parser.zig").RESP3Parser;
-    const allocator = std.heap.direct_allocator;
+    const allocator = std.heap.page_allocator;
 
     {
-        const reply = try Verbatim.Redis.Parser.parseAlloc('+', parser, allocator, &MakeSimpleString().stream);
+        const reply = try Verbatim.Redis.Parser.parseAlloc('+', parser, allocator, MakeSimpleString().inStream());
         testing.expectEqualSlices(u8, "Yayyyy I'm a string!", reply.string);
         switch (reply.format) {
             else => unreachable,
@@ -107,7 +107,7 @@ test "verbatim" {
     }
 
     {
-        const reply = try Verbatim.Redis.Parser.parseAlloc('$', parser, allocator, &MakeBlobString().stream);
+        const reply = try Verbatim.Redis.Parser.parseAlloc('$', parser, allocator, MakeBlobString().inStream());
         testing.expectEqualSlices(u8, "Hello World!", reply.string);
         switch (reply.format) {
             else => unreachable,
@@ -116,7 +116,7 @@ test "verbatim" {
     }
 
     {
-        const reply = try Verbatim.Redis.Parser.parseAlloc('=', parser, allocator, &MakeVerbatimString().stream);
+        const reply = try Verbatim.Redis.Parser.parseAlloc('=', parser, allocator, MakeVerbatimString().inStream());
         testing.expectEqualSlices(u8, "Oh hello there!", reply.string);
         switch (reply.format) {
             else => unreachable,
@@ -125,7 +125,7 @@ test "verbatim" {
     }
 
     {
-        const reply = try Verbatim.Redis.Parser.parseAlloc('=', parser, allocator, &MakeBadVerbatimString().stream);
+        const reply = try Verbatim.Redis.Parser.parseAlloc('=', parser, allocator, MakeBadVerbatimString().inStream());
         testing.expectEqualSlices(u8, "t", reply.string);
         switch (reply.format) {
             else => unreachable,
@@ -134,7 +134,7 @@ test "verbatim" {
     }
 
     {
-        const reply = try Verbatim.Redis.Parser.parseAlloc('=', parser, allocator, &MakeBadVerbatimString2().stream);
+        const reply = try Verbatim.Redis.Parser.parseAlloc('=', parser, allocator, MakeBadVerbatimString2().inStream());
         testing.expectEqualSlices(u8, "", reply.string);
         switch (reply.format) {
             else => unreachable,
@@ -143,18 +143,18 @@ test "verbatim" {
     }
 }
 
-fn MakeSimpleString() std.io.SliceInStream {
-    return std.io.SliceInStream.init("+Yayyyy I'm a string!\r\n"[1..]);
+fn MakeSimpleString() std.io.FixedBufferStream([]const u8) {
+    return std.io.fixedBufferStream("+Yayyyy I'm a string!\r\n"[1..]);
 }
-fn MakeBlobString() std.io.SliceInStream {
-    return std.io.SliceInStream.init("$12\r\nHello World!\r\n"[1..]);
+fn MakeBlobString() std.io.FixedBufferStream([]const u8) {
+    return std.io.fixedBufferStream("$12\r\nHello World!\r\n"[1..]);
 }
-fn MakeVerbatimString() std.io.SliceInStream {
-    return std.io.SliceInStream.init("=19\r\ntxt:Oh hello there!\r\n"[1..]);
+fn MakeVerbatimString() std.io.FixedBufferStream([]const u8) {
+    return std.io.fixedBufferStream("=19\r\ntxt:Oh hello there!\r\n"[1..]);
 }
-fn MakeBadVerbatimString() std.io.SliceInStream {
-    return std.io.SliceInStream.init("=1\r\nt\r\n"[1..]);
+fn MakeBadVerbatimString() std.io.FixedBufferStream([]const u8) {
+    return std.io.fixedBufferStream("=1\r\nt\r\n"[1..]);
 }
-fn MakeBadVerbatimString2() std.io.SliceInStream {
-    return std.io.SliceInStream.init("=4\r\nmkd:\r\n"[1..]);
+fn MakeBadVerbatimString2() std.io.FixedBufferStream([]const u8) {
+    return std.io.fixedBufferStream("=4\r\nmkd:\r\n"[1..]);
 }
