@@ -8,7 +8,7 @@ pub const geo = @import("./commands/geo.zig");
 //! These are all command builders than can be used interchangeably with the main syntax:
 //! ```
 //! try client.send(void, .{"SET", "key", 42});
-//! try client.send(void, SET.init("key", 42, .NoConditions, .NoExpire));
+//! try client.send(void, SET.init("key", 42, .NoExpire, .NoConditions));
 //! ```
 //! Command builders offer more comptime safety through their `.init` functions and
 //! most of them also feature a `.validate()` method that performs semantic validation.
