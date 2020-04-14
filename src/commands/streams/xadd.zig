@@ -5,6 +5,32 @@ const common = @import("../_common_utils.zig");
 const FV = common.FV;
 
 pub const XADD = struct {
+    //! Command builder for XADD.
+    //!
+    //! Use `XADD.forStruct(T)` to create at `comptime` a specialized version of XADD
+    //! whose `.init` accepts a struct for your choosing instead of `fvs`.
+    //!
+    //! ```
+    //! const cmd = XADD.init("mykey", "*", .NoMaxLen, &[_]FV{
+    //!     .{ .field = "field1", .value = "val1" },
+    //!     .{ .field = "field2", .value = "val2" },
+    //! });
+    //!
+    //! const ExampleStruct = struct {
+    //!     banana: usize,
+    //!     id: []const u8,
+    //! };
+    //!
+    //! const example = ExampleStruct{
+    //!     .banana = 10,
+    //!     .id = "ok",
+    //! };
+    //!
+    //! const MyXADD = XADD.forStruct(ExampleStruct);
+    //!
+    //! const cmd1 = MyXADD.init("mykey", "*", .NoMaxLen, example);
+    //! ```
+
     key: []const u8,
     id: []const u8,
     maxlen: MaxLen = .NoMaxLen,
@@ -15,9 +41,11 @@ pub const XADD = struct {
         return .{ .key = key, .id = id, .maxlen = maxlen, .fvs = fvs };
     }
 
+    /// Type constructor that creates a specialized version of XADD whose
+    /// .init accepts a struct for your choosing instead of `fvs`.
+    pub const forStruct = _forStruct;
     // This reassignment is necessary to avoid having two definitions of
     // RedisCommand in the same scope (it causes a shadowing error).
-    pub const forStruct = _forStruct;
 
     /// Validates if the command is syntactically correct.
     pub fn validate(self: XADD) !void {

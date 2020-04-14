@@ -543,7 +543,7 @@
                     return value + "";
                 }
             default:
-                throw new Error("TODO implement getValueText for this type");
+                console.trace("TODO implement getValueText for this type:", zigAnalysis.typeKinds[typeObj.kind]);
         }
     }
 
@@ -1086,7 +1086,7 @@
                 var fieldNode = zigAnalysis.astNodes[containerNode.fields[i]];
                 var divDom = domListFields.children[i];
 
-                var html = '<pre>' + escapeHtml(fieldNode.name);
+                var html = '<div class="mobile-scroll-container"><pre class="scroll-item">' + escapeHtml(fieldNode.name);
 
                 if (container.kind === typeKinds.Enum) {
                     html += ' = <span class="tok-number">' + field + '</span>';
@@ -1099,7 +1099,7 @@
                     }
                 }
 
-                html += ',</pre>';
+                html += ',</pre></div>';
 
                 var docs = fieldNode.docs;
                 if (docs != null) {
@@ -1432,7 +1432,7 @@
                     line.type = "ul";
                     line.text = line.text.substr(1);
                 }
-                else if (line.text.match(/\d+\./)) {
+                else if (line.text.match(/^\d+\..*$/)) { // if line starts with {number}{dot}
                     const match = line.text.match(/(\d+)\./);
                     line.type = "ul";
                     line.text = line.text.substr(match[0].length);

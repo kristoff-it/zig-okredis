@@ -1,6 +1,6 @@
-// MSET key value [key value ...]
+// // MSET key value [key value ...]
 
-// const MSET = struct {
+// pub const MSET = struct {
 //     kvs: []const KV,
 
 //     const Self = @This();
@@ -23,8 +23,6 @@
 //         };
 //     };
 // };
-
-
 
 // test "basic usage" {
 //     const cmd = MSET.init(.{ "lol", "123", "test" });

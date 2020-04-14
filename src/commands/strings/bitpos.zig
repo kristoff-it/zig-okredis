@@ -6,6 +6,10 @@ pub const Bit = enum {
 };
 
 pub const BITPOS = struct {
+    //! ```
+    //! const cmd = BITPOS.init("test", .Zero, -3, null);
+    //! ```
+    
     key: []const u8,
     bit: Bit,
     bounds: Bounds,

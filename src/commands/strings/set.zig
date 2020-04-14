@@ -2,6 +2,14 @@ const Value = @import("../_common_utils.zig").Value;
 
 /// SET key value [EX seconds|PX milliseconds] [NX|XX]
 pub const SET = struct {
+    //! Command builder for SET.
+    //!
+    //! Allows you to use both strings and numbers as values.
+    //! ```
+    //! const cmd1 = SET.init("mykey", 42, .NoExpire, .NoConditions);
+    //! const cmd2 = SET.init("mykey", "banana", .NoExpire, .IfNotExisting);
+    //! ```
+
     key: []const u8,
 
     /// Users should provide either a string or a number to `.init()`.

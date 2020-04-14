@@ -3,6 +3,8 @@ const client = @import("./client.zig");
 const parser = @import("./parser.zig");
 const serializer = @import("./serializer.zig");
 
+//! Test top level docs
+
 pub const commands = @import("./commands.zig");
 pub const types = @import("./types.zig");
 pub const traits = @import("./traits.zig");

@@ -1,6 +1,6 @@
 // GEODIST key member1 member2 [m|km|ft|mi]
 
-const Unit = @import("../utils/geo.zig").Unit;
+const Unit = @import("./_utils.zig").Unit;
 
 pub const GEODIST = struct {
     key: []const u8,
@@ -28,5 +28,5 @@ pub const GEODIST = struct {
 };
 
 test "basic usage" {
-    const cmd = GEODIST.init("lol", 100, "banana");
+    const cmd = GEODIST.init("cities", "rome", "paris", .meters);
 }

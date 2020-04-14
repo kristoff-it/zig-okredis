@@ -1,7 +1,6 @@
 // GEORADIUSBYMEMBER key member radius m|km|ft|mi [WITHCOORD] [WITHDIST] [WITHHASH] [COUNT count] [ASC|DESC] [STORE key] [STOREDIST key]
 
-const common = @import("../utils/common.zig");
-const Unit = @import("../utils/geo.zig").Unit;
+const Unit = @import("./_utils.zig").Unit;
 
 pub const GEORADIUSBYMEMBER = struct {
     key: []const u8,
@@ -17,7 +16,7 @@ pub const GEORADIUSBYMEMBER = struct {
     store: ?[]const u8,
     storedist: ?[]const u8,
 
-    pub const Ordering = union {
+    pub const Ordering = enum {
         Asc,
         Desc,
     };
@@ -105,4 +104,7 @@ pub const GEORADIUSBYMEMBER = struct {
     };
 };
 
-test "basic usage" {}
+test "basic usage" {
+    const cmd = GEORADIUSBYMEMBER.init("mykey", "mymember", 20, .meters, false, false, false, 0, .Asc, null, null);
+    try cmd.validate();
+}

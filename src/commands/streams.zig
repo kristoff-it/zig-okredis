@@ -10,3 +10,8 @@ test "streams" {
     _ = @import("./streams/xread.zig");
     _ = @import("./streams/xtrim.zig");
 }
+
+test "docs" {
+    const std = @import("std");
+    std.meta.refAllDecls(@This());
+}

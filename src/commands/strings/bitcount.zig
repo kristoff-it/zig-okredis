@@ -1,6 +1,10 @@
 // BITCOUNT key [start end]
 
 pub const BITCOUNT = struct {
+    //! ```
+    //! const cmd = BITCOUNT.init("test", BITCOUNT.Bounds{ .Slice = .{ .start = -2, .end = -1 } });
+    //! ```
+
     key: []const u8,
     bounds: Bounds = .FullString,
 

@@ -2,6 +2,11 @@
 const Value = @import("../_common_utils.zig").Value;
 
 pub const SETBIT = struct {
+    //! ```
+    //! const cmd1 = SETBIT.init("lol", 100, 42);
+    //! const cmd2 = SETBIT.init("lol", 100, "banana");
+    //! ```
+
     key: []const u8,
     offset: usize,
     value: Value,

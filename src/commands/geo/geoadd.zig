@@ -25,7 +25,7 @@ pub const GEOADD = struct {
     };
 
     /// Instantiates a new GEOADD command.
-    pub fn init(key: []const u8, points: []const GeoPoint) HSET {
+    pub fn init(key: []const u8, points: []const GeoPoint) GEOADD {
         return .{ .key = key, .points = points };
     }
 
@@ -35,7 +35,7 @@ pub const GEOADD = struct {
     }
 
     pub const RedisCommand = struct {
-        pub fn serialize(self: HSET, comptime rootSerializer: type, msg: var) !void {
+        pub fn serialize(self: GEOADD, comptime rootSerializer: type, msg: var) !void {
             return rootSerializer.serializeCommand(msg, .{ "GEOADD", self.key, self.points });
         }
     };
@@ -43,8 +43,8 @@ pub const GEOADD = struct {
 
 test "basic usage" {
     const cmd = GEOADD.init("mykey", &[_]GEOADD.GeoPoint{
-        .{ 80.05, 80.05, "place1" },
-        .{ 81.05, 81.05, "place2" },
+        .{ .long = 80.05, .lat = 80.05, .member = "place1" },
+        .{ .long = 81.05, .lat = 81.05, .member = "place2" },
     });
 
     try cmd.validate();

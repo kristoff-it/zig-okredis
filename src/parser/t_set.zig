@@ -27,6 +27,7 @@ pub const SetParser = struct {
     pub fn parse(comptime T: type, comptime rootParser: type, msg: var) !T {
         return parseImpl(T, rootParser, .{}, msg);
     }
+
     pub fn parseAlloc(comptime T: type, comptime rootParser: type, allocator: *std.mem.Allocator, msg: var) !T {
         // HASHMAP
         if (@typeInfo(T) == .Struct and @hasDecl(T, "KV")) {

@@ -1,7 +1,6 @@
 // GEORADIUS key longitude latitude radius m|km|ft|mi [WITHCOORD] [WITHDIST] [WITHHASH] [COUNT count] [ASC|DESC] [STORE key] [STOREDIST key]
 
-const common = @import("../utils/common.zig");
-const Unit = @import("../utils/geo.zig").Unit;
+const Unit = @import("./_utils.zig").Unit;
 
 pub const GEORADIUS = struct {
     key: []const u8,
@@ -18,7 +17,7 @@ pub const GEORADIUS = struct {
     store: ?[]const u8,
     storedist: ?[]const u8,
 
-    pub const Ordering = union {
+    pub const Ordering = enum {
         Asc,
         Desc,
     };
@@ -109,4 +108,7 @@ pub const GEORADIUS = struct {
     };
 };
 
-test "basic usage" {}
+test "basic usage" {
+    const cmd = GEORADIUS.init("mykey", 0.1, 0.2, 20, .meters, true, true, true, 10, null, null, null);
+    try cmd.validate();
+}

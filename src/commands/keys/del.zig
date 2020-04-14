@@ -1,4 +1,4 @@
-const DEL = struct {
+pub const DEL = struct {
     keys: []const []const u8,
 
     const Self = @This();
@@ -14,5 +14,5 @@ const DEL = struct {
 };
 
 test "basic usage" {
-    const cmd = DEL.init(.{ "lol", "123", "test" });
+    const cmd = DEL.init(&[_][]const u8{ "lol", "123", "test" });
 }

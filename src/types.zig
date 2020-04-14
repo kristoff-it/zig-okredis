@@ -11,6 +11,13 @@ pub const DynamicReply = reply.DynamicReply;
 pub const OrFullErr = err.OrFullErr;
 pub const OrErr = err.OrErr;
 
+//! These are custom types that implement custom decoding logic.
+//!
+//! - `OrErr(T)` is a type that can decode error replies from Redis.
+//! - `FixBuf(N)` is an array + length for decoding variable-length string replies from Redis without needing an allocator.
+//! - `Verbatim` decodes strings from Redis and keeps track of metadata like wether the string is of a special type (e.g. markdown)
+//! - `DynamicReply` is a union that can represent any possible reply from Redis, useful for when you don't know what Redis will send to you (e.g. interactive clients).
+
 test "types" {
     _ = @import("./types/attributes.zig");
     _ = @import("./types/verbatim.zig");

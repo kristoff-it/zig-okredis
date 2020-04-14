@@ -3,6 +3,10 @@
 // TODO: implement Op as a Redis.Arguments?
 
 pub const BITOP = struct {
+    //! ```
+    //! const cmd = BITOP.init(.AND, "result", &[_][]const u8{ "key1", "key2" });
+    //! ```
+
     operation: Op,
     destKey: []const u8,
     sourceKeys: []const []const u8,

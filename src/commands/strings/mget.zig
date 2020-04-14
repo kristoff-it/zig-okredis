@@ -1,6 +1,6 @@
 // MGET key [key ...]
 
-const MGET = struct {
+pub const MGET = struct {
     keys: []const []const u8,
 
     pub fn init(keys: []const []const u8) MGET {

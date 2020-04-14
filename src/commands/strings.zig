@@ -1,6 +1,6 @@
 pub const APPEND = @import("./strings/append.zig").APPEND;
 pub const BITCOUNT = @import("./strings/bitcount.zig").BITCOUNT;
-pub const BITFIELD = @import("./strings/bitfield.zig").BITFIELD;
+// pub const BITFIELD = @import("./strings/bitfield.zig").BITFIELD;
 pub const BITOP = @import("./strings/bitop.zig").BITOP;
 pub const BITPOS = @import("./strings/bitpos.zig").BITPOS;
 pub const DECR = @import("./strings/decr.zig").DECR;
@@ -13,18 +13,16 @@ pub const INCR = @import("./strings/incr.zig").INCR;
 pub const INCRBY = @import("./strings/incrby.zig").INCRBY;
 pub const INCRBYFLOAT = @import("./strings/incrbyfloat.zig").INCRBYFLOAT;
 pub const MGET = @import("./strings/mget.zig").MGET;
-pub const MSET = @import("./strings/mset.zig").MSET;
-pub const MSETNX = @import("./strings/msetnx.zig").MSETNX;
-pub const PSETEX = @import("./strings/psetex.zig").PSETEX;
+// pub const MSET = @import("./strings/mset.zig").MSET;
+// pub const MSETNX = @import("./strings/msetnx.zig").MSETNX;
+// pub const PSETEX = @import("./strings/psetex.zig").PSETEX;
 pub const SET = @import("./strings/set.zig").SET;
 pub const SETBIT = @import("./strings/setbit.zig").SETBIT;
 pub const utils = struct {
-    // usingnamespace @import("./strings/_utils.zig");
     pub const Value = @import("./_common_utils.zig").Value;
 };
 
 test "strings" {
-    // _ = @import("./commands/utils/common.zig");
     _ = @import("./strings/append.zig");
     _ = @import("./strings/bitcount.zig");
     _ = @import("./strings/bitfield.zig");
@@ -45,4 +43,9 @@ test "strings" {
     _ = @import("./strings/psetex.zig");
     _ = @import("./strings/set.zig");
     _ = @import("./strings/setbit.zig");
+}
+
+test "docs" {
+    const std = @import("std");
+    std.meta.refAllDecls(@This());
 }

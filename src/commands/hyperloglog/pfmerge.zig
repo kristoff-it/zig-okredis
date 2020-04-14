@@ -18,3 +18,8 @@ pub const PFMERGE = struct {
         }
     };
 };
+
+test "basic usage" {
+    const cmd = PFMERGE.init("finalcounter", &[_][]const u8{ "counter1", "counter2", "counter3" });
+    try cmd.validate();
+}

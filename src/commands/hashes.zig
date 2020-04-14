@@ -8,3 +8,8 @@ test "hashes" {
     _ = @import("./hashes/hmget.zig");
     _ = @import("./hashes/hset.zig");
 }
+
+test "docs" {
+    const std = @import("std");
+    std.meta.refAllDecls(@This());
+}

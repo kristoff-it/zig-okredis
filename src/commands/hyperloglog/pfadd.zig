@@ -18,3 +18,8 @@ pub const PFADD = struct {
         }
     };
 };
+
+test "basic usage" {
+    const cmd = PFADD.init("counter", &[_][]const u8{ "m1", "m2", "m3" });
+    try cmd.validate();
+}
