@@ -24,7 +24,7 @@ pub const Client = struct {
 
     /// Initializes a Client and connects it to the specified IPv4 address and port.
     pub fn initIp4(self: *Client, addr: []const u8, port: u16) !void {
-        // self.sock = try net.tcpConnectToAddress(try net.Address.parseIp4(addr, port));
+        self.sock = try net.tcpConnectToAddress(try net.Address.parseIp4(addr, port));
         errdefer self.sock.close();
 
         self.readStream = self.sock.inStream();
