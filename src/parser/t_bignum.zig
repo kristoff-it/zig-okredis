@@ -41,7 +41,7 @@ test "bignum" {
     var bgn = try BigNumParser.parseAlloc(std.math.big.Int, void, allocator, MakeBigNum().inStream());
     defer bgn.deinit();
 
-    const bgnStr = try bgn.toString(allocator, 10);
+    const bgnStr = try bgn.toString(allocator, 10, false);
     defer allocator.free(bgnStr);
     testing.expectEqualSlices(u8, "1234567899990000009999876543211234567890", bgnStr);
 
