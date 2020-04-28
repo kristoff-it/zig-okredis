@@ -96,9 +96,10 @@ pub const Client = struct {
     fn pipelineImpl(self: *Client, comptime Ts: type, cmds: var, allocator: var) !Ts {
         // TODO: find a way to express some of the metaprogramming requirements
         // in a more clear way. Using @hasField this way is ugly.
-        if (self.broken) return error.BrokenConnection;
-        errdefer self.broken = true;
-
+        {
+            // if (self.broken) return error.BrokenConnection;
+            // errdefer self.broken = true;
+        }
         var heldWrite: std.event.Lock.Held = undefined;
         var heldRead: std.event.Lock.Held = undefined;
         var heldReadFrame: @Frame(std.event.Lock.acquire) = undefined;
