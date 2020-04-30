@@ -59,7 +59,7 @@ possible to get surprised occasionally (especially by thinking you don't need to
 read the documentation). This brings us to the first rule:
 
 **Asking for a type that ends up being incompatible with the reply will cause 
-the client to return `error.UnsupportedConversion`.**
+the client to return `error.UnsupportedConversion`.** *(Note: error mapping is still WIP so not all errors are being correctly masked for now, so you might momentarily encounter other errors)*
 
 One way in which commands often surprise programmers is by returning errors or 
 `nil`. For example calling `INCR` on a non-numeric string will return an error,
@@ -71,11 +71,9 @@ which brings us to the second rule:
 or a `nil` reply, the client will return `error.GotErrorReply` or 
 `error.GotNilReply` if any such event occurs.**
 
-At the moment, triggering any of these errors will result in a corrupted 
-connection and will require you to close and reopen the client. *This might 
-change in the future.*
+Note that encurring in the errors mentioned above will not corrupt the connection. *(Note: this is still WIP, so YMMV)*
 
-Later in this document you will see how to properly decode errors, `nil` replies
+Later in this document you will see how to properly decode errors, `nil` replies,
 and how to decode replies whose type you can't predict, for example when writing 
 an interactive client.
 

@@ -14,13 +14,12 @@ OkRedis aims to offer an interface with great ergonomics without
 compromising on performance or flexibility.
 
 ## Project status
-OkRedis is currently in alpha as some basic (and boring) connection-management 
-features need to be added, but it's definitely complete enough to be taken for a
-spin.
+OkRedis is currently in alpha. The main features are mostly complete, but
+a lot of polishing is still required.
 
 Everything mentioned in the docs is already implemented and you can just 
-`zig run example.zig` to quickly see what it can do, but don't forget that you 
-need a version of Redis that supports RESP3.
+`zig run example.zig` to quickly see what it can do. Remember OkRedis only
+supports Redis 6 and above.
 
 ## Zero dynamic allocations, unless explicitly wanted
 The client has two main interfaces to send commands: `send` and `sendAlloc`. 
@@ -123,7 +122,6 @@ Take a look at the final section of `REPLIES.md`.
 
 ## TODOS
 - Implement remaining command builders
-- Consider making decoding type mismatches consume the right amount of stream
 - Better connection management (ipv6, unixsockets, ...)
 - Streamline design of Zig errors
 - Refine support for async/await and think about connection pooling
