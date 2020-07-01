@@ -86,7 +86,7 @@ pub fn main() !void {
 
     // When you are fine with allocating memory,
     // you can use the .sendAlloc interface.
-    const allocator = std.heap.direct_allocator;
+    const allocator = std.heap.page_allocator;
 
     // But then it's up to you to free all that was allocated.
     var inferno = try client.sendAlloc([]u8, allocator, .{ "GET", "divine" });
@@ -154,7 +154,7 @@ pub fn main() !void {
         .Nil, .Bool, .Number, .Double, .Bignum, .String, .List, .Set => {},
         .Map => |kvs| {
             for (kvs) |kv| {
-                std.debug.warn("\t[{}] => '{}'\n", .{ kv.key.data.String.string, kv.value.data.String });
+                std.debug.warn("\t[{}] => '{}'\n", .{ kv[0].data.String.string, kv[1].data.String });
             }
         },
     }

@@ -95,10 +95,15 @@ pub const SetParser = struct {
 
     pub fn parseImpl(comptime T: type, comptime rootParser: type, allocator: var, msg: var) !T {
         // Indirectly delegate all cases to the list parser.
-        return if (@hasField(@TypeOf(allocator), "ptr"))
-            rootParser.parseAllocFromTag(T, '*', allocator.ptr, msg)
-        else
-            rootParser.parseFromTag(T, '*', msg);
+
+        // TODO: fix this. Delegating with the same top-level T looks
+        // like a loop to the compiler. Solution would be to make the
+        // tag comptime known.
+        // return if (@hasField(@TypeOf(allocator), "ptr"))
+        //     rootParser.parseAllocFromTag(T, '*', allocator.ptr, msg)
+        // else
+        //     rootParser.parseFromTag(T, '*', msg);
+        return error.DecodeError;
     }
 };
 

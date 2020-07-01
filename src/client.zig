@@ -26,7 +26,6 @@ pub const Client = struct {
     pub fn initIp4(self: *Client, addr: []const u8, port: u16) !void {
         self.sock = try net.tcpConnectToAddress(try net.Address.parseIp4(addr, port));
         errdefer self.sock.close();
-
         self.readStream = self.sock.inStream();
         self.writeStream = self.sock.outStream();
         self.bufReadStream = std.io.bufferedInStream(self.readStream);

@@ -13,7 +13,7 @@ pub const BigNumParser = struct {
 
     // TODO: add support for strings
     pub fn isSupportedAlloc(comptime T: type) bool {
-        return T == std.math.big.Int or T == []u8;
+        return T == std.math.big.int.Managed or T == []u8;
     }
 
     pub fn parseAlloc(comptime T: type, comptime _: type, allocator: *std.mem.Allocator, msg: var) !T {
@@ -38,7 +38,7 @@ pub const BigNumParser = struct {
 
 test "bignum" {
     const allocator = std.heap.page_allocator;
-    var bgn = try BigNumParser.parseAlloc(std.math.big.Int, void, allocator, MakeBigNum().inStream());
+    var bgn = try BigNumParser.parseAlloc(std.math.big.int.Managed, void, allocator, MakeBigNum().inStream());
     defer bgn.deinit();
 
     const bgnStr = try bgn.toString(allocator, 10, false);

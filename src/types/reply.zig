@@ -18,7 +18,7 @@ pub const DynamicReply = struct {
         Bool: bool,
         Number: i64,
         Double: f64,
-        Bignum: std.math.big.Int,
+        Bignum: std.math.big.int.Managed,
         String: Verbatim,
         List: []DynamicReply,
         Set: []DynamicReply,
@@ -81,7 +81,7 @@ pub const DynamicReply = struct {
                     '%' => Data{ .Map = rootParser.parseAllocFromTag([][2]*DynamicReply, '%', allocator, msg) catch return E },
                     '*' => Data{ .List = rootParser.parseAllocFromTag([]DynamicReply, '*', allocator, msg) catch return E },
                     '~' => Data{ .Set = rootParser.parseAllocFromTag([]DynamicReply, '~', allocator, msg) catch return E },
-                    '(' => Data{ .Bignum = rootParser.parseAllocFromTag(std.math.big.Int, '(', allocator, msg) catch return E },
+                    '(' => Data{ .Bignum = rootParser.parseAllocFromTag(std.math.big.int.Managed, '(', allocator, msg) catch return E },
                 };
 
                 return res;
