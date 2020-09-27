@@ -15,7 +15,7 @@ pub const XTRIM = struct {
     }
 
     pub const RedisCommand = struct {
-        pub fn serialize(self: XTRIM, comptime rootSerializer: type, msg: var) !void {
+        pub fn serialize(self: XTRIM, comptime rootSerializer: type, msg: anytype) !void {
             return rootSerializer.serializeCommand(msg, .{ "XTRIM", self.key, self.strategy });
         }
     };
@@ -37,7 +37,7 @@ pub const XTRIM = struct {
                 }
             }
 
-            pub fn serialize(self: Strategy, comptime rootSerializer: type, msg: var) !void {
+            pub fn serialize(self: Strategy, comptime rootSerializer: type, msg: anytype) !void {
                 switch (self) {
                     .MaxLen => |m| {
                         try rootSerializer.serializeArgument(msg, []const u8, "MAXLEN");

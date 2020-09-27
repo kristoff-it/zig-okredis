@@ -14,8 +14,8 @@ pub const SetParser = struct {
 
     pub fn isSupportedAlloc(comptime T: type) bool {
         // HashMap
-        if (@typeInfo(T) == .Struct and @hasDecl(T, "KV")) {
-            return void == std.meta.fieldInfo(T.KV, "value").field_type;
+        if (@typeInfo(T) == .Struct and @hasDecl(T, "Entry")) {
+            return void == std.meta.fieldInfo(T.Entry, "value").field_type;
         }
 
         return switch (@typeInfo(T)) {
@@ -24,13 +24,15 @@ pub const SetParser = struct {
         };
     }
 
-    pub fn parse(comptime T: type, comptime rootParser: type, msg: var) !T {
+    pub fn parse(comptime T: type, comptime rootParser: type, msg: anytype) !T {
         return parseImpl(T, rootParser, .{}, msg);
     }
 
-    pub fn parseAlloc(comptime T: type, comptime rootParser: type, allocator: *std.mem.Allocator, msg: var) !T {
+    pub fn parseAlloc(comptime T: type, comptime rootParser: type, allocator: *std.mem.Allocator, msg: anytype) !T {
         // HASHMAP
-        if (@typeInfo(T) == .Struct and @hasDecl(T, "KV")) {
+        if (@typeInfo(T) == .Struct and @hasDecl(T, "Entry")) {
+            const isManaged = @typeInfo(@TypeOf(T.deinit)).Fn.args.len == 1;
+
             // TODO: write real implementation
             var buf: [100]u8 = undefined;
             var end: usize = 0;
@@ -43,13 +45,19 @@ pub const SetParser = struct {
                 }
             }
 
-            try msg.skipBytes(1);
+            try msg.skipBytes(1, .{});
             const size = try fmt.parseInt(usize, buf[0..end], 10);
 
             var hmap = T.init(allocator);
-            errdefer hmap.deinit();
+            errdefer {
+                if (isManaged) {
+                    hmap.deinit();
+                } else {
+                    hmap.deinit(allocator.ptr);
+                }
+            }
 
-            const KeyType = std.meta.fieldInfo(T.KV, "key").field_type;
+            const KeyType = std.meta.fieldInfo(T.Entry, "key").field_type;
 
             var foundNil = false;
             var foundErr = false;
@@ -77,7 +85,7 @@ pub const SetParser = struct {
                     };
 
                     // If we got here then no error occurred and we can add the key.
-                    _ = hmap.put(key, {}) catch |err| {
+                    (if (isManaged) hmap.put(key, {}) else hmap.put(allocator.ptr, key, {})) catch |err| {
                         hashMapError = true;
                         continue;
                     };
@@ -93,17 +101,23 @@ pub const SetParser = struct {
         return parseImpl(T, rootParser, .{ .ptr = allocator }, msg);
     }
 
-    pub fn parseImpl(comptime T: type, comptime rootParser: type, allocator: var, msg: var) !T {
+    pub fn parseImpl(comptime T: type, comptime rootParser: type, allocator: anytype, msg: anytype) !T {
         // Indirectly delegate all cases to the list parser.
 
         // TODO: fix this. Delegating with the same top-level T looks
         // like a loop to the compiler. Solution would be to make the
         // tag comptime known.
+        //
         // return if (@hasField(@TypeOf(allocator), "ptr"))
         //     rootParser.parseAllocFromTag(T, '*', allocator.ptr, msg)
         // else
         //     rootParser.parseFromTag(T, '*', msg);
-        return error.DecodeError;
+        const ListParser = @import("./t_list.zig").ListParser;
+        return if (@hasField(@TypeOf(allocator), "ptr"))
+            ListParser.parseAlloc(T, rootParser, allocator.ptr, msg)
+        else
+            ListParser.parse(T, rootParser, msg);
+        // return error.DecodeError;
     }
 };
 

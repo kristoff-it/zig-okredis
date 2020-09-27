@@ -14,7 +14,7 @@ pub const GETRANGE = struct {
     }
 
     pub const RedisCommand = struct {
-        pub fn serialize(self: GETRANGE, comptime rootSerializer: type, msg: var) !void {
+        pub fn serialize(self: GETRANGE, comptime rootSerializer: type, msg: anytype) !void {
             return rootSerializer.serializeCommand(msg, .{ "GETRANGE", self.key, self.start, self.end });
         }
     };

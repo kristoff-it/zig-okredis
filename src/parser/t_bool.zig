@@ -11,9 +11,9 @@ pub const BoolParser = struct {
         };
     }
 
-    pub fn parse(comptime T: type, comptime _: type, msg: var) !T {
+    pub fn parse(comptime T: type, comptime _: type, msg: anytype) !T {
         const ch = try msg.readByte();
-        try msg.skipBytes(2);
+        try msg.skipBytes(2, .{});
         return switch (@typeInfo(T)) {
             else => unreachable,
             .Bool => ch == 't',
@@ -25,7 +25,7 @@ pub const BoolParser = struct {
         return isSupported(T);
     }
 
-    pub fn parseAlloc(comptime T: type, comptime _: type, allocator: *std.mem.Allocator, msg: var) !T {
+    pub fn parseAlloc(comptime T: type, comptime _: type, allocator: *std.mem.Allocator, msg: anytype) !T {
         return parse(T, struct {}, msg);
     }
 };

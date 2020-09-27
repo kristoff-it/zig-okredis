@@ -13,7 +13,7 @@ pub const SimpleStringParser = struct {
         };
     }
 
-    pub fn parse(comptime T: type, comptime _: type, msg: var) !T {
+    pub fn parse(comptime T: type, comptime _: type, msg: anytype) !T {
         switch (@typeInfo(T)) {
             else => unreachable,
             .Int => {
@@ -27,7 +27,7 @@ pub const SimpleStringParser = struct {
                         break;
                     }
                 }
-                try msg.skipBytes(1);
+                try msg.skipBytes(1, .{});
                 return fmt.parseInt(T, buf[0..end], 10);
             },
             .Float => {
@@ -41,7 +41,7 @@ pub const SimpleStringParser = struct {
                         break;
                     }
                 }
-                try msg.skipBytes(1);
+                try msg.skipBytes(1, .{});
                 return fmt.parseFloat(T, buf[0..end]);
             },
             .Array => |arr| {
@@ -58,7 +58,7 @@ pub const SimpleStringParser = struct {
                 }
                 if (ch != '\r') return error.LengthMismatch;
 
-                try msg.skipBytes(1);
+                try msg.skipBytes(1, .{});
                 return res;
             },
         }
@@ -74,7 +74,7 @@ pub const SimpleStringParser = struct {
         };
     }
 
-    pub fn parseAlloc(comptime T: type, comptime _: type, allocator: *std.mem.Allocator, msg: var) !T {
+    pub fn parseAlloc(comptime T: type, comptime _: type, allocator: *std.mem.Allocator, msg: anytype) !T {
         switch (@typeInfo(T)) {
             .Pointer => |ptr| {
                 switch (ptr.size) {
@@ -82,7 +82,7 @@ pub const SimpleStringParser = struct {
                     .Slice => {
                         const bytes = try msg.readUntilDelimiterAlloc(allocator, '\r', 4096);
                         _ = std.math.divExact(usize, bytes.len, @sizeOf(ptr.child)) catch return error.LengthMismatch;
-                        try msg.skipBytes(1);
+                        try msg.skipBytes(1, .{});
                         return bytes;
                     },
                     .C => {

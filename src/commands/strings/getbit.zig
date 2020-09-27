@@ -13,7 +13,7 @@ pub const GETBIT = struct {
     }
 
     pub const RedisCommand = struct {
-        pub fn serialize(self: GETBIT, comptime rootSerializer: type, msg: var) !void {
+        pub fn serialize(self: GETBIT, comptime rootSerializer: type, msg: anytype) !void {
             return rootSerializer.serializeCommand(msg, .{ "GETBIT", self.key, self.offset });
         }
     };

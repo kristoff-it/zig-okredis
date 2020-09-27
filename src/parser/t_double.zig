@@ -12,7 +12,7 @@ pub const DoubleParser = struct {
         };
     }
 
-    pub fn parse(comptime T: type, comptime _: type, msg: var) !T {
+    pub fn parse(comptime T: type, comptime _: type, msg: anytype) !T {
         // TODO: write real implementation
         var buf: [100]u8 = undefined;
         var end: usize = 0;
@@ -24,7 +24,7 @@ pub const DoubleParser = struct {
                 break;
             }
         }
-        try msg.skipBytes(1);
+        try msg.skipBytes(1, .{});
         return switch (@typeInfo(T)) {
             else => unreachable,
             .Float => try fmt.parseFloat(T, buf[0..end]),
@@ -35,7 +35,7 @@ pub const DoubleParser = struct {
         return isSupported(T);
     }
 
-    pub fn parseAlloc(comptime T: type, comptime _: type, allocator: *std.mem.Allocator, msg: var) !T {
+    pub fn parseAlloc(comptime T: type, comptime _: type, allocator: *std.mem.Allocator, msg: anytype) !T {
         return parse(T, struct {}, msg);
     }
 };

@@ -47,28 +47,28 @@ pub const Client = struct {
     }
 
     /// Sends a command to Redis and tries to parse the response as the specified type.
-    pub fn send(self: *Client, comptime T: type, cmd: var) !T {
+    pub fn send(self: *Client, comptime T: type, cmd: anytype) !T {
         return self.pipelineImpl(T, cmd, .{ .one = {} });
     }
 
     /// Like `send`, can allocate memory.
-    pub fn sendAlloc(self: *Client, comptime T: type, allocator: *Allocator, cmd: var) !T {
+    pub fn sendAlloc(self: *Client, comptime T: type, allocator: *Allocator, cmd: anytype) !T {
         return self.pipelineImpl(T, cmd, .{ .one = {}, .ptr = allocator });
     }
 
     /// Performs a Redis MULTI/EXEC transaction using pipelining.
     /// It's mostly provided for convenience as the same result
     /// can be achieved by making explicit use of `pipe` and `pipeAlloc`.
-    pub fn trans(self: *Client, comptime Ts: type, cmds: var) !Ts {
+    pub fn trans(self: *Client, comptime Ts: type, cmds: anytype) !Ts {
         return self.transactionImpl(Ts, cmds, .{});
     }
 
     /// Like `trans`, but can allocate memory.
-    pub fn transAlloc(self: *Client, comptime Ts: type, allocator: *Allocator, cmds: var) !Ts {
+    pub fn transAlloc(self: *Client, comptime Ts: type, allocator: *Allocator, cmds: anytype) !Ts {
         return transactionImpl(self, Ts, cmds, .{ .ptr = allocator });
     }
 
-    fn transactionImpl(self: *Client, comptime Ts: type, cmds: var, allocator: var) !Ts {
+    fn transactionImpl(self: *Client, comptime Ts: type, cmds: anytype, allocator: anytype) !Ts {
         // TODO: this is not threadsafe.
         _ = try self.send(void, .{"MULTI"});
 
@@ -83,16 +83,16 @@ pub const Client = struct {
     }
 
     /// Sends a group of commands more efficiently than sending them one by one.
-    pub fn pipe(self: *Client, comptime Ts: type, cmds: var) !Ts {
+    pub fn pipe(self: *Client, comptime Ts: type, cmds: anytype) !Ts {
         return pipelineImpl(self, Ts, cmds, .{});
     }
 
     /// Like `pipe`, but can allocate memory.
-    pub fn pipeAlloc(self: *Client, comptime Ts: type, allocator: *Allocator, cmds: var) !Ts {
+    pub fn pipeAlloc(self: *Client, comptime Ts: type, allocator: *Allocator, cmds: anytype) !Ts {
         return pipelineImpl(self, Ts, cmds, .{ .ptr = allocator });
     }
 
-    fn pipelineImpl(self: *Client, comptime Ts: type, cmds: var, allocator: var) !Ts {
+    fn pipelineImpl(self: *Client, comptime Ts: type, cmds: anytype, allocator: anytype) !Ts {
         // TODO: find a way to express some of the metaprogramming requirements
         // in a more clear way. Using @hasField this way is ugly.
         {

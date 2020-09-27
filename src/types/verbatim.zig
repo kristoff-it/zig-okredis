@@ -21,7 +21,7 @@ pub const Verbatim = struct {
 
     pub const Redis = struct {
         pub const Parser = struct {
-            pub fn parse(tag: u8, comptime rootParser: type, msg: var) !Verbatim {
+            pub fn parse(tag: u8, comptime rootParser: type, msg: anytype) !Verbatim {
                 @compileError("Verbatim requires an allocator, use `parseAlloc`.");
             }
 
@@ -29,7 +29,7 @@ pub const Verbatim = struct {
                 allocator.free(self.string);
             }
 
-            pub fn parseAlloc(tag: u8, comptime rootParser: type, allocator: *Allocator, msg: var) !Verbatim {
+            pub fn parseAlloc(tag: u8, comptime rootParser: type, allocator: *Allocator, msg: anytype) !Verbatim {
                 switch (tag) {
                     else => return error.DecodingError,
                     '-', '!' => {
@@ -53,7 +53,7 @@ pub const Verbatim = struct {
                             }
                         }
 
-                        try msg.skipBytes(1);
+                        try msg.skipBytes(1, .{});
                         var size = try fmt.parseInt(usize, buf[0..end], 10);
 
                         // We must consider the case in which a malformed
@@ -73,7 +73,7 @@ pub const Verbatim = struct {
                             };
 
                             // Skip the `:` character, subtract what we consumed
-                            try msg.skipBytes(1);
+                            try msg.skipBytes(1, .{});
                             size -= 4;
                         } else {
                             format = Format{ .Err = {} };
@@ -83,7 +83,7 @@ pub const Verbatim = struct {
                         errdefer allocator.free(res);
 
                         try msg.readNoEof(res[0..size]);
-                        try msg.skipBytes(2);
+                        try msg.skipBytes(2, .{});
 
                         return Verbatim{ .format = format, .string = res };
                     },

@@ -12,7 +12,7 @@ pub const DECR = struct {
     }
 
     pub const RedisCommand = struct {
-        pub fn serialize(self: DECR, comptime rootSerializer: type, msg: var) !void {
+        pub fn serialize(self: DECR, comptime rootSerializer: type, msg: anytype) !void {
             return rootSerializer.serializeCommand(msg, .{ "DECR", self.key });
         }
     };

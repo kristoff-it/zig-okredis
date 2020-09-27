@@ -15,7 +15,7 @@ pub const GEODIST = struct {
     pub fn validate(self: GEODIST) !void {}
 
     pub const RedisCommand = struct {
-        pub fn serialize(self: GEODIST, comptime rootSerializer: type, msg: var) !void {
+        pub fn serialize(self: GEODIST, comptime rootSerializer: type, msg: anytype) !void {
             return rootSerializer.serializeCommand(msg, .{
                 "GEODIST",
                 self.key,

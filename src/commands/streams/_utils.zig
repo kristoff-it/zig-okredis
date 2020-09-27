@@ -26,7 +26,7 @@ pub fn isValidStreamID(cmd: StreamFns, id: []const u8) bool {
     };
 }
 
-fn isAny(arg: []const u8, strings: var) bool {
+fn isAny(arg: []const u8, strings: anytype) bool {
     inline for (std.meta.fields(@TypeOf(strings))) |field| {
         const str = @field(strings, field.name);
         if (std.mem.eql(u8, arg, str)) return true;

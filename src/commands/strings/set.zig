@@ -22,7 +22,7 @@ pub const SET = struct {
     conditions: Conditions = .NoConditions,
 
     /// Provide either a number or a string as `value`.
-    pub fn init(key: []const u8, value: var, expire: Expire, conditions: Conditions) SET {
+    pub fn init(key: []const u8, value: anytype, expire: Expire, conditions: Conditions) SET {
         return .{
             .key = key,
             .value = Value.fromVar(value),
@@ -36,7 +36,7 @@ pub const SET = struct {
     }
 
     pub const RedisCommand = struct {
-        pub fn serialize(self: SET, comptime rootSerializer: type, msg: var) !void {
+        pub fn serialize(self: SET, comptime rootSerializer: type, msg: anytype) !void {
             return rootSerializer.serializeCommand(msg, .{
                 "SET",
                 self.key,
@@ -60,7 +60,7 @@ pub const SET = struct {
                 };
             }
 
-            pub fn serialize(self: Expire, comptime rootSerializer: type, msg: var) !void {
+            pub fn serialize(self: Expire, comptime rootSerializer: type, msg: anytype) !void {
                 switch (self) {
                     .NoExpire => {},
                     .Seconds => |s| {
@@ -94,7 +94,7 @@ pub const SET = struct {
                 };
             }
 
-            pub fn serialize(self: Conditions, comptime rootSerializer: type, msg: var) !void {
+            pub fn serialize(self: Conditions, comptime rootSerializer: type, msg: anytype) !void {
                 switch (self) {
                     .NoConditions => {},
                     .IfNotExisting => |s| try rootSerializer.serializeArgument(msg, []const u8, "NX"),

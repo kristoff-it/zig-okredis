@@ -13,7 +13,7 @@ pub const PFMERGE = struct {
     pub fn validate(self: PFMERGE) !void {}
 
     pub const RedisCommand = struct {
-        pub fn serialize(self: PFMERGE, comptime rootSerializer: type, msg: var) !void {
+        pub fn serialize(self: PFMERGE, comptime rootSerializer: type, msg: anytype) !void {
             return rootSerializer.serializeCommand(msg, .{ "PFMERGE", self.destkey, self.sourcekeys });
         }
     };

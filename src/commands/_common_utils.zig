@@ -7,7 +7,7 @@ pub const FV = struct {
             return 2;
         }
 
-        pub fn serialize(self: FV, comptime rootSerializer: type, msg: var) !void {
+        pub fn serialize(self: FV, comptime rootSerializer: type, msg: anytype) !void {
             try rootSerializer.serializeArgument(msg, []const u8, self.field);
             try rootSerializer.serializeArgument(msg, []const u8, self.value);
         }
@@ -21,7 +21,7 @@ pub const Value = union(enum) {
     Float: f64,
 
     /// Wraps either a string or a number.
-    pub fn fromVar(value: var) Value {
+    pub fn fromVar(value: anytype) Value {
         return switch (@typeInfo(@TypeOf(value))) {
             .Int, .ComptimeInt => Value{ .Int = value },
             .Float, .ComptimeFloat => Value{ .Float = value },
@@ -36,7 +36,7 @@ pub const Value = union(enum) {
             return 1;
         }
 
-        pub fn serialize(self: Value, comptime rootSerializer: type, msg: var) !void {
+        pub fn serialize(self: Value, comptime rootSerializer: type, msg: anytype) !void {
             switch (self) {
                 .String => |s| try rootSerializer.serializeArgument(msg, []const u8, s),
                 .Int => |i| try rootSerializer.serializeArgument(msg, i64, i),

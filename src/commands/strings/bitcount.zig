@@ -17,7 +17,7 @@ pub const BITCOUNT = struct {
     }
 
     pub const RedisCommand = struct {
-        pub fn serialize(self: BITCOUNT, comptime rootSerializer: type, msg: var) !void {
+        pub fn serialize(self: BITCOUNT, comptime rootSerializer: type, msg: anytype) !void {
             return rootSerializer.serializeCommand(msg, .{ "BITCOUNT", self.key, self.bounds });
         }
     };
@@ -37,7 +37,7 @@ pub const BITCOUNT = struct {
                 };
             }
 
-            pub fn serialize(self: Bounds, comptime rootSerializer: type, msg: var) !void {
+            pub fn serialize(self: Bounds, comptime rootSerializer: type, msg: anytype) !void {
                 switch (self) {
                     .FullString => {},
                     .Slice => |slice| {

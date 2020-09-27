@@ -9,7 +9,7 @@ const fmt = std.fmt;
 /// have found a map instead. This trick is used by the root parser in the
 /// initial setup of both `parse` and `parseAlloc`.
 pub const VoidParser = struct {
-    pub fn discardOne(tag: u8, msg: var) !void {
+    pub fn discardOne(tag: u8, msg: anytype) !void {
         // When we start, we have one item to consume.
         // As we inspect it, we might discover that it's a container, requiring
         // us to increase our items count.
@@ -22,8 +22,8 @@ pub const VoidParser = struct {
             switch (itemTag) {
                 else => std.debug.panic("Found `{c}` in the *VOID* parser's switch." ++
                     " Probably a bug in a type that implements `Redis.Parser`.", .{itemTag}),
-                '_' => try msg.skipBytes(2), // `_\r\n`
-                '#' => try msg.skipBytes(3), // `#t\r\n`, `#t\r\n`
+                '_' => try msg.skipBytes(2, .{}), // `_\r\n`
+                '#' => try msg.skipBytes(3, .{}), // `#t\r\n`, `#t\r\n`
                 '$', '=', '!' => {
                     // Lenght-prefixed string
                     if (itemTag == '!') {
@@ -42,7 +42,7 @@ pub const VoidParser = struct {
                         }
                     }
                     var size = try fmt.parseInt(usize, buf[0..end], 10);
-                    try msg.skipBytes(1 + size + 2);
+                    try msg.skipBytes(1 + size + 2, .{});
                 },
                 ':', ',', '+', '-' => {
                     // Simple element with final `\r\n`
@@ -69,7 +69,7 @@ pub const VoidParser = struct {
                             break;
                         }
                     }
-                    try msg.skipBytes(1);
+                    try msg.skipBytes(1, .{});
                     var size = try fmt.parseInt(usize, buf[0..end], 10);
                     size *= 2;
 
@@ -91,7 +91,7 @@ pub const VoidParser = struct {
                             break;
                         }
                     }
-                    try msg.skipBytes(1);
+                    try msg.skipBytes(1, .{});
                     var size = try fmt.parseInt(usize, buf[0..end], 10);
 
                     // Maps advertize the number of field-value pairs,

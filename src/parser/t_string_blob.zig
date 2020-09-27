@@ -13,7 +13,7 @@ pub const BlobStringParser = struct {
         };
     }
 
-    pub fn parse(comptime T: type, comptime _: type, msg: var) !T {
+    pub fn parse(comptime T: type, comptime _: type, msg: anytype) !T {
         var buf: [100]u8 = undefined;
         var end: usize = 0;
         for (buf) |*elem, i| {
@@ -25,7 +25,7 @@ pub const BlobStringParser = struct {
             }
         }
 
-        try msg.skipBytes(1);
+        try msg.skipBytes(1, .{});
         const size = try fmt.parseInt(usize, buf[0..end], 10);
 
         switch (@typeInfo(T)) {
@@ -37,7 +37,7 @@ pub const BlobStringParser = struct {
 
                 try msg.readNoEof(buf[0..size]);
                 const res = try fmt.parseInt(T, buf[0..size], 10);
-                try msg.skipBytes(2);
+                try msg.skipBytes(2, .{});
                 return res;
             },
             .Float => {
@@ -47,7 +47,7 @@ pub const BlobStringParser = struct {
 
                 try msg.readNoEof(buf[0..size]);
                 const res = try fmt.parseFloat(T, buf[0..size]);
-                try msg.skipBytes(2);
+                try msg.skipBytes(2, .{});
                 return res;
             },
             .Array => |arr| {
@@ -58,7 +58,7 @@ pub const BlobStringParser = struct {
                 }
 
                 try msg.readNoEof(bytesSlice);
-                try msg.skipBytes(2);
+                try msg.skipBytes(2, .{});
                 return res;
             },
         }
@@ -71,7 +71,9 @@ pub const BlobStringParser = struct {
         };
     }
 
-    pub fn parseAlloc(comptime T: type, comptime rootParser: type, allocator: *std.mem.Allocator, msg: var) !T {
+    pub fn parseAlloc(comptime T: type, comptime rootParser: type, allocator: *std.mem.Allocator, msg: anytype) !T {
+        // @compileLog(@typeInfo(T));
+        // std.debug.print("\n\nTYPE={}\n\n", .{@typeInfo(T)});
         switch (@typeInfo(T)) {
             .Pointer => |ptr| {
                 // TODO: write real implementation
@@ -86,7 +88,7 @@ pub const BlobStringParser = struct {
                     }
                 }
 
-                try msg.skipBytes(1);
+                try msg.skipBytes(1, .{});
                 var size = try fmt.parseInt(usize, buf[0..end], 10);
 
                 if (ptr.size == .C) size += @sizeOf(ptr.child);
@@ -105,7 +107,7 @@ pub const BlobStringParser = struct {
                 } else {
                     msg.readNoEof(bytes[0..]) catch return error.GraveProtocolError;
                 }
-                try msg.skipBytes(2);
+                try msg.skipBytes(2, .{});
 
                 return switch (ptr.size) {
                     .One, .Many => @compileError("Only Slices and C pointers should reach sub-parsers"),

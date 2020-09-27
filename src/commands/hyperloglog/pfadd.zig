@@ -13,7 +13,7 @@ pub const PFADD = struct {
     pub fn validate(self: PFADD) !void {}
 
     pub const RedisCommand = struct {
-        pub fn serialize(self: PFADD, comptime rootSerializer: type, msg: var) !void {
+        pub fn serialize(self: PFADD, comptime rootSerializer: type, msg: anytype) !void {
             return rootSerializer.serializeCommand(msg, .{ "PFADD", self.key, self.elements });
         }
     };

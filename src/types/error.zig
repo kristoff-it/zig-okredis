@@ -45,7 +45,7 @@ pub fn OrErr(comptime T: type) type {
             pub const Parser = struct {
                 pub const NoOptionalWrapper = true;
 
-                pub fn parse(tag: u8, comptime rootParser: type, msg: var) !Self {
+                pub fn parse(tag: u8, comptime rootParser: type, msg: anytype) !Self {
                     return switch (tag) {
                         '_', '-', '!' => internalParse(tag, rootParser, msg),
                         else => Self{ .Ok = try rootParser.parseFromTag(T, tag, msg) },
@@ -59,18 +59,18 @@ pub fn OrErr(comptime T: type) type {
                     }
                 }
 
-                pub fn parseAlloc(tag: u8, comptime rootParser: type, allocator: *Allocator, msg: var) !Self {
+                pub fn parseAlloc(tag: u8, comptime rootParser: type, allocator: *Allocator, msg: anytype) !Self {
                     return switch (tag) {
                         '_', '-', '!' => internalParse(tag, rootParser, msg),
                         else => return Self{ .Ok = try rootParser.parseAllocFromTag(T, tag, allocator, msg) },
                     };
                 }
 
-                fn internalParse(tag: u8, comptime rootParser: type, msg: var) !Self {
+                fn internalParse(tag: u8, comptime rootParser: type, msg: anytype) !Self {
                     switch (tag) {
                         else => unreachable,
                         '_' => {
-                            try msg.skipBytes(2);
+                            try msg.skipBytes(2, .{});
                             return Self{ .Nil = {} };
                         },
                         '!' => {
@@ -86,7 +86,7 @@ pub fn OrErr(comptime T: type) type {
                                 }
                             }
 
-                            try msg.skipBytes(1);
+                            try msg.skipBytes(1, .{});
                             var size = try fmt.parseInt(usize, buf[0..end], 10);
                             var res = Self{ .Err = undefined };
 
@@ -97,7 +97,7 @@ pub fn OrErr(comptime T: type) type {
                                     elem.* = ch;
                                     res.Err.end = i;
                                     // res.Err.code = res.Err._buf[0..i];
-                                    try msg.skipBytes(2);
+                                    try msg.skipBytes(2, .{});
                                     return res;
                                 }
                                 switch (ch) {
@@ -115,7 +115,7 @@ pub fn OrErr(comptime T: type) type {
 
                             if (ch != ' ') return error.ErrorCodeBufTooSmall;
                             const remainder = size - res.Err.end + 2; // +2 because of `\r\n`
-                            if (remainder > 0) try msg.skipBytes(remainder);
+                            if (remainder > 0) try msg.skipBytes(remainder, .{});
                             return res;
                         },
                         '-' => {
@@ -133,7 +133,7 @@ pub fn OrErr(comptime T: type) type {
                                     '\r' => {
                                         res.Err.end = i;
                                         // res.Err.code = res.Err._buf[0..i];
-                                        try msg.skipBytes(1);
+                                        try msg.skipBytes(1, .{});
                                         return res;
                                     },
                                     else => {
@@ -170,7 +170,7 @@ pub fn OrFullErr(comptime T: type) type {
             pub const Parser = struct {
                 pub const NoOptionalWrapper = true;
 
-                pub fn parse(tag: u8, comptime rootParser: type, msg: var) !Self {
+                pub fn parse(tag: u8, comptime rootParser: type, msg: anytype) !Self {
                     @compileError("OrFullErr requires an allocator, use `OrErr` to parse just the error code without the need of an allocator.");
                 }
 
@@ -182,11 +182,11 @@ pub fn OrFullErr(comptime T: type) type {
                     }
                 }
 
-                pub fn parseAlloc(tag: u8, comptime rootParser: type, allocator: *Allocator, msg: var) !Self {
+                pub fn parseAlloc(tag: u8, comptime rootParser: type, allocator: *Allocator, msg: anytype) !Self {
                     switch (tag) {
                         else => return Self{ .Ok = try rootParser.parseAllocFromTag(T, tag, allocator, msg) },
                         '_' => {
-                            try msg.skipBytes(2);
+                            try msg.skipBytes(2, .{});
                             return Self{ .Nil = {} };
                         },
                         '!' => {
@@ -202,7 +202,7 @@ pub fn OrFullErr(comptime T: type) type {
                                 }
                             }
 
-                            try msg.skipBytes(1);
+                            try msg.skipBytes(1, .{});
                             var size = try fmt.parseInt(usize, buf[0..end], 10);
                             var res = Self{ .Err = undefined };
                             res.Err.message = &[0]u8{};
@@ -214,7 +214,7 @@ pub fn OrFullErr(comptime T: type) type {
                                     elem.* = ch;
                                     res.Err.end = i;
                                     // res.Err.code = res.Err._buf[0..i];
-                                    try msg.skipBytes(2);
+                                    try msg.skipBytes(2, .{});
                                     return res;
                                 }
                                 switch (ch) {
@@ -240,7 +240,7 @@ pub fn OrFullErr(comptime T: type) type {
 
                             try msg.readNoEof(slice);
                             res.Err.message = slice;
-                            try msg.skipBytes(2);
+                            try msg.skipBytes(2, .{});
                             return res;
                         },
                         '-' => {
@@ -259,7 +259,7 @@ pub fn OrFullErr(comptime T: type) type {
                                     '\r' => {
                                         res.Err.end = i;
                                         // res.Err.code = res.Err._buf[0..i];
-                                        try msg.skipBytes(1);
+                                        try msg.skipBytes(1, .{});
                                         return res;
                                     },
                                     else => {
@@ -273,7 +273,7 @@ pub fn OrFullErr(comptime T: type) type {
                             // Seek through the rest of the message,
                             // discarding it.
                             res.Err.message = try msg.readUntilDelimiterAlloc(allocator, '\r', 4096);
-                            try msg.skipBytes(1);
+                            try msg.skipBytes(1, .{});
                             return res;
                         },
                     }
@@ -326,13 +326,13 @@ test "parse simple errors" {
     }
 }
 const fakeParser = struct {
-    pub inline fn parse(comptime T: type, msg: var) !T {
+    pub inline fn parse(comptime T: type, msg: anytype) !T {
         return error.Errror;
     }
-    pub inline fn parseFromTag(comptime T: type, tag: u8, msg: var) !T {
+    pub inline fn parseFromTag(comptime T: type, tag: u8, msg: anytype) !T {
         return error.Errror;
     }
-    pub inline fn parseAllocFromTag(comptime T: type, tag: u8, allocator: *Allocator, msg: var) !T {
+    pub inline fn parseAllocFromTag(comptime T: type, tag: u8, allocator: *Allocator, msg: anytype) !T {
         return error.Errror;
     }
 };

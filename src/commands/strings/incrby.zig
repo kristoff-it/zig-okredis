@@ -12,7 +12,7 @@ pub const INCRBY = struct {
     }
 
     pub const RedisCommand = struct {
-        pub fn serialize(self: INCRBY, comptime rootSerializer: type, msg: var) !void {
+        pub fn serialize(self: INCRBY, comptime rootSerializer: type, msg: anytype) !void {
             return rootSerializer.serializeCommand(msg, .{ "INCRBY", self.key, self.increment });
         }
     };

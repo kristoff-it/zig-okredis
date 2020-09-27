@@ -17,7 +17,7 @@ pub fn WithAttribs(comptime T: type) type {
             pub const Parser = struct {
                 pub const HandlesAttributes = true;
 
-                pub fn parse(tag: u8, comptime rootParser: type, msg: var) !Self {
+                pub fn parse(tag: u8, comptime rootParser: type, msg: anytype) !Self {
                     @compileError("WithAttribs requires an allocator. Use `sendAlloc`.");
                 }
 
@@ -26,7 +26,7 @@ pub fn WithAttribs(comptime T: type) type {
                     rootParser.freeReply(self.data, allocator);
                 }
 
-                pub fn parseAlloc(tag: u8, comptime rootParser: type, allocator: *Allocator, msg: var) !Self {
+                pub fn parseAlloc(tag: u8, comptime rootParser: type, allocator: *Allocator, msg: anytype) !Self {
                     var itemTag = tag;
 
                     var res: Self = undefined;

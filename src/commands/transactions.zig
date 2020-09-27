@@ -8,7 +8,7 @@ pub const WATCH = struct {
     }
 
     pub const RedisCommand = struct {
-        pub fn serialize(self: WATCH, comptime rootSerializer: type, msg: var) !void {
+        pub fn serialize(self: WATCH, comptime rootSerializer: type, msg: anytype) !void {
             return rootSerializer.serializeCommand(msg, .{ "WATCH", self.keys });
         }
     };
@@ -16,7 +16,7 @@ pub const WATCH = struct {
 
 pub const UNWATCH = struct {
     pub const RedisCommand = struct {
-        pub fn serialize(self: UNWATCH, comptime rootSerializer: type, msg: var) !void {
+        pub fn serialize(self: UNWATCH, comptime rootSerializer: type, msg: anytype) !void {
             return rootSerializer.serializeCommand(msg, .{"UNWATCH"});
         }
     };
@@ -24,7 +24,7 @@ pub const UNWATCH = struct {
 
 pub const MULTI = struct {
     pub const RedisCommand = struct {
-        pub fn serialize(self: MULTI, comptime rootSerializer: type, msg: var) !void {
+        pub fn serialize(self: MULTI, comptime rootSerializer: type, msg: anytype) !void {
             return rootSerializer.serializeCommand(msg, .{"MULTI"});
         }
     };
@@ -32,7 +32,7 @@ pub const MULTI = struct {
 
 pub const EXEC = struct {
     pub const RedisCommand = struct {
-        pub fn serialize(self: EXEC, comptime rootSerializer: type, msg: var) !void {
+        pub fn serialize(self: EXEC, comptime rootSerializer: type, msg: anytype) !void {
             return rootSerializer.serializeCommand(msg, .{"EXEC"});
         }
     };
@@ -40,7 +40,7 @@ pub const EXEC = struct {
 
 pub const DISCARD = struct {
     pub const RedisCommand = struct {
-        pub fn serialize(self: DISCARD, comptime rootSerializer: type, msg: var) !void {
+        pub fn serialize(self: DISCARD, comptime rootSerializer: type, msg: anytype) !void {
             return rootSerializer.serializeCommand(msg, .{"DISCARD"});
         }
     };

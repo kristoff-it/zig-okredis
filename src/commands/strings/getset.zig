@@ -10,7 +10,7 @@ pub const GETSET = struct {
     key: []const u8,
     value: Value,
 
-    pub fn init(key: []const u8, value: var) GETSET {
+    pub fn init(key: []const u8, value: anytype) GETSET {
         return .{
             .key = key,
             .value = Value.fromVar(value),
@@ -23,7 +23,7 @@ pub const GETSET = struct {
 
     const Redis = struct {
         const Command = struct {
-            pub fn serialize(self: GETSET, rootSerializer: type, msg: var) !void {
+            pub fn serialize(self: GETSET, rootSerializer: type, msg: anytype) !void {
                 return rootSerializer.command(msg, .{ "GETSET", self.key, self.value });
             }
         };

@@ -2,7 +2,7 @@ const std = @import("std");
 const traits = @import("./traits.zig");
 
 pub const CommandSerializer = struct {
-    pub fn serializeCommand(msg: var, command: var) !void {
+    pub fn serializeCommand(msg: anytype, command: anytype) !void {
         // Serializes an entire command.
         // Callers can expect this function to:
         // 1. Write the number of arguments in the command
@@ -129,7 +129,7 @@ pub const CommandSerializer = struct {
         }
     }
 
-    pub fn serializeArgument(msg: var, comptime T: type, val: T) !void {
+    pub fn serializeArgument(msg: anytype, comptime T: type, val: T) !void {
         // Serializes a single argument.
         // Supports the following types:
         // 1. Strings
@@ -191,7 +191,7 @@ pub const CommandSerializer = struct {
     }
 };
 
-fn fieldArgNum(field: var) usize {
+fn fieldArgNum(field: anytype) usize {
     if (comptime traits.isArguments(ArgT)) {
         return ArgT.RedisArguments.count(arg);
     } else {

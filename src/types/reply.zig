@@ -29,7 +29,7 @@ pub const DynamicReply = struct {
         pub const Parser = struct {
             pub const HandlesAttributes = true;
 
-            pub fn parse(tag: u8, comptime _: type, msg: var) !DynamicReply {
+            pub fn parse(tag: u8, comptime _: type, msg: anytype) !DynamicReply {
                 @compileError("DynamicReply requires an allocator. Use `sendAlloc`!");
             }
 
@@ -56,7 +56,7 @@ pub const DynamicReply = struct {
                 }
             }
 
-            pub fn parseAlloc(tag: u8, comptime rootParser: type, allocator: *Allocator, msg: var) error{DynamicReplyError}!DynamicReply {
+            pub fn parseAlloc(tag: u8, comptime rootParser: type, allocator: *Allocator, msg: anytype) error{DynamicReplyError}!DynamicReply {
                 var itemTag = tag;
 
                 var res: DynamicReply = undefined;

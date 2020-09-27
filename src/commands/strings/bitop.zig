@@ -21,7 +21,7 @@ pub const BITOP = struct {
     }
 
     pub const RedisCommand = struct {
-        pub fn serialize(self: BITOP, comptime rootSerializer: type, msg: var) !void {
+        pub fn serialize(self: BITOP, comptime rootSerializer: type, msg: anytype) !void {
             const op = switch (self.operation) {
                 .AND => "AND",
                 .OR => "OR",

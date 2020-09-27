@@ -20,21 +20,21 @@ const traits = @import("./traits.zig");
 pub const RESP3Parser = struct {
     const rootParser = @This();
 
-    pub fn parse(comptime T: type, msg: var) !T {
+    pub fn parse(comptime T: type, msg: anytype) !T {
         const tag = try msg.readByte();
         return parseImpl(T, tag, .{}, msg);
     }
 
-    pub fn parseFromTag(comptime T: type, tag: u8, msg: var) !T {
+    pub fn parseFromTag(comptime T: type, tag: u8, msg: anytype) !T {
         return parseImpl(T, tag, .{}, msg);
     }
 
-    pub fn parseAlloc(comptime T: type, allocator: *Allocator, msg: var) !T {
+    pub fn parseAlloc(comptime T: type, allocator: *Allocator, msg: anytype) !T {
         const tag = try msg.readByte();
         return try parseImpl(T, tag, .{ .ptr = allocator }, msg);
     }
 
-    pub fn parseAllocFromTag(comptime T: type, tag: u8, allocator: *Allocator, msg: var) !T {
+    pub fn parseAllocFromTag(comptime T: type, tag: u8, allocator: *Allocator, msg: anytype) !T {
         return parseImpl(T, tag, .{ .ptr = allocator }, msg);
     }
 
@@ -76,7 +76,7 @@ pub const RESP3Parser = struct {
     //     }
     //     return errorset;
     // }
-    pub fn parseImpl(comptime T: type, tag: u8, allocator: var, msg: var) anyerror!T {
+    pub fn parseImpl(comptime T: type, tag: u8, allocator: anytype, msg: anytype) anyerror!T {
         // First we get out of the way the basic case where
         // the return type is void and we just discard one full answer.
         if (T == void) return VoidParser.discardOne(tag, msg);
@@ -96,7 +96,7 @@ pub const RESP3Parser = struct {
 
                 // If we found nil, return immediately.
                 if (nextTag == '_') {
-                    try msg.skipBytes(2);
+                    try msg.skipBytes(2, .{});
                     return null;
                 }
 
@@ -115,7 +115,10 @@ pub const RESP3Parser = struct {
                         res.* = try parseImpl(ptr.child, tag, allocator, msg);
                         return res;
                     },
-                    .Many, .C => @compileError("Pointers to unknown size or C-type are not supported."),
+                    .Many, .C => {
+                        @panic("!");
+                        // @compileError("Pointers to unknown size or C-type are not supported.");
+                    },
                     .Slice => {
                         // Slices are ok. We continue.
                     },
@@ -160,7 +163,7 @@ pub const RESP3Parser = struct {
             else => std.debug.panic("Found `{c}` in the main parser's switch." ++
                 " Probably a bug in a type that implements `Redis.Parser`.", .{nextTag}),
             '_' => {
-                try msg.skipBytes(2);
+                try msg.skipBytes(2, .{});
                 return error.GotNilReply;
             },
             '-' => {
@@ -183,7 +186,7 @@ pub const RESP3Parser = struct {
         }
     }
 
-    fn ifSupported(comptime parser: type, comptime T: type, allocator: var, msg: var) !T {
+    fn ifSupported(comptime parser: type, comptime T: type, allocator: anytype, msg: anytype) !T {
         if (@hasField(@TypeOf(allocator), "ptr")) {
             return if (comptime parser.isSupportedAlloc(T))
                 parser.parseAlloc(T, rootParser, allocator.ptr, msg)
@@ -200,7 +203,7 @@ pub const RESP3Parser = struct {
     // Frees values created by `sendAlloc`.
     // If the top value is a pointer, it frees that too.
     // TODO: free stdlib types!
-    pub fn freeReply(val: var, allocator: *Allocator) void {
+    pub fn freeReply(val: anytype, allocator: *Allocator) void {
         const T = @TypeOf(val);
 
         switch (@typeInfo(T)) {
@@ -447,9 +450,9 @@ test "hashmap" {
     const allocator = std.heap.page_allocator;
     const FloatDict = std.StringHashMap(f64);
     const res = try RESP3Parser.parseAlloc(FloatDict, allocator, MakeFloatMap().inStream());
-    testing.expect(12.34 == res.getValue("aaa").?);
-    testing.expect(56.78 == res.getValue("bbb").?);
-    testing.expect(99.99 == res.getValue("ccc").?);
+    testing.expect(12.34 == res.get("aaa").?);
+    testing.expect(56.78 == res.get("bbb").?);
+    testing.expect(99.99 == res.get("ccc").?);
 }
 fn MakeFloatMap() std.io.FixedBufferStream([]const u8) {
     return std.io.fixedBufferStream("%3\r\n$3\r\naaa\r\n,12.34\r\n$3\r\nbbb\r\n,56.78\r\n$3\r\nccc\r\n,99.99\r\n"[0..]);

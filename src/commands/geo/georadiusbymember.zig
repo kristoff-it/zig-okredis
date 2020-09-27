@@ -52,7 +52,7 @@ pub const GEORADIUSBYMEMBER = struct {
     pub fn validate(self: GEORADIUSBYMEMBER) !void {}
 
     pub const RedisCommand = struct {
-        pub fn serialize(self: GEORADIUSBYMEMBER, comptime rootSerializer: type, msg: var) !void {
+        pub fn serialize(self: GEORADIUSBYMEMBER, comptime rootSerializer: type, msg: anytype) !void {
             return rootSerializer.serializeCommand(msg, .{
                 "GEORADIUSBYMEMBER",
                 self.key,
@@ -77,7 +77,7 @@ pub const GEORADIUSBYMEMBER = struct {
             return total;
         }
 
-        pub fn serialize(self: GEORADIUSBYMEMBER, comptime rootSerializer: type, msg: var) !void {
+        pub fn serialize(self: GEORADIUSBYMEMBER, comptime rootSerializer: type, msg: anytype) !void {
             if (self.count) |c| {
                 try rootSerializer.serializeArgument(msg, []const u8, "COUNT");
                 try rootSerializer.serializeArgument(msg, u64, c);

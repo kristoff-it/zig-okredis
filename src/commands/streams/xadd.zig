@@ -62,7 +62,7 @@ pub const XADD = struct {
     }
 
     pub const RedisCommand = struct {
-        pub fn serialize(self: XADD, comptime rootSerializer: type, msg: var) !void {
+        pub fn serialize(self: XADD, comptime rootSerializer: type, msg: anytype) !void {
             return rootSerializer.serializeCommand(msg, .{
                 "XADD",
                 self.key,
@@ -87,7 +87,7 @@ pub const XADD = struct {
                 };
             }
 
-            pub fn serialize(self: MaxLen, comptime rootSerializer: type, msg: var) !void {
+            pub fn serialize(self: MaxLen, comptime rootSerializer: type, msg: anytype) !void {
                 switch (self) {
                     .NoMaxLen => {},
                     .MaxLen => |c| {
@@ -125,7 +125,7 @@ fn _forStruct(comptime T: type) type {
         }
 
         pub const RedisCommand = struct {
-            pub fn serialize(self: Self, comptime rootSerializer: type, msg: var) !void {
+            pub fn serialize(self: Self, comptime rootSerializer: type, msg: anytype) !void {
                 return rootSerializer.serializeCommand(msg, .{
                     "XADD",
                     self.key,
@@ -144,7 +144,7 @@ fn _forStruct(comptime T: type) type {
                 return comptime std.meta.fields(T).len * 2;
             }
 
-            pub fn serialize(self: Self, comptime rootSerializer: type, msg: var) !void {
+            pub fn serialize(self: Self, comptime rootSerializer: type, msg: anytype) !void {
                 inline for (std.meta.fields(T)) |field| {
                     const arg = @field(self.values, field.name);
                     const ArgT = @TypeOf(arg);

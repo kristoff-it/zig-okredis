@@ -76,13 +76,13 @@ pub fn main() !void {
     try client.send(void, .{
         "SET",
         "divine",
-            \\When half way through the journey of our life
-            \\I found that I was in a gloomy wood,
-            \\because the path which led aright was lost.
-            \\And ah, how hard it is to say just what
-            \\this wild and rough and stubborn woodland was,
-            \\the very thought of which renews my fear!
-        });
+        \\When half way through the journey of our life
+        \\I found that I was in a gloomy wood,
+        \\because the path which led aright was lost.
+        \\And ah, how hard it is to say just what
+        \\this wild and rough and stubborn woodland was,
+        \\the very thought of which renews my fear!
+    });
 
     // When you are fine with allocating memory,
     // you can use the .sendAlloc interface.

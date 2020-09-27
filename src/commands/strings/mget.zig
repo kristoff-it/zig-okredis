@@ -17,7 +17,7 @@ pub const MGET = struct {
     }
 
     const RedisCommand = struct {
-        pub fn serialize(self: MGET, rootSerializer: type, msg: var) !void {
+        pub fn serialize(self: MGET, rootSerializer: type, msg: anytype) !void {
             return rootSerializer.serialize(msg, .{ "MGET", self.keys });
         }
     };

@@ -7,10 +7,9 @@
 /// Will error if you have too many decimal places,
 /// invalid characters within the number, or an
 /// empty string.
-/// 
+///
 /// Is also subject to rounding errors.
 ///
-
 const std = @import("std");
 const mem = std.mem;
 const time = std.time;
@@ -25,7 +24,7 @@ inline fn toDigit(ch: u8) !u8 {
     return error.InvalidCharacter;
 }
 
-fn parseFloat(comptime T: type, slice: []const u8) error{Empty, InvalidCharacter, TooManyDigits}!T {
+fn parseFloat(comptime T: type, slice: []const u8) error{ Empty, InvalidCharacter, TooManyDigits }!T {
     var s = mem.separate(slice, " ").next() orelse return error.Empty;
     if (s.len == 0) return error.Empty;
 
@@ -35,9 +34,9 @@ fn parseFloat(comptime T: type, slice: []const u8) error{Empty, InvalidCharacter
         s = s[1..];
     }
 
-    if (mem.eql(u8, s[0..3], "inf")) return if(is_neg) -inf(T) else inf(T);
+    if (mem.eql(u8, s[0..3], "inf")) return if (is_neg) -inf(T) else inf(T);
     if (mem.eql(u8, s[0..3], "nan")) return nan(T); // -nan makes no sense.
-    
+
     // Read the digits into an integer and note
     // where the decimal point is.
     var n: u64 = 0;
@@ -54,7 +53,7 @@ fn parseFloat(comptime T: type, slice: []const u8) error{Empty, InvalidCharacter
         else
             decimal_places += 1;
         n += try toDigit(ch);
-        n *= 10;            
+        n *= 10;
     }
     if (decimal_places + numeral_places > 18) return error.TooManyDigits; // f64 has 18 s.f.
 
@@ -72,12 +71,11 @@ fn parseFloat(comptime T: type, slice: []const u8) error{Empty, InvalidCharacter
             }
         }
     }
-    
+
     var res = @floatCast(T, n_as_float);
     if (is_neg) res *= -1;
     return res;
 }
-
 
 pub fn main() !void {
     {

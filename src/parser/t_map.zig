@@ -40,14 +40,14 @@ pub const MapParser = struct {
         };
     }
 
-    pub fn parse(comptime T: type, comptime rootParser: type, msg: var) !T {
+    pub fn parse(comptime T: type, comptime rootParser: type, msg: anytype) !T {
         return parseImpl(T, rootParser, .{}, msg);
     }
-    pub fn parseAlloc(comptime T: type, comptime rootParser: type, allocator: *std.mem.Allocator, msg: var) !T {
+    pub fn parseAlloc(comptime T: type, comptime rootParser: type, allocator: *std.mem.Allocator, msg: anytype) !T {
         return parseImpl(T, rootParser, .{ .ptr = allocator }, msg);
     }
 
-    pub fn parseImpl(comptime T: type, comptime rootParser: type, allocator: var, msg: var) !T {
+    pub fn parseImpl(comptime T: type, comptime rootParser: type, allocator: anytype, msg: anytype) !T {
         // TODO: write real implementation
         var buf: [100]u8 = undefined;
         var end: usize = 0;
@@ -59,15 +59,22 @@ pub const MapParser = struct {
                 break;
             }
         }
-        try msg.skipBytes(1);
+        try msg.skipBytes(1, .{});
         const size = try fmt.parseInt(usize, buf[0..end], 10);
         // TODO: remove some redundant code
 
         // HASHMAP
         if (@hasField(@TypeOf(allocator), "ptr")) {
-            if (@typeInfo(T) == .Struct and @hasDecl(T, "KV")) {
+            if (@typeInfo(T) == .Struct and @hasDecl(T, "Entry")) {
+                const isManaged = @typeInfo(@TypeOf(T.deinit)).Fn.args.len == 1;
                 var hmap = T.init(allocator.ptr);
-                errdefer hmap.deinit();
+                errdefer {
+                    if (isManaged) {
+                        hmap.deinit();
+                    } else {
+                        hmap.deinit(allocator.ptr);
+                    }
+                }
 
                 var foundNil = false;
                 var foundErr = false;
@@ -94,7 +101,7 @@ pub const MapParser = struct {
                     } else {
                         // Differently from the Lists case, here we can't `continue` immediately on fail
                         // because then we would lose count of how many tokens we consumed.
-                        var key = rootParser.parseAlloc(std.meta.fieldInfo(T.KV, "key").field_type, allocator.ptr, msg) catch |err| switch (err) {
+                        var key = rootParser.parseAlloc(std.meta.fieldInfo(T.Entry, "key").field_type, allocator.ptr, msg) catch |err| switch (err) {
                             error.GotNilReply => blk: {
                                 foundNil = true;
                                 break :blk undefined;
@@ -105,7 +112,7 @@ pub const MapParser = struct {
                             },
                             else => return err,
                         };
-                        var val = rootParser.parseAlloc(std.meta.fieldInfo(T.KV, "value").field_type, allocator.ptr, msg) catch |err| switch (err) {
+                        var val = rootParser.parseAlloc(std.meta.fieldInfo(T.Entry, "value").field_type, allocator.ptr, msg) catch |err| switch (err) {
                             error.GotNilReply => blk: {
                                 foundNil = true;
                                 break :blk undefined;
@@ -118,7 +125,7 @@ pub const MapParser = struct {
                         };
 
                         if (!foundErr and !foundNil) {
-                            _ = hmap.put(key, val) catch |err| {
+                            (if (isManaged) hmap.put(key, val) else hmap.put(allocator.ptr, key, val)) catch |err| {
                                 hashMapError = true;
                                 continue;
                             };
@@ -181,7 +188,8 @@ pub const MapParser = struct {
                 // advantage of being a comptime-known number, allowing the
                 // compiler to unroll the while loop, if advantageous to do so.
                 var i: usize = 0;
-                upper: while (i < stc.fields.len) : (i += 1) {
+                // upper: (renable label when fixed in Zig)
+                while (i < stc.fields.len) : (i += 1) {
                     if (foundNil or foundErr) {
                         // field
                         rootParser.parse(void, msg) catch |err| switch (err) {
@@ -256,7 +264,6 @@ pub const MapParser = struct {
 
                     // GotErrorReply takes precedence over LengthMismatch
                     if (foundErr) return error.GotErrorReply;
-                    return error.LengthMismatch;
                 }
 
                 // Given what we declared in isSupported,
@@ -364,7 +371,7 @@ pub const MapParser = struct {
         }
     }
 
-    fn decodeMap(comptime T: type, result: [][2]T, rootParser: var, allocator: var, msg: var) !void {
+    fn decodeMap(comptime T: type, result: [][2]T, rootParser: anytype, allocator: anytype, msg: anytype) !void {
         var foundNil = false;
         var foundErr = false;
         for (result) |*pair| {

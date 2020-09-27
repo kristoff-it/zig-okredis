@@ -30,7 +30,7 @@ pub const HMGET = struct {
     pub const forStruct = _forStruct;
 
     pub const RedisCommand = struct {
-        pub fn serialize(self: HMGET, comptime rootSerializer: type, msg: var) !void {
+        pub fn serialize(self: HMGET, comptime rootSerializer: type, msg: anytype) !void {
             return rootSerializer.serializeCommand(msg, .{ "HMGET", self.key, self.fields });
         }
     };
@@ -53,7 +53,7 @@ fn _forStruct(comptime T: type) type {
         }
 
         pub const RedisCommand = struct {
-            pub fn serialize(self: Self, comptime rootSerializer: type, msg: var) !void {
+            pub fn serialize(self: Self, comptime rootSerializer: type, msg: anytype) !void {
                 return rootSerializer.serializeCommand(msg, .{
                     "HMGET",
                     self.key,
@@ -70,7 +70,7 @@ fn _forStruct(comptime T: type) type {
                 return comptime std.meta.fields(T).len;
             }
 
-            pub fn serialize(self: Self, comptime rootSerializer: type, msg: var) !void {
+            pub fn serialize(self: Self, comptime rootSerializer: type, msg: anytype) !void {
                 inline for (std.meta.fields(T)) |field| {
                     try rootSerializer.serializeArgument(msg, []const u8, field.name);
                 }

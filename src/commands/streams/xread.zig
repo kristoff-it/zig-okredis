@@ -39,7 +39,7 @@ pub const XREAD = struct {
     }
 
     pub const RedisCommand = struct {
-        pub fn serialize(self: XREAD, comptime rootSerializer: type, msg: var) !void {
+        pub fn serialize(self: XREAD, comptime rootSerializer: type, msg: anytype) !void {
             return rootSerializer.serializeCommand(msg, .{
                 "XREAD",
                 self.count,
@@ -63,7 +63,7 @@ pub const XREAD = struct {
                 };
             }
 
-            pub fn serialize(self: Count, comptime rootSerializer: type, msg: var) !void {
+            pub fn serialize(self: Count, comptime rootSerializer: type, msg: anytype) !void {
                 switch (self) {
                     .NoCount => {},
                     .Count => |c| {
@@ -88,7 +88,7 @@ pub const XREAD = struct {
                 };
             }
 
-            pub fn serialize(self: Block, comptime rootSerializer: type, msg: var) !void {
+            pub fn serialize(self: Block, comptime rootSerializer: type, msg: anytype) !void {
                 switch (self) {
                     .NoBlock => {},
                     .Forever => |m| {

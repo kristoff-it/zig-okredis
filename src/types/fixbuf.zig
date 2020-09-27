@@ -17,7 +17,7 @@ pub fn FixBuf(comptime size: usize) type {
 
         pub const Redis = struct {
             pub const Parser = struct {
-                pub fn parse(tag: u8, comptime rootParser: type, msg: var) !Self {
+                pub fn parse(tag: u8, comptime rootParser: type, msg: anytype) !Self {
                     switch (tag) {
                         else => return error.UnsupportedConversion,
                         '-', '!' => {
@@ -30,14 +30,14 @@ pub fn FixBuf(comptime size: usize) type {
                             for (res.buf) |*elem, i| {
                                 if (ch == '\r') {
                                     res.len = i;
-                                    try msg.skipBytes(1);
+                                    try msg.skipBytes(1, .{});
                                     return res;
                                 }
                                 elem.* = ch;
                                 ch = try msg.readByte();
                             }
                             if (ch != '\r') return error.BufTooSmall;
-                            try msg.skipBytes(1);
+                            try msg.skipBytes(1, .{});
                             return res;
                         },
                         '$' => {
@@ -53,7 +53,7 @@ pub fn FixBuf(comptime size: usize) type {
                                 }
                             }
 
-                            try msg.skipBytes(1);
+                            try msg.skipBytes(1, .{});
                             const respSize = try fmt.parseInt(usize, buf[0..end], 10);
 
                             if (respSize > size) return error.BufTooSmall;
@@ -61,14 +61,14 @@ pub fn FixBuf(comptime size: usize) type {
                             var res: Self = undefined;
                             res.len = respSize;
                             _ = try msg.readNoEof(res.buf[0..respSize]);
-                            try msg.skipBytes(2);
+                            try msg.skipBytes(2, .{});
                             return res;
                         },
                     }
                 }
 
                 pub fn destroy(self: Self, comptime rootParser: type, allocator: *std.mem.Allocator) void {}
-                pub fn parseAlloc(tag: u8, comptime _: type, msg: var) !Self {
+                pub fn parseAlloc(tag: u8, comptime _: type, msg: anytype) !Self {
                     return parse(tag, _, msg);
                 }
             };

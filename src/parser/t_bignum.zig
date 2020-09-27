@@ -7,7 +7,7 @@ pub const BigNumParser = struct {
         return false;
     }
 
-    pub fn parse(comptime T: type, comptime _: type, msg: var) !T {
+    pub fn parse(comptime T: type, comptime _: type, msg: anytype) !T {
         @compileError("The BigNum parser handles a type that needs an allocator.");
     }
 
@@ -16,13 +16,13 @@ pub const BigNumParser = struct {
         return T == std.math.big.int.Managed or T == []u8;
     }
 
-    pub fn parseAlloc(comptime T: type, comptime _: type, allocator: *std.mem.Allocator, msg: var) !T {
+    pub fn parseAlloc(comptime T: type, comptime _: type, allocator: *std.mem.Allocator, msg: anytype) !T {
         // TODO: find a better max_size limit than a random 1k value
         const bigSlice = try msg.readUntilDelimiterAlloc(allocator, '\r', 1000);
         errdefer allocator.free(bigSlice);
 
         // Skip the remaining `\n`
-        try msg.skipBytes(1);
+        try msg.skipBytes(1, .{});
 
         if (T == []u8) {
             return bigSlice;

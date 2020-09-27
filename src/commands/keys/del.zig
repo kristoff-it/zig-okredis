@@ -7,7 +7,7 @@ pub const DEL = struct {
     }
 
     const RedisCommand = struct {
-        pub fn serialize(self: Self, rootSerializer: type, msg: var) !void {
+        pub fn serialize(self: Self, rootSerializer: type, msg: anytype) !void {
             return rootSerializer.serialize(msg, .{ "DEL", self.keys });
         }
     };

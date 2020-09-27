@@ -16,7 +16,7 @@ pub const GEOADD = struct {
                 return 3;
             }
 
-            pub fn serialize(self: GeoPoint, comptime rootSerializer: type, msg: var) !void {
+            pub fn serialize(self: GeoPoint, comptime rootSerializer: type, msg: anytype) !void {
                 try rootSerializer.serializeArgument(msg, f64, self.long);
                 try rootSerializer.serializeArgument(msg, f64, self.lat);
                 try rootSerializer.serializeArgument(msg, []const u8, self.member);
@@ -35,7 +35,7 @@ pub const GEOADD = struct {
     }
 
     pub const RedisCommand = struct {
-        pub fn serialize(self: GEOADD, comptime rootSerializer: type, msg: var) !void {
+        pub fn serialize(self: GEOADD, comptime rootSerializer: type, msg: anytype) !void {
             return rootSerializer.serializeCommand(msg, .{ "GEOADD", self.key, self.points });
         }
     };

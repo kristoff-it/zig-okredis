@@ -9,7 +9,7 @@ pub const Unit = enum {
             return 1;
         }
 
-        pub fn serialize(self: Unit, comptime rootSerializer: type, msg: var) !void {
+        pub fn serialize(self: Unit, comptime rootSerializer: type, msg: anytype) !void {
             const symbol = switch (self) {
                 .meters => "m",
                 .kilometers => "km",

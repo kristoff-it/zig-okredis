@@ -30,7 +30,7 @@ pub const HSET = struct {
     pub const forStruct = _forStruct;
 
     pub const RedisCommand = struct {
-        pub fn serialize(self: HSET, comptime rootSerializer: type, msg: var) !void {
+        pub fn serialize(self: HSET, comptime rootSerializer: type, msg: anytype) !void {
             return rootSerializer.serializeCommand(msg, .{ "HSET", self.key, self });
         }
     };
@@ -40,7 +40,7 @@ pub const HSET = struct {
             return self.fvs.len * 2;
         }
 
-        pub fn serialize(self: HSET, comptime rootSerializer: type, msg: var) !void {
+        pub fn serialize(self: HSET, comptime rootSerializer: type, msg: anytype) !void {
             for (self.fvs) |fv| {
                 try rootSerializer.serializeArgument(msg, []const u8, fv.field);
                 try rootSerializer.serializeArgument(msg, []const u8, fv.value);
@@ -68,7 +68,7 @@ fn _forStruct(comptime T: type) type {
         }
 
         pub const RedisCommand = struct {
-            pub fn serialize(self: Self, comptime rootSerializer: type, msg: var) !void {
+            pub fn serialize(self: Self, comptime rootSerializer: type, msg: anytype) !void {
                 return rootSerializer.serializeCommand(msg, .{
                     "HSET",
                     self.key,
@@ -85,7 +85,7 @@ fn _forStruct(comptime T: type) type {
                 return comptime std.meta.fields(T).len * 2;
             }
 
-            pub fn serialize(self: Self, comptime rootSerializer: type, msg: var) !void {
+            pub fn serialize(self: Self, comptime rootSerializer: type, msg: anytype) !void {
                 inline for (std.meta.fields(T)) |field| {
                     const arg = @field(self.values, field.name);
                     const ArgT = @TypeOf(arg);

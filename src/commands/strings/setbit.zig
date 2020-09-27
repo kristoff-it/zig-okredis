@@ -11,7 +11,7 @@ pub const SETBIT = struct {
     offset: usize,
     value: Value,
 
-    pub fn init(key: []const u8, offset: usize, value: var) SETBIT {
+    pub fn init(key: []const u8, offset: usize, value: anytype) SETBIT {
         return .{ .key = key, .offset = offset, .value = Value.fromVar(value) };
     }
 
@@ -20,7 +20,7 @@ pub const SETBIT = struct {
     }
 
     pub const RedisCommand = struct {
-        pub fn serialize(self: SETBIT, comptime rootSerializer: type, msg: var) !void {
+        pub fn serialize(self: SETBIT, comptime rootSerializer: type, msg: anytype) !void {
             return rootSerializer.serializeCommand(msg, .{ "SETBIT", self.key, self.offset, self.value });
         }
     };

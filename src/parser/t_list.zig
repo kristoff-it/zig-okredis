@@ -20,14 +20,14 @@ pub const ListParser = struct {
         };
     }
 
-    pub fn parse(comptime T: type, comptime rootParser: type, msg: var) !T {
+    pub fn parse(comptime T: type, comptime rootParser: type, msg: anytype) !T {
         return parseImpl(T, rootParser, .{}, msg);
     }
-    pub fn parseAlloc(comptime T: type, comptime rootParser: type, allocator: *std.mem.Allocator, msg: var) !T {
+    pub fn parseAlloc(comptime T: type, comptime rootParser: type, allocator: *std.mem.Allocator, msg: anytype) !T {
         return parseImpl(T, rootParser, .{ .ptr = allocator }, msg);
     }
 
-    fn decodeArray(comptime T: type, result: []T, rootParser: var, allocator: var, msg: var) !void {
+    fn decodeArray(comptime T: type, result: []T, rootParser: anytype, allocator: anytype, msg: anytype) !void {
         var foundNil = false;
         var foundErr = false;
         for (result) |*elem| {
@@ -62,7 +62,7 @@ pub const ListParser = struct {
         return;
     }
 
-    pub fn parseImpl(comptime T: type, comptime rootParser: type, allocator: var, msg: var) !T {
+    pub fn parseImpl(comptime T: type, comptime rootParser: type, allocator: anytype, msg: anytype) !T {
         // TODO: write real implementation
         var buf: [100]u8 = undefined;
         var end: usize = 0;
@@ -74,7 +74,7 @@ pub const ListParser = struct {
                 break;
             }
         }
-        try msg.skipBytes(1);
+        try msg.skipBytes(1, .{});
         const size = try fmt.parseInt(usize, buf[0..end], 10);
 
         switch (@typeInfo(T)) {
