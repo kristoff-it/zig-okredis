@@ -32,8 +32,8 @@ pub const Client = struct {
         self.bufWriteStream = std.io.bufferedOutStream(self.writeStream);
 
         if (std.io.is_async) {
-            self.readLock = std.event.Lock.init();
-            self.writeLock = std.event.Lock.init();
+            self.readLock = std.event.Lock{};
+            self.writeLock = std.event.Lock{};
         }
 
         self.send(void, .{ "HELLO", "3" }) catch |err| switch (err) {
@@ -135,10 +135,12 @@ pub const Client = struct {
                 }
             } // Here is where the write lock gets released by the `defer` statement.
 
-            // TODO: Flush only if we don't have any other frame waiting.
-            // if (@atomicLoad(u8, &self.writeLock.queue_empty_bit, .SeqCst) == 1) {
+            // TODO: see if this stuff can be implemented nicely
+            // so that you don't have to depend on magic numbers & implementation details.
             if (std.io.is_async) {
-                if (self.writeLock.queue.head == null) {
+                const held = self.writeLock.mutex.acquire();
+                defer held.release();
+                if (self.writeLock.head == 1) {
                     try self.bufWriteStream.flush();
                 }
             } else {

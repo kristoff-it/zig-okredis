@@ -13,18 +13,19 @@ pub const CommandSerializer = struct {
         // `command` can be:
         // 1. RedisCommand trait
         // 2. RedisArguments trait
-        // 3. ArgList
+        // 3. Zig Tuple
         // 4. Array / Slice
         //
         // Redis.Command types can call this function
         // in order to delegate simple serialization
         // scenarios, the only requirement being that they
-        // pass an ArgList or an Array/Slice, and not another
+        // pass a Zig Tuple or an Array/Slice, and not another
         // reference to themselves (as that would loop forever).
         //
         // As an example, the `commands.GET` command calls this
         // function passing `.{"GET", self.key}` as
         // argument.
+
         const CmdT = @TypeOf(command);
         if (comptime traits.isCommand(CmdT)) {
             return CmdT.RedisCommand.serialize(command, CommandSerializer, msg);
@@ -43,6 +44,13 @@ pub const CommandSerializer = struct {
                 @compileError("unsupported");
             },
             .Struct => {
+                // Since we already handled structs that implement the
+                // Command trait, the expectation here is that this struct
+                // is in fact a Zig Tuple.
+                if (!(comptime std.meta.trait.isTuple(CmdT))) {
+                    @compileError("Only Zig tuples and Redis.Command types are allowed as argument to send.");
+                }
+
                 // Count the number of arguments
                 var argNum: usize = 0;
                 inline for (std.meta.fields(CmdT)) |field| {
