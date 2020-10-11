@@ -18,8 +18,9 @@ const okredis = @import("./src/okredis.zig");
 const Client = okredis.Client;
 
 pub fn main() !void {
-    var client: Client = undefined;
-    try client.initIp4("127.0.0.1", 6379);
+    const addr = try std.net.Address.parseIp4("127.0.0.1", 6379);
+    var connection = try std.net.tcpConnectToAddress(addr);
+    var client = try Client.init(connection);
     defer client.close();
 
     try client.send(void, .{ "SET", "key", "42" });

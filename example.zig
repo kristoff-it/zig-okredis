@@ -1,13 +1,15 @@
 const std = @import("std");
+const net = std.net;
 const okredis = @import("./src/okredis.zig");
 const Client = okredis.Client;
 
 pub fn main() !void {
     // Connect
-    var client: Client = undefined;
-    try client.initIp4("127.0.0.1", 6379);
-    defer client.close();
+    const addr = try net.Address.parseIp4("127.0.0.1", 6379);
+    var connection = try net.tcpConnectToAddress(addr);
+    var client = try Client.init(connection);
 
+    defer client.close();
     //   -
     //   == INTRODUCTION ==
     //   -
