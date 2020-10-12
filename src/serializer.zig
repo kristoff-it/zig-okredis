@@ -25,7 +25,6 @@ pub const CommandSerializer = struct {
         // As an example, the `commands.GET` command calls this
         // function passing `.{"GET", self.key}` as
         // argument.
-
         const CmdT = @TypeOf(command);
         if (comptime traits.isCommand(CmdT)) {
             return CmdT.RedisCommand.serialize(command, CommandSerializer, msg);

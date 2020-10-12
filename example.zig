@@ -7,9 +7,11 @@ pub fn main() !void {
     // Connect
     const addr = try net.Address.parseIp4("127.0.0.1", 6379);
     var connection = try net.tcpConnectToAddress(addr);
-    var client = try Client.init(connection);
 
+    var client: Client = undefined;
+    try client.init(connection);
     defer client.close();
+
     //   -
     //   == INTRODUCTION ==
     //   -

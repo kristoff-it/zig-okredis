@@ -20,7 +20,9 @@ const Client = okredis.Client;
 pub fn main() !void {
     const addr = try std.net.Address.parseIp4("127.0.0.1", 6379);
     var connection = try std.net.tcpConnectToAddress(addr);
-    var client = try Client.init(connection);
+    
+    var client: Client = undefined;
+    try client.init(connection);
     defer client.close();
 
     try client.send(void, .{ "SET", "key", "42" });

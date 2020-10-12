@@ -17,21 +17,30 @@ pub const Logging = union(enum) {
 };
 
 pub const Client = RedisClient(.NoBuffering, .NoLogging);
+pub const BufferedClient = RedisClient(.{ .Fixed = 4096 }, .NoLogging);
 pub fn RedisClient(buffering: Buffering, logging: Logging) type {
+    const ReadBuffer = switch (buffering) {
+        .NoBuffering => void,
+        .Fixed => |b| std.io.BufferedReader(b, std.fs.File.Reader),
+    };
+
+    const WriteBuffer = switch (buffering) {
+        .NoBuffering => void,
+        .Fixed => |b| std.io.BufferedWriter(b, std.fs.File.Writer),
+    };
+
     return struct {
         conn: std.fs.File,
         reader: switch (buffering) {
             .NoBuffering => std.fs.File.Reader,
-            .Fixed => |b| std.io.BufferedReader(b, std.fs.File.Reader).Reader,
+            .Fixed => |b| ReadBuffer.Reader,
         },
         writer: switch (buffering) {
             .NoBuffering => std.fs.File.Writer,
-            .Fixed => |b| std.io.BufferedWriter(b, std.fs.File.Writer).Writer,
+            .Fixed => |b| WriteBuffer.Writer,
         },
-        writeBuffer: switch (buffering) {
-            .NoBuffering => void,
-            .Fixed => |b| std.io.BufferedWriter(b, std.fs.File.Writer),
-        },
+        readBuffer: ReadBuffer,
+        writeBuffer: WriteBuffer,
 
         readLock: if (std.io.is_async) std.event.Lock else void,
         writeLock: if (std.io.is_async) std.event.Lock else void,
@@ -42,18 +51,17 @@ pub fn RedisClient(buffering: Buffering, logging: Logging) type {
         const Self = @This();
 
         /// Initializes a Client on a connection / pipe provided by the user.
-        pub fn init(conn: std.fs.File) !Self {
-            var self: Self = undefined;
-
+        pub fn init(self: *Self, conn: std.fs.File) !void {
             self.conn = conn;
             switch (buffering) {
                 .NoBuffering => {
                     self.reader = conn.reader();
                     self.writer = conn.writer();
                 },
-                .Fixed => |b| {
-                    self.reader = @TypeOf(self.reader)(conn.reader());
-                    self.writeBuffer = @TypeOf(self.writeBuffer)(conn.writer());
+                .Fixed => {
+                    self.readBuffer = ReadBuffer{ .unbuffered_reader = conn.reader() };
+                    self.reader = self.readBuffer.reader();
+                    self.writeBuffer = WriteBuffer{ .unbuffered_writer = conn.writer() };
                     self.writer = self.writeBuffer.writer();
                 },
             }
@@ -73,8 +81,6 @@ pub fn RedisClient(buffering: Buffering, logging: Logging) type {
                     return err;
                 }
             };
-
-            return self;
         }
 
         pub fn close(self: Self) void {

@@ -8,6 +8,7 @@ pub const types = @import("./types.zig");
 pub const traits = @import("./traits.zig");
 pub const freeReply = parser.RESP3Parser.freeReply;
 pub const Client = client.Client;
+pub const BufferedClient = client.BufferedClient;
 
 test "okredis" {
     _ = @import("./client.zig");
