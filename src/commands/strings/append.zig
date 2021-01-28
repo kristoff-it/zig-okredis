@@ -38,11 +38,11 @@ test "serializer" {
         testMsg.reset();
 
         try serializer.serializeCommand(
-            testMsg.outStream(),
+            testMsg.writer(),
             APPEND.init("mykey", "42"),
         );
         try serializer.serializeCommand(
-            correctMsg.outStream(),
+            correctMsg.writer(),
             .{ "APPEND", "mykey", "42" },
         );
 

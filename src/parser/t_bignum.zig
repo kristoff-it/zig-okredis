@@ -38,14 +38,14 @@ pub const BigNumParser = struct {
 
 test "bignum" {
     const allocator = std.heap.page_allocator;
-    var bgn = try BigNumParser.parseAlloc(std.math.big.int.Managed, void, allocator, MakeBigNum().inStream());
+    var bgn = try BigNumParser.parseAlloc(std.math.big.int.Managed, void, allocator, MakeBigNum().reader());
     defer bgn.deinit();
 
     const bgnStr = try bgn.toString(allocator, 10, false);
     defer allocator.free(bgnStr);
     testing.expectEqualSlices(u8, "1234567899990000009999876543211234567890", bgnStr);
 
-    const str = try BigNumParser.parseAlloc([]u8, void, allocator, MakeBigNum().inStream());
+    const str = try BigNumParser.parseAlloc([]u8, void, allocator, MakeBigNum().reader());
     defer allocator.free(str);
 
     testing.expectEqualSlices(u8, bgnStr, str);

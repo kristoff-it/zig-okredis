@@ -127,11 +127,11 @@ test "serializer" {
             testMsg.reset();
 
             try serializer.serializeCommand(
-                testMsg.outStream(),
+                testMsg.writer(),
                 SET.init("mykey", 42, .NoExpire, .NoConditions),
             );
             try serializer.serializeCommand(
-                correctMsg.outStream(),
+                correctMsg.writer(),
                 .{ "SET", "mykey", "42" },
             );
 
@@ -143,11 +143,11 @@ test "serializer" {
             testMsg.reset();
 
             try serializer.serializeCommand(
-                testMsg.outStream(),
+                testMsg.writer(),
                 SET.init("mykey", "banana", .NoExpire, .IfNotExisting),
             );
             try serializer.serializeCommand(
-                correctMsg.outStream(),
+                correctMsg.writer(),
                 .{ "SET", "mykey", "banana", "NX" },
             );
 
@@ -159,11 +159,11 @@ test "serializer" {
             testMsg.reset();
 
             try serializer.serializeCommand(
-                testMsg.outStream(),
+                testMsg.writer(),
                 SET.init("mykey", "banana", SET.Expire{ .Seconds = 20 }, .IfAlreadyExisting),
             );
             try serializer.serializeCommand(
-                correctMsg.outStream(),
+                correctMsg.writer(),
                 .{ "SET", "mykey", "banana", "EX", "20", "XX" },
             );
 

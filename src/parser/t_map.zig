@@ -101,7 +101,7 @@ pub const MapParser = struct {
                     } else {
                         // Differently from the Lists case, here we can't `continue` immediately on fail
                         // because then we would lose count of how many tokens we consumed.
-                        var key = rootParser.parseAlloc(std.meta.fieldInfo(T.Entry, "key").field_type, allocator.ptr, msg) catch |err| switch (err) {
+                        var key = rootParser.parseAlloc(std.meta.fieldInfo(T.Entry, .key).field_type, allocator.ptr, msg) catch |err| switch (err) {
                             error.GotNilReply => blk: {
                                 foundNil = true;
                                 break :blk undefined;
@@ -112,7 +112,7 @@ pub const MapParser = struct {
                             },
                             else => return err,
                         };
-                        var val = rootParser.parseAlloc(std.meta.fieldInfo(T.Entry, "value").field_type, allocator.ptr, msg) catch |err| switch (err) {
+                        var val = rootParser.parseAlloc(std.meta.fieldInfo(T.Entry, .value).field_type, allocator.ptr, msg) catch |err| switch (err) {
                             error.GotNilReply => blk: {
                                 foundNil = true;
                                 break :blk undefined;

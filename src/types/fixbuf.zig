@@ -77,6 +77,6 @@ pub fn FixBuf(comptime size: usize) type {
 }
 
 test "docs" {
-    @import("std").meta.refAllDecls(@This());
-    @import("std").meta.refAllDecls(FixBuf(42));
+    @import("std").testing.refAllDecls(@This());
+    @import("std").testing.refAllDecls(FixBuf(42));
 }

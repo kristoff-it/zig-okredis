@@ -39,11 +39,11 @@ test "serializer" {
         testMsg.reset();
 
         try serializer.serializeCommand(
-            testMsg.outStream(),
+            testMsg.writer(),
             GETRANGE.init("mykey", 1, 99),
         );
         try serializer.serializeCommand(
-            correctMsg.outStream(),
+            correctMsg.writer(),
             .{ "GETRANGE", "mykey", 1, 99 },
         );
 

@@ -268,5 +268,5 @@ pub fn RedisClient(buffering: Buffering, logging: Logging) type {
 }
 
 test "docs" {
-    @import("std").meta.refAllDecls(Client);
+    @import("std").testing.refAllDecls(Client);
 }

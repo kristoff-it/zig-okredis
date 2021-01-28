@@ -283,41 +283,41 @@ pub fn OrFullErr(comptime T: type) type {
     };
 }
 test "parse simple errors" {
-    switch (try OrErr(u8).Redis.Parser.parse('_', fakeParser, MakeNil().inStream())) {
+    switch (try OrErr(u8).Redis.Parser.parse('_', fakeParser, MakeNil().reader())) {
         .Ok, .Err => unreachable,
         .Nil => testing.expect(true),
     }
-    switch (try OrErr(u8).Redis.Parser.parse('!', fakeParser, MakeBlobErr().inStream())) {
+    switch (try OrErr(u8).Redis.Parser.parse('!', fakeParser, MakeBlobErr().reader())) {
         .Ok, .Nil => unreachable,
         .Err => |err| testing.expectEqualSlices(u8, "ERRN\r\nOGOODFOOD", err.getCode()),
     }
 
-    switch (try OrErr(u8).Redis.Parser.parse('-', fakeParser, MakeErr().inStream())) {
+    switch (try OrErr(u8).Redis.Parser.parse('-', fakeParser, MakeErr().reader())) {
         .Ok, .Nil => unreachable,
         .Err => |err| testing.expectEqualSlices(u8, "ERRNOGOODFOOD", err.getCode()),
     }
 
-    switch (try OrErr(u8).Redis.Parser.parse('-', fakeParser, MakeErroji().inStream())) {
+    switch (try OrErr(u8).Redis.Parser.parse('-', fakeParser, MakeErroji().reader())) {
         .Ok, .Nil => unreachable,
         .Err => |err| testing.expectEqualSlices(u8, "😈", err.getCode()),
     }
 
-    switch (try OrErr(u8).Redis.Parser.parse('-', fakeParser, MakeShortErr().inStream())) {
+    switch (try OrErr(u8).Redis.Parser.parse('-', fakeParser, MakeShortErr().reader())) {
         .Ok, .Nil => unreachable,
         .Err => |err| testing.expectEqualSlices(u8, "ABC", err.getCode()),
     }
 
-    testing.expectError(error.ErrorCodeBufTooSmall, OrErr(u8).Redis.Parser.parse('-', fakeParser, MakeBadErr().inStream()));
+    testing.expectError(error.ErrorCodeBufTooSmall, OrErr(u8).Redis.Parser.parse('-', fakeParser, MakeBadErr().reader()));
 
     const allocator = std.heap.page_allocator;
-    switch (try OrFullErr(u8).Redis.Parser.parseAlloc('-', fakeParser, allocator, MakeErroji().inStream())) {
+    switch (try OrFullErr(u8).Redis.Parser.parseAlloc('-', fakeParser, allocator, MakeErroji().reader())) {
         .Ok, .Nil => unreachable,
         .Err => |err| {
             testing.expectEqualSlices(u8, "😈", err.getCode());
             testing.expectEqualSlices(u8, "your Redis belongs to us", err.message);
         },
     }
-    switch (try OrFullErr(u8).Redis.Parser.parseAlloc('!', fakeParser, allocator, MakeBlobErr().inStream())) {
+    switch (try OrFullErr(u8).Redis.Parser.parseAlloc('!', fakeParser, allocator, MakeBlobErr().reader())) {
         .Ok, .Nil => unreachable,
         .Err => |err| {
             testing.expectEqualSlices(u8, "ERRN\r\nOGOODFOOD", err.getCode());
@@ -357,7 +357,7 @@ fn MakeNil() std.io.FixedBufferStream([]const u8) {
 }
 
 test "docs" {
-    @import("std").meta.refAllDecls(@This());
-    @import("std").meta.refAllDecls(Error);
-    @import("std").meta.refAllDecls(FullError);
+    @import("std").testing.refAllDecls(@This());
+    @import("std").testing.refAllDecls(Error);
+    @import("std").testing.refAllDecls(FullError);
 }

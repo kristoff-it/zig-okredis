@@ -63,7 +63,7 @@ test "WithAttribs" {
     const res = try parser.parseAlloc(
         WithAttribs([2]WithAttribs([]WithAttribs(i64))),
         allocator,
-        MakeComplexListWithAttributes().inStream(),
+        MakeComplexListWithAttributes().reader(),
     );
     testing.expectEqual(@as(usize, 2), res.attribs.len);
     testing.expectEqualSlices(u8, "Ciao", res.attribs[0][0].data.String.string);
@@ -114,8 +114,8 @@ fn MakeComplexListWithAttributes() std.io.FixedBufferStream([]const u8) {
 //zig fmt: on
 
 test "docs" {
-    @import("std").meta.refAllDecls(@This());
-    @import("std").meta.refAllDecls(WithAttribs(FixBuf(100)));
-    @import("std").meta.refAllDecls(WithAttribs([]u8));
-    @import("std").meta.refAllDecls(WithAttribs(usize));
+    @import("std").testing.refAllDecls(@This());
+    @import("std").testing.refAllDecls(WithAttribs(FixBuf(100)));
+    @import("std").testing.refAllDecls(WithAttribs([]u8));
+    @import("std").testing.refAllDecls(WithAttribs(usize));
 }

@@ -95,12 +95,12 @@ test "dynamic replies" {
     const allocator = std.heap.page_allocator;
 
     {
-        const reply = try DynamicReply.Redis.Parser.parseAlloc('+', parser, allocator, MakeSimpleString().inStream());
+        const reply = try DynamicReply.Redis.Parser.parseAlloc('+', parser, allocator, MakeSimpleString().reader());
         testing.expectEqualSlices(u8, "Yayyyy I'm a string!", reply.data.String.string);
     }
 
     {
-        const reply = try DynamicReply.Redis.Parser.parseAlloc('*', parser, allocator, MakeComplexList().inStream());
+        const reply = try DynamicReply.Redis.Parser.parseAlloc('*', parser, allocator, MakeComplexList().reader());
         testing.expectEqual(@as(usize, 0), reply.attribs.len);
 
         testing.expectEqualSlices(u8, "Hello", reply.data.List[0].data.String.string);
@@ -118,7 +118,7 @@ test "dynamic replies" {
     }
 
     {
-        const reply = try DynamicReply.Redis.Parser.parseAlloc('|', parser, allocator, MakeComplexListWithAttributes().inStream());
+        const reply = try DynamicReply.Redis.Parser.parseAlloc('|', parser, allocator, MakeComplexListWithAttributes().reader());
         testing.expectEqual(@as(usize, 2), reply.attribs.len);
         testing.expectEqualSlices(u8, "Ciao", reply.attribs[0][0].data.String.string);
         testing.expectEqualSlices(u8, "World", reply.attribs[0][1].data.String.string);
@@ -181,6 +181,6 @@ fn MakeComplexListWithAttributes() std.io.FixedBufferStream([]const u8) {
 //zig fmt: on
 
 test "docs" {
-    @import("std").meta.refAllDecls(@This());
-    @import("std").meta.refAllDecls(DynamicReply);
+    @import("std").testing.refAllDecls(@This());
+    @import("std").testing.refAllDecls(DynamicReply);
 }

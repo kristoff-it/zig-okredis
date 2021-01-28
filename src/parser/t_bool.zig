@@ -31,12 +31,12 @@ pub const BoolParser = struct {
 };
 
 test "parses bools" {
-    testing.expect(true == try BoolParser.parse(bool, struct {}, TrueMSG().inStream()));
-    testing.expect(false == try BoolParser.parse(bool, struct {}, FalseMSG().inStream()));
-    testing.expect(1 == try BoolParser.parse(i64, struct {}, TrueMSG().inStream()));
-    testing.expect(0 == try BoolParser.parse(u32, struct {}, FalseMSG().inStream()));
-    testing.expect(1.0 == try BoolParser.parse(f32, struct {}, TrueMSG().inStream()));
-    testing.expect(0.0 == try BoolParser.parse(f64, struct {}, FalseMSG().inStream()));
+    testing.expect(true == try BoolParser.parse(bool, struct {}, TrueMSG().reader()));
+    testing.expect(false == try BoolParser.parse(bool, struct {}, FalseMSG().reader()));
+    testing.expect(1 == try BoolParser.parse(i64, struct {}, TrueMSG().reader()));
+    testing.expect(0 == try BoolParser.parse(u32, struct {}, FalseMSG().reader()));
+    testing.expect(1.0 == try BoolParser.parse(f32, struct {}, TrueMSG().reader()));
+    testing.expect(0.0 == try BoolParser.parse(f64, struct {}, FalseMSG().reader()));
 }
 
 fn TrueMSG() std.io.FixedBufferStream([]const u8) {

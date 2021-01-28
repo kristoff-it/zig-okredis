@@ -6,5 +6,5 @@ test "keys" {
 
 test "docs" {
     const std = @import("std");
-    std.meta.refAllDecls(@This());
+    std.testing.refAllDecls(@This());
 }

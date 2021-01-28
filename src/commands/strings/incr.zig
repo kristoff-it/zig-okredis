@@ -37,11 +37,11 @@ test "serializer" {
         testMsg.reset();
 
         try serializer.serializeCommand(
-            testMsg.outStream(),
+            testMsg.writer(),
             INCR.init("mykey"),
         );
         try serializer.serializeCommand(
-            correctMsg.outStream(),
+            correctMsg.writer(),
             .{ "INCR", "mykey" },
         );
 

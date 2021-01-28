@@ -192,11 +192,11 @@ test "serializer" {
             testMsg.reset();
 
             try serializer.serializeCommand(
-                testMsg.outStream(),
+                testMsg.writer(),
                 XADD.init("k1", "1-1", .NoMaxLen, &[_]FV{.{ .field = "f1", .value = "v1" }}),
             );
             try serializer.serializeCommand(
-                correctMsg.outStream(),
+                correctMsg.writer(),
                 .{ "XADD", "k1", "1-1", "f1", "v1" },
             );
 
@@ -217,11 +217,11 @@ test "serializer" {
             const MyXADD = XADD.forStruct(MyStruct);
 
             try serializer.serializeCommand(
-                testMsg.outStream(),
+                testMsg.writer(),
                 MyXADD.init("k1", "1-1", .NoMaxLen, .{ .field1 = "nice!", .field2 = 'a', .field3 = 42 }),
             );
             try serializer.serializeCommand(
-                correctMsg.outStream(),
+                correctMsg.writer(),
                 .{ "XADD", "k1", "1-1", "field1", "nice!", "field2", 'a', "field3", 42 },
             );
 
@@ -241,7 +241,7 @@ test "serializer" {
             const MyXADD = XADD.forStruct(MyStruct);
 
             try serializer.serializeCommand(
-                testMsg.outStream(),
+                testMsg.writer(),
                 MyXADD.init(
                     "k1",
                     "1-1",
@@ -250,7 +250,7 @@ test "serializer" {
                 ),
             );
             try serializer.serializeCommand(
-                correctMsg.outStream(),
+                correctMsg.writer(),
                 .{ "XADD", "k1", "1-1", "MAXLEN", 40, "field1", "nice!", "field2", 'a', "field3", 42 },
             );
 
