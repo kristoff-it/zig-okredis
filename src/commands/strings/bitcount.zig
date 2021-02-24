@@ -69,11 +69,11 @@ test "serializer" {
         testMsg.reset();
 
         try serializer.serializeCommand(
-            testMsg.outStream(),
+            testMsg.writer(),
             BITCOUNT.init("mykey", BITCOUNT.Bounds{ .Slice = .{ .start = 1, .end = 10 } }),
         );
         try serializer.serializeCommand(
-            correctMsg.outStream(),
+            correctMsg.writer(),
             .{ "BITCOUNT", "mykey", 1, 10 },
         );
 

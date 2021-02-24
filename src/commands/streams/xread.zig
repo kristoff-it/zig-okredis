@@ -131,7 +131,7 @@ test "serializer" {
         testMsg.reset();
 
         try serializer.serializeCommand(
-            testMsg.outStream(),
+            testMsg.writer(),
             XREAD.init(
                 .NoCount,
                 .NoBlock,
@@ -140,7 +140,7 @@ test "serializer" {
             ),
         );
         try serializer.serializeCommand(
-            correctMsg.outStream(),
+            correctMsg.writer(),
             .{ "XREAD", "STREAMS", "key1", "key2", "$", "$" },
         );
 

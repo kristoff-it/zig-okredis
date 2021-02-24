@@ -59,11 +59,11 @@ test "serializer" {
         testMsg.reset();
 
         try serializer.serializeCommand(
-            testMsg.outStream(),
+            testMsg.writer(),
             BITOP.init(.AND, "mykey", &[_][]const u8{ "key1", "key2" }),
         );
         try serializer.serializeCommand(
-            correctMsg.outStream(),
+            correctMsg.writer(),
             .{ "BITOP", "AND", "mykey", "key1", "key2" },
         );
         std.testing.expectEqualSlices(u8, correctMsg.getWritten(), testMsg.getWritten());

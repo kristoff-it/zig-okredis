@@ -37,11 +37,11 @@ test "serializer" {
         testMsg.reset();
 
         try serializer.serializeCommand(
-            testMsg.outStream(),
+            testMsg.writer(),
             INCRBYFLOAT.init("mykey", 42.1337),
         );
         try serializer.serializeCommand(
-            correctMsg.outStream(),
+            correctMsg.writer(),
             .{ "INCRBYFLOAT", "mykey", 42.1337 },
         );
 

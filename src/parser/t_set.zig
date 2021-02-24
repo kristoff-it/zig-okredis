@@ -15,7 +15,7 @@ pub const SetParser = struct {
     pub fn isSupportedAlloc(comptime T: type) bool {
         // HashMap
         if (@typeInfo(T) == .Struct and @hasDecl(T, "Entry")) {
-            return void == std.meta.fieldInfo(T.Entry, "value").field_type;
+            return void == std.meta.fieldInfo(T.Entry, .value).field_type;
         }
 
         return switch (@typeInfo(T)) {
@@ -57,7 +57,7 @@ pub const SetParser = struct {
                 }
             }
 
-            const KeyType = std.meta.fieldInfo(T.Entry, "key").field_type;
+            const KeyType = std.meta.fieldInfo(T.Entry, .key).field_type;
 
             var foundNil = false;
             var foundErr = false;
@@ -125,14 +125,14 @@ test "set" {
     const parser = @import("../parser.zig").RESP3Parser;
     const allocator = std.heap.page_allocator;
 
-    const arr = try SetParser.parse([3]i32, parser, MakeSet().inStream());
+    const arr = try SetParser.parse([3]i32, parser, MakeSet().reader());
     testing.expectEqualSlices(i32, &[3]i32{ 1, 2, 3 }, &arr);
 
-    const sli = try SetParser.parseAlloc([]i64, parser, allocator, MakeSet().inStream());
+    const sli = try SetParser.parseAlloc([]i64, parser, allocator, MakeSet().reader());
     defer allocator.free(sli);
     testing.expectEqualSlices(i64, &[3]i64{ 1, 2, 3 }, sli);
 
-    var hmap = try SetParser.parseAlloc(std.AutoHashMap(i64, void), parser, allocator, MakeSet().inStream());
+    var hmap = try SetParser.parseAlloc(std.AutoHashMap(i64, void), parser, allocator, MakeSet().reader());
     defer hmap.deinit();
 
     if (hmap.remove(1)) |_| {} else unreachable;

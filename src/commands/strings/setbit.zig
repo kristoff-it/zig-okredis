@@ -45,11 +45,11 @@ test "serializer" {
         testMsg.reset();
 
         try serializer.serializeCommand(
-            testMsg.outStream(),
+            testMsg.writer(),
             SETBIT.init("mykey", 1, 99),
         );
         try serializer.serializeCommand(
-            correctMsg.outStream(),
+            correctMsg.writer(),
             .{ "SETBIT", "mykey", 1, 99 },
         );
 

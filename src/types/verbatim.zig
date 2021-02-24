@@ -98,7 +98,7 @@ test "verbatim" {
     const allocator = std.heap.page_allocator;
 
     {
-        const reply = try Verbatim.Redis.Parser.parseAlloc('+', parser, allocator, MakeSimpleString().inStream());
+        const reply = try Verbatim.Redis.Parser.parseAlloc('+', parser, allocator, MakeSimpleString().reader());
         testing.expectEqualSlices(u8, "Yayyyy I'm a string!", reply.string);
         switch (reply.format) {
             else => unreachable,
@@ -107,7 +107,7 @@ test "verbatim" {
     }
 
     {
-        const reply = try Verbatim.Redis.Parser.parseAlloc('$', parser, allocator, MakeBlobString().inStream());
+        const reply = try Verbatim.Redis.Parser.parseAlloc('$', parser, allocator, MakeBlobString().reader());
         testing.expectEqualSlices(u8, "Hello World!", reply.string);
         switch (reply.format) {
             else => unreachable,
@@ -116,7 +116,7 @@ test "verbatim" {
     }
 
     {
-        const reply = try Verbatim.Redis.Parser.parseAlloc('=', parser, allocator, MakeVerbatimString().inStream());
+        const reply = try Verbatim.Redis.Parser.parseAlloc('=', parser, allocator, MakeVerbatimString().reader());
         testing.expectEqualSlices(u8, "Oh hello there!", reply.string);
         switch (reply.format) {
             else => unreachable,
@@ -125,7 +125,7 @@ test "verbatim" {
     }
 
     {
-        const reply = try Verbatim.Redis.Parser.parseAlloc('=', parser, allocator, MakeBadVerbatimString().inStream());
+        const reply = try Verbatim.Redis.Parser.parseAlloc('=', parser, allocator, MakeBadVerbatimString().reader());
         testing.expectEqualSlices(u8, "t", reply.string);
         switch (reply.format) {
             else => unreachable,
@@ -134,7 +134,7 @@ test "verbatim" {
     }
 
     {
-        const reply = try Verbatim.Redis.Parser.parseAlloc('=', parser, allocator, MakeBadVerbatimString2().inStream());
+        const reply = try Verbatim.Redis.Parser.parseAlloc('=', parser, allocator, MakeBadVerbatimString2().reader());
         testing.expectEqualSlices(u8, "", reply.string);
         switch (reply.format) {
             else => unreachable,

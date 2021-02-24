@@ -79,11 +79,11 @@ test "serializer" {
 
         var cmd = BITPOS.init("test", .Zero, -3, null);
         try serializer.serializeCommand(
-            testMsg.outStream(),
+            testMsg.writer(),
             cmd,
         );
         try serializer.serializeCommand(
-            correctMsg.outStream(),
+            correctMsg.writer(),
             .{ "BITPOS", "test", "0", "-3" },
         );
 

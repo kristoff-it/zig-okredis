@@ -21,22 +21,22 @@ pub const BufferedClient = RedisClient(.{ .Fixed = 4096 }, .NoLogging);
 pub fn RedisClient(buffering: Buffering, logging: Logging) type {
     const ReadBuffer = switch (buffering) {
         .NoBuffering => void,
-        .Fixed => |b| std.io.BufferedReader(b, std.fs.File.Reader),
+        .Fixed => |b| std.io.BufferedReader(b, net.Stream.Reader),
     };
 
     const WriteBuffer = switch (buffering) {
         .NoBuffering => void,
-        .Fixed => |b| std.io.BufferedWriter(b, std.fs.File.Writer),
+        .Fixed => |b| std.io.BufferedWriter(b, net.Stream.Writer),
     };
 
     return struct {
-        conn: std.fs.File,
+        conn: net.Stream,
         reader: switch (buffering) {
-            .NoBuffering => std.fs.File.Reader,
+            .NoBuffering => net.Stream.Reader,
             .Fixed => |b| ReadBuffer.Reader,
         },
         writer: switch (buffering) {
-            .NoBuffering => std.fs.File.Writer,
+            .NoBuffering => net.Stream.Writer,
             .Fixed => |b| WriteBuffer.Writer,
         },
         readBuffer: ReadBuffer,
@@ -51,7 +51,7 @@ pub fn RedisClient(buffering: Buffering, logging: Logging) type {
         const Self = @This();
 
         /// Initializes a Client on a connection / pipe provided by the user.
-        pub fn init(self: *Self, conn: std.fs.File) !void {
+        pub fn init(self: *Self, conn: net.Stream) !void {
             self.conn = conn;
             switch (buffering) {
                 .NoBuffering => {
@@ -268,5 +268,5 @@ pub fn RedisClient(buffering: Buffering, logging: Logging) type {
 }
 
 test "docs" {
-    @import("std").meta.refAllDecls(Client);
+    @import("std").testing.refAllDecls(Client);
 }

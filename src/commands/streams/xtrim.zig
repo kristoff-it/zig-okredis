@@ -69,11 +69,11 @@ test "serializer" {
         testMsg.reset();
 
         try serializer.serializeCommand(
-            testMsg.outStream(),
+            testMsg.writer(),
             XTRIM.init("mykey", XTRIM.Strategy{ .MaxLen = .{ .count = 30 } }),
         );
         try serializer.serializeCommand(
-            correctMsg.outStream(),
+            correctMsg.writer(),
             .{ "XTRIM", "mykey", "MAXLEN", "~", 30 },
         );
 

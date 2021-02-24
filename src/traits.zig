@@ -22,23 +22,23 @@ pub fn isParserType(comptime T: type) bool {
     {
         if (!@hasDecl(T.Redis.Parser, "parse"))
             @compileError(
-            \\`Redis.Parser` trait requires implementing:
-            \\    fn parse(tag: u8, comptime rootParser: type, msg: var) !Self
-            \\
+                \\`Redis.Parser` trait requires implementing:
+                \\    fn parse(tag: u8, comptime rootParser: type, msg: var) !Self
+                \\
             );
 
         if (!@hasDecl(T.Redis.Parser, "parseAlloc"))
             @compileError(
-            \\`Redis.Parser` trait requires implementing:
-            \\    fn parseAlloc(tag: u8, comptime rootParser: type, allocator: *Allocator, msg: var) !Self
-            \\
+                \\`Redis.Parser` trait requires implementing:
+                \\    fn parseAlloc(tag: u8, comptime rootParser: type, allocator: *Allocator, msg: var) !Self
+                \\
             );
 
         if (!@hasDecl(T.Redis.Parser, "destroy"))
             @compileError(
-            \\`Redis.Parser` trait requires implementing:
-            \\    fn destroy(self: *Self, comptime rootParser: type, allocator: *Allocator) void
-            \\
+                \\`Redis.Parser` trait requires implementing:
+                \\    fn destroy(self: *Self, comptime rootParser: type, allocator: *Allocator) void
+                \\
             );
 
         return true;
@@ -101,5 +101,5 @@ pub fn isCommand(comptime T: type) bool {
 // }
 
 test "docs" {
-    @import("std").meta.refAllDecls(@This());
+    @import("std").testing.refAllDecls(@This());
 }

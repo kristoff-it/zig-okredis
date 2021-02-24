@@ -133,11 +133,11 @@ test "serializer" {
             testMsg.reset();
 
             try serializer.serializeCommand(
-                testMsg.outStream(),
+                testMsg.writer(),
                 HSET.init("k1", &[_]FV{.{ .field = "f1", .value = "v1" }}),
             );
             try serializer.serializeCommand(
-                correctMsg.outStream(),
+                correctMsg.writer(),
                 .{ "HSET", "k1", "f1", "v1" },
             );
 
@@ -158,14 +158,14 @@ test "serializer" {
             const MyHSET = HSET.forStruct(MyStruct);
 
             try serializer.serializeCommand(
-                testMsg.outStream(),
+                testMsg.writer(),
                 MyHSET.init(
                     "k1",
                     .{ .field1 = "nice!", .field2 = 'a', .field3 = 42 },
                 ),
             );
             try serializer.serializeCommand(
-                correctMsg.outStream(),
+                correctMsg.writer(),
                 .{ "HSET", "k1", "field1", "nice!", "field2", 'a', "field3", 42 },
             );
 
