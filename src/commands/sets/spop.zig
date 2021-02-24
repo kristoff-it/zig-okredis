@@ -72,11 +72,11 @@ test "serializer" {
             testMsg.reset();
 
             try serializer.serializeCommand(
-                testMsg.outStream(),
+                testMsg.writer(),
                 SPOP.init("s", .One),
             );
             try serializer.serializeCommand(
-                correctMsg.outStream(),
+                correctMsg.writer(),
                 .{ "SPOP", "s" },
             );
 
@@ -89,11 +89,11 @@ test "serializer" {
             testMsg.reset();
 
             try serializer.serializeCommand(
-                testMsg.outStream(),
+                testMsg.writer(),
                 SPOP.init("s", SPOP.Count{ .Count = 5 }),
             );
             try serializer.serializeCommand(
-                correctMsg.outStream(),
+                correctMsg.writer(),
                 .{ "SPOP", "s", 5 },
             );
 

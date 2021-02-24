@@ -38,11 +38,11 @@ test "serializer" {
         testMsg.reset();
 
         try serializer.serializeCommand(
-            testMsg.outStream(),
+            testMsg.writer(),
             SCARD.init("myset"),
         );
         try serializer.serializeCommand(
-            correctMsg.outStream(),
+            correctMsg.writer(),
             .{ "SCARD", "myset" },
         );
 

@@ -3,6 +3,7 @@ pub const strings = @import("./commands/strings.zig");
 pub const streams = @import("./commands/streams.zig");
 pub const hashes = @import("./commands/hashes.zig");
 pub const keys = @import("./commands/keys.zig");
+pub const sets = @import("./commands/sets.zig");
 pub const geo = @import("./commands/geo.zig");
 
 //! These are all command builders than can be used interchangeably with the main syntax:
@@ -22,6 +23,7 @@ test "commands" {
     _ = @import("./commands/streams.zig");
     _ = @import("./commands/hashes.zig");
     _ = @import("./commands/keys.zig");
+    _ = @import("./commands/sets.zig");
     _ = @import("./commands/geo.zig");
 }
 

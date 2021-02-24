@@ -100,11 +100,11 @@ test "serializer" {
             testMsg.reset();
 
             try serializer.serializeCommand(
-                testMsg.outStream(),
+                testMsg.writer(),
                 SSCAN.init("myset", "0", .NoPattern, .NoCount),
             );
             try serializer.serializeCommand(
-                correctMsg.outStream(),
+                correctMsg.writer(),
                 .{ "SSCAN", "myset", "0" },
             );
 
@@ -117,11 +117,11 @@ test "serializer" {
             testMsg.reset();
 
             try serializer.serializeCommand(
-                testMsg.outStream(),
+                testMsg.writer(),
                 SSCAN.init("myset", "0", SSCAN.Pattern{ .Pattern = "zig_*" }, SSCAN.Count{ .Count = 5 }),
             );
             try serializer.serializeCommand(
-                correctMsg.outStream(),
+                correctMsg.writer(),
                 .{ "SSCAN", "myset", 0, "MATCH", "zig_*", "COUNT", 5 },
             );
 

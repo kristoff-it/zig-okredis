@@ -45,11 +45,11 @@ test "serializer" {
             testMsg.reset();
 
             try serializer.serializeCommand(
-                testMsg.outStream(),
+                testMsg.writer(),
                 SDIFFSTORE.init("destination", &[_][]const u8{ "set1", "set2" }),
             );
             try serializer.serializeCommand(
-                correctMsg.outStream(),
+                correctMsg.writer(),
                 .{ "SDIFFSTORE", "destination", "set1", "set2" },
             );
 

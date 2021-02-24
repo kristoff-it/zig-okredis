@@ -56,11 +56,11 @@ test "serializer" {
             testMsg.reset();
 
             try serializer.serializeCommand(
-                testMsg.outStream(),
+                testMsg.writer(),
                 SMOVE.init("s", "d", "m"),
             );
             try serializer.serializeCommand(
-                correctMsg.outStream(),
+                correctMsg.writer(),
                 .{ "SMOVE", "s", "d", "m" },
             );
 

@@ -72,11 +72,11 @@ test "serializer" {
             testMsg.reset();
 
             try serializer.serializeCommand(
-                testMsg.outStream(),
+                testMsg.writer(),
                 SRANDMEMBER.init("s", .One),
             );
             try serializer.serializeCommand(
-                correctMsg.outStream(),
+                correctMsg.writer(),
                 .{ "SRANDMEMBER", "s" },
             );
 
@@ -89,11 +89,11 @@ test "serializer" {
             testMsg.reset();
 
             try serializer.serializeCommand(
-                testMsg.outStream(),
+                testMsg.writer(),
                 SRANDMEMBER.init("s", SRANDMEMBER.Count{ .Count = 5 }),
             );
             try serializer.serializeCommand(
-                correctMsg.outStream(),
+                correctMsg.writer(),
                 .{ "SRANDMEMBER", "s", 5 },
             );
 

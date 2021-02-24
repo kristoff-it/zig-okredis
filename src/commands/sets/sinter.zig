@@ -43,11 +43,11 @@ test "serializer" {
             testMsg.reset();
 
             try serializer.serializeCommand(
-                testMsg.outStream(),
+                testMsg.writer(),
                 SINTER.init(&[_][]const u8{ "set1", "set2" }),
             );
             try serializer.serializeCommand(
-                correctMsg.outStream(),
+                correctMsg.writer(),
                 .{ "SINTER", "set1", "set2" },
             );
 

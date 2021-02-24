@@ -45,11 +45,11 @@ test "serializer" {
             testMsg.reset();
 
             try serializer.serializeCommand(
-                testMsg.outStream(),
+                testMsg.writer(),
                 SUNIONSTORE.init("destination", &[_][]const u8{ "set1", "set2" }),
             );
             try serializer.serializeCommand(
-                correctMsg.outStream(),
+                correctMsg.writer(),
                 .{ "SUNIONSTORE", "destination", "set1", "set2" },
             );
 

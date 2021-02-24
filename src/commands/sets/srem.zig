@@ -45,11 +45,11 @@ test "serializer" {
             testMsg.reset();
 
             try serializer.serializeCommand(
-                testMsg.outStream(),
+                testMsg.writer(),
                 SREM.init("set1", &[_][]const u8{ "alice", "bob" }),
             );
             try serializer.serializeCommand(
-                correctMsg.outStream(),
+                correctMsg.writer(),
                 .{ "SREM", "set1", "alice", "bob" },
             );
 

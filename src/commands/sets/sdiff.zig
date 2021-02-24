@@ -43,11 +43,11 @@ test "serializer" {
             testMsg.reset();
 
             try serializer.serializeCommand(
-                testMsg.outStream(),
+                testMsg.writer(),
                 SDIFF.init(&[_][]const u8{ "set1", "set2" }),
             );
             try serializer.serializeCommand(
-                correctMsg.outStream(),
+                correctMsg.writer(),
                 .{ "SDIFF", "set1", "set2" },
             );
 
