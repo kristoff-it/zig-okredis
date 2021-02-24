@@ -19,7 +19,7 @@ const inf = math.inf;
 const nan = math.nan;
 const warn = std.debug.warn;
 
-inline fn toDigit(ch: u8) !u8 {
+fn toDigit(ch: u8) callconv(.Inline) !u8 {
     if (ch >= '0' and ch <= '9') return ch - '0';
     return error.InvalidCharacter;
 }

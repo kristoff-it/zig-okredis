@@ -326,13 +326,13 @@ test "parse simple errors" {
     }
 }
 const fakeParser = struct {
-    pub inline fn parse(comptime T: type, msg: anytype) !T {
+    pub fn parse(comptime T: type, msg: anytype) callconv(.Inline) !T {
         return error.Errror;
     }
-    pub inline fn parseFromTag(comptime T: type, tag: u8, msg: anytype) !T {
+    pub fn parseFromTag(comptime T: type, tag: u8, msg: anytype) callconv(.Inline) !T {
         return error.Errror;
     }
-    pub inline fn parseAllocFromTag(comptime T: type, tag: u8, allocator: *Allocator, msg: anytype) !T {
+    pub fn parseAllocFromTag(comptime T: type, tag: u8, allocator: *Allocator, msg: anytype) callconv(.Inline) !T {
         return error.Errror;
     }
 };

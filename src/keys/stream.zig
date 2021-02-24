@@ -31,10 +31,8 @@ test "usage" {
     last_hour = temperatures.xreadStruct(MyTemp, 30, .NoBlock, "123");
 }
 
-
 const StreamConsumer = struct {
-	keys: []const u8,
+    keys: []const u8,
 
-	pub fn ensure() void {}
-	pub fn 
+    pub fn ensure() void {}
 };
