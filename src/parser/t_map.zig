@@ -66,8 +66,8 @@ pub const MapParser = struct {
         // HASHMAP
         if (@hasField(@TypeOf(allocator), "ptr")) {
             if (@typeInfo(T) == .Struct and @hasDecl(T, "Entry")) {
-                const isManaged = @typeInfo(@TypeOf(T.deinit)).Fn.args.len == 1;
-                var hmap = T.init(allocator.ptr);
+                const isManaged = @hasField(T, "unmanaged");
+                var hmap = if (isManaged) T.init(allocator.ptr) else T{};
                 errdefer {
                     if (isManaged) {
                         hmap.deinit();
@@ -101,7 +101,7 @@ pub const MapParser = struct {
                     } else {
                         // Differently from the Lists case, here we can't `continue` immediately on fail
                         // because then we would lose count of how many tokens we consumed.
-                        var key = rootParser.parseAlloc(std.meta.fieldInfo(T.Entry, .key).field_type, allocator.ptr, msg) catch |err| switch (err) {
+                        var key = rootParser.parseAlloc(std.meta.fieldInfo(T.Entry, .key_ptr).field_type, allocator.ptr, msg) catch |err| switch (err) {
                             error.GotNilReply => blk: {
                                 foundNil = true;
                                 break :blk undefined;
@@ -112,7 +112,7 @@ pub const MapParser = struct {
                             },
                             else => return err,
                         };
-                        var val = rootParser.parseAlloc(std.meta.fieldInfo(T.Entry, .value).field_type, allocator.ptr, msg) catch |err| switch (err) {
+                        var val = rootParser.parseAlloc(std.meta.fieldInfo(T.Entry, .value_ptr).field_type, allocator.ptr, msg) catch |err| switch (err) {
                             error.GotNilReply => blk: {
                                 foundNil = true;
                                 break :blk undefined;
@@ -125,7 +125,7 @@ pub const MapParser = struct {
                         };
 
                         if (!foundErr and !foundNil) {
-                            (if (isManaged) hmap.put(key, val) else hmap.put(allocator.ptr, key, val)) catch |err| {
+                            (if (isManaged) hmap.put(key.*, val.*) else hmap.put(allocator.ptr, key.*, val.*)) catch |err| {
                                 hashMapError = true;
                                 continue;
                             };

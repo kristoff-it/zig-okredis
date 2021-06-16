@@ -99,7 +99,7 @@ test "verbatim" {
 
     {
         const reply = try Verbatim.Redis.Parser.parseAlloc('+', parser, allocator, MakeSimpleString().reader());
-        testing.expectEqualSlices(u8, "Yayyyy I'm a string!", reply.string);
+       try testing.expectEqualSlices(u8, "Yayyyy I'm a string!", reply.string);
         switch (reply.format) {
             else => unreachable,
             .Simple => {},
@@ -108,7 +108,7 @@ test "verbatim" {
 
     {
         const reply = try Verbatim.Redis.Parser.parseAlloc('$', parser, allocator, MakeBlobString().reader());
-        testing.expectEqualSlices(u8, "Hello World!", reply.string);
+       try testing.expectEqualSlices(u8, "Hello World!", reply.string);
         switch (reply.format) {
             else => unreachable,
             .Simple => {},
@@ -117,16 +117,16 @@ test "verbatim" {
 
     {
         const reply = try Verbatim.Redis.Parser.parseAlloc('=', parser, allocator, MakeVerbatimString().reader());
-        testing.expectEqualSlices(u8, "Oh hello there!", reply.string);
+       try testing.expectEqualSlices(u8, "Oh hello there!", reply.string);
         switch (reply.format) {
             else => unreachable,
-            .Verbatim => |format| testing.expectEqualSlices(u8, "txt", &format),
+            .Verbatim => |format|try testing.expectEqualSlices(u8, "txt", &format),
         }
     }
 
     {
         const reply = try Verbatim.Redis.Parser.parseAlloc('=', parser, allocator, MakeBadVerbatimString().reader());
-        testing.expectEqualSlices(u8, "t", reply.string);
+       try testing.expectEqualSlices(u8, "t", reply.string);
         switch (reply.format) {
             else => unreachable,
             .Err => {},
@@ -135,10 +135,10 @@ test "verbatim" {
 
     {
         const reply = try Verbatim.Redis.Parser.parseAlloc('=', parser, allocator, MakeBadVerbatimString2().reader());
-        testing.expectEqualSlices(u8, "", reply.string);
+       try testing.expectEqualSlices(u8, "", reply.string);
         switch (reply.format) {
             else => unreachable,
-            .Verbatim => |format| testing.expectEqualSlices(u8, "mkd", &format),
+            .Verbatim => |format|try testing.expectEqualSlices(u8, "mkd", &format),
         }
     }
 }

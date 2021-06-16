@@ -59,20 +59,20 @@ pub fn isNumericStreamID(id: []const u8) bool {
 }
 
 test "numeric stream ids" {
-    std.testing.expectEqual(false, isNumericStreamID(""));
-    std.testing.expectEqual(false, isNumericStreamID(" "));
-    std.testing.expectEqual(false, isNumericStreamID("-"));
-    std.testing.expectEqual(false, isNumericStreamID("-0"));
-    std.testing.expectEqual(false, isNumericStreamID("-1234"));
-    std.testing.expectEqual(false, isNumericStreamID("0-"));
-    std.testing.expectEqual(false, isNumericStreamID("123-"));
-    std.testing.expectEqual(true, isNumericStreamID("0"));
-    std.testing.expectEqual(true, isNumericStreamID("123"));
-    std.testing.expectEqual(true, isNumericStreamID("0-0"));
-    std.testing.expectEqual(true, isNumericStreamID("0-123"));
-    std.testing.expectEqual(true, isNumericStreamID("123123123-123123123"));
-    std.testing.expectEqual(true, isNumericStreamID("18446744073709551615-18446744073709551615"));
-    std.testing.expectEqual(false, isNumericStreamID("18446744073709551616-18446744073709551615"));
-    std.testing.expectEqual(false, isNumericStreamID("18446744073709551615-18446744073709551616"));
-    std.testing.expectEqual(false, isNumericStreamID("922337203685412312377580123123112317-922337212312312312312036854775808"));
+    try std.testing.expectEqual(false, isNumericStreamID(""));
+    try std.testing.expectEqual(false, isNumericStreamID(" "));
+    try std.testing.expectEqual(false, isNumericStreamID("-"));
+    try std.testing.expectEqual(false, isNumericStreamID("-0"));
+    try std.testing.expectEqual(false, isNumericStreamID("-1234"));
+    try std.testing.expectEqual(false, isNumericStreamID("0-"));
+    try std.testing.expectEqual(false, isNumericStreamID("123-"));
+    try std.testing.expectEqual(true, isNumericStreamID("0"));
+    try std.testing.expectEqual(true, isNumericStreamID("123"));
+    try std.testing.expectEqual(true, isNumericStreamID("0-0"));
+    try std.testing.expectEqual(true, isNumericStreamID("0-123"));
+    try std.testing.expectEqual(true, isNumericStreamID("123123123-123123123"));
+    try std.testing.expectEqual(true, isNumericStreamID("18446744073709551615-18446744073709551615"));
+    try std.testing.expectEqual(false, isNumericStreamID("18446744073709551616-18446744073709551615"));
+    try std.testing.expectEqual(false, isNumericStreamID("18446744073709551615-18446744073709551616"));
+    try std.testing.expectEqual(false, isNumericStreamID("922337203685412312377580123123112317-922337212312312312312036854775808"));
 }

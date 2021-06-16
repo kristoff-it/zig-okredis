@@ -96,55 +96,55 @@ test "dynamic replies" {
 
     {
         const reply = try DynamicReply.Redis.Parser.parseAlloc('+', parser, allocator, MakeSimpleString().reader());
-        testing.expectEqualSlices(u8, "Yayyyy I'm a string!", reply.data.String.string);
+       try testing.expectEqualSlices(u8, "Yayyyy I'm a string!", reply.data.String.string);
     }
 
     {
         const reply = try DynamicReply.Redis.Parser.parseAlloc('*', parser, allocator, MakeComplexList().reader());
-        testing.expectEqual(@as(usize, 0), reply.attribs.len);
+       try testing.expectEqual(@as(usize, 0), reply.attribs.len);
 
-        testing.expectEqualSlices(u8, "Hello", reply.data.List[0].data.String.string);
+       try testing.expectEqualSlices(u8, "Hello", reply.data.List[0].data.String.string);
 
-        testing.expectEqual(true, reply.data.List[1].data.Bool);
-        testing.expectEqual(@as(usize, 0), reply.data.List[1].attribs.len);
+       try testing.expectEqual(true, reply.data.List[1].data.Bool);
+       try testing.expectEqual(@as(usize, 0), reply.data.List[1].attribs.len);
 
-        testing.expectEqual(@as(usize, 0), reply.data.List[2].attribs.len);
+       try testing.expectEqual(@as(usize, 0), reply.data.List[2].attribs.len);
 
-        testing.expectEqual(@as(i64, 123), reply.data.List[2].data.List[0].data.Number);
-        testing.expectEqual(@as(usize, 0), reply.data.List[2].data.List[0].attribs.len);
+       try testing.expectEqual(@as(i64, 123), reply.data.List[2].data.List[0].data.Number);
+       try testing.expectEqual(@as(usize, 0), reply.data.List[2].data.List[0].attribs.len);
 
-        testing.expectEqual(@as(f64, 12.34), reply.data.List[2].data.List[1].data.Double);
-        testing.expectEqual(@as(usize, 0), reply.data.List[2].data.List[1].attribs.len);
+       try testing.expectEqual(@as(f64, 12.34), reply.data.List[2].data.List[1].data.Double);
+       try testing.expectEqual(@as(usize, 0), reply.data.List[2].data.List[1].attribs.len);
     }
 
     {
         const reply = try DynamicReply.Redis.Parser.parseAlloc('|', parser, allocator, MakeComplexListWithAttributes().reader());
-        testing.expectEqual(@as(usize, 2), reply.attribs.len);
-        testing.expectEqualSlices(u8, "Ciao", reply.attribs[0][0].data.String.string);
-        testing.expectEqualSlices(u8, "World", reply.attribs[0][1].data.String.string);
-        testing.expectEqualSlices(u8, "Peach", reply.attribs[1][0].data.String.string);
-        testing.expectEqual(@as(f64, 9.99), reply.attribs[1][1].data.Double);
+       try testing.expectEqual(@as(usize, 2), reply.attribs.len);
+       try testing.expectEqualSlices(u8, "Ciao", reply.attribs[0][0].data.String.string);
+       try testing.expectEqualSlices(u8, "World", reply.attribs[0][1].data.String.string);
+       try testing.expectEqualSlices(u8, "Peach", reply.attribs[1][0].data.String.string);
+       try testing.expectEqual(@as(f64, 9.99), reply.attribs[1][1].data.Double);
 
-        testing.expectEqualSlices(u8, "Hello", reply.data.List[0].data.String.string);
-        testing.expectEqual(@as(usize, 0), reply.data.List[0].attribs.len);
+       try testing.expectEqualSlices(u8, "Hello", reply.data.List[0].data.String.string);
+       try testing.expectEqual(@as(usize, 0), reply.data.List[0].attribs.len);
 
-        testing.expectEqual(true, reply.data.List[1].data.Bool);
-        testing.expectEqual(@as(usize, 1), reply.data.List[1].attribs.len);
-        testing.expectEqualSlices(u8, "ttl", reply.data.List[1].attribs[0][0].data.String.string);
-        testing.expectEqual(@as(i64, 100), reply.data.List[1].attribs[0][1].data.Number);
+       try testing.expectEqual(true, reply.data.List[1].data.Bool);
+       try testing.expectEqual(@as(usize, 1), reply.data.List[1].attribs.len);
+       try testing.expectEqualSlices(u8, "ttl", reply.data.List[1].attribs[0][0].data.String.string);
+       try testing.expectEqual(@as(i64, 100), reply.data.List[1].attribs[0][1].data.Number);
 
-        testing.expectEqual(@as(usize, 0), reply.data.List[2].attribs.len);
+       try testing.expectEqual(@as(usize, 0), reply.data.List[2].attribs.len);
 
-        testing.expectEqual(@as(i64, 123), reply.data.List[2].data.List[0].data.Number);
-        testing.expectEqual(@as(usize, 1), reply.data.List[2].data.List[0].attribs.len);
-        testing.expectEqualSlices(u8, "Banana", reply.data.List[2].data.List[0].attribs[0][0].data.String.string);
-        testing.expectEqual(true, reply.data.List[2].data.List[0].attribs[0][1].data.Bool);
+       try testing.expectEqual(@as(i64, 123), reply.data.List[2].data.List[0].data.Number);
+       try testing.expectEqual(@as(usize, 1), reply.data.List[2].data.List[0].attribs.len);
+       try testing.expectEqualSlices(u8, "Banana", reply.data.List[2].data.List[0].attribs[0][0].data.String.string);
+       try testing.expectEqual(true, reply.data.List[2].data.List[0].attribs[0][1].data.Bool);
 
-        testing.expectEqual(@as(i64, 424242), try reply.data.List[2].data.List[1].data.Bignum.to(i64));
-        testing.expectEqual(@as(usize, 0), reply.data.List[2].data.List[1].attribs.len);
+       try testing.expectEqual(@as(i64, 424242), try reply.data.List[2].data.List[1].data.Bignum.to(i64));
+       try testing.expectEqual(@as(usize, 0), reply.data.List[2].data.List[1].attribs.len);
 
-        testing.expectEqual(@as(f64, 12.34), reply.data.List[2].data.List[2].data.Double);
-        testing.expectEqual(@as(usize, 0), reply.data.List[2].data.List[2].attribs.len);
+       try testing.expectEqual(@as(f64, 12.34), reply.data.List[2].data.List[2].data.Double);
+       try testing.expectEqual(@as(usize, 0), reply.data.List[2].data.List[2].attribs.len);
     }
 }
 

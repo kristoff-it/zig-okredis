@@ -6,16 +6,16 @@ pub const keys = @import("./commands/keys.zig");
 pub const sets = @import("./commands/sets.zig");
 pub const geo = @import("./commands/geo.zig");
 
-//! These are all command builders than can be used interchangeably with the main syntax:
-//! ```
-//! try client.send(void, .{"SET", "key", 42});
-//! try client.send(void, SET.init("key", 42, .NoExpire, .NoConditions));
-//! ```
-//! Command builders offer more comptime safety through their `.init` functions and
-//! most of them also feature a `.validate()` method that performs semantic validation.
-//!
-//! The `.validate()` method can be run at comptime for command instances that don't
-//! depend on runtime data, ensuring correctness without impacting runtime performance.
+// These are all command builders than can be used interchangeably with the main syntax:
+// ```
+// try client.send(void, .{"SET", "key", 42});
+// try client.send(void, SET.init("key", 42, .NoExpire, .NoConditions));
+// ```
+// Command builders offer more comptime safety through their `.init` functions and
+// most of them also feature a `.validate()` method that performs semantic validation.
+//
+// The `.validate()` method can be run at comptime for command instances that don't
+// depend on runtime data, ensuring correctness without impacting runtime performance.
 
 test "commands" {
     _ = @import("./commands/hyperloglog.zig");
