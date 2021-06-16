@@ -77,6 +77,6 @@ test "serializer" {
             .{ "BITCOUNT", "mykey", 1, 10 },
         );
 
-        std.testing.expectEqualSlices(u8, correctMsg.getWritten(), testMsg.getWritten());
+        try std.testing.expectEqualSlices(u8, correctMsg.getWritten(), testMsg.getWritten());
     }
 }

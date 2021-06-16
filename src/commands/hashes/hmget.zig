@@ -116,7 +116,7 @@ test "serializer" {
             );
 
             // std.debug.warn("{}\n\n\n{}\n", .{ correctMsg.getWritten(), testMsg.getWritten() });
-            std.testing.expectEqualSlices(u8, correctMsg.getWritten(), testMsg.getWritten());
+            try std.testing.expectEqualSlices(u8, correctMsg.getWritten(), testMsg.getWritten());
         }
 
         {
@@ -140,7 +140,7 @@ test "serializer" {
                 .{ "HMGET", "k1", "field1", "field2", "field3" },
             );
 
-            std.testing.expectEqualSlices(u8, correctMsg.getWritten(), testMsg.getWritten());
+            try std.testing.expectEqualSlices(u8, correctMsg.getWritten(), testMsg.getWritten());
         }
     }
 }

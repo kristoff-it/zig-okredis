@@ -143,7 +143,7 @@ test "serializer" {
             );
 
             // std.debug.warn("{}\n\n\n{}\n", .{ correctMsg.getWritten(), testMsg.getWritten() });
-            std.testing.expectEqualSlices(u8, correctMsg.getWritten(), testMsg.getWritten());
+            try std.testing.expectEqualSlices(u8, correctMsg.getWritten(), testMsg.getWritten());
         }
 
         {
@@ -170,7 +170,7 @@ test "serializer" {
                 .{ "HSET", "k1", "field1", "nice!", "field2", 'a', "field3", 42 },
             );
 
-            std.testing.expectEqualSlices(u8, correctMsg.getWritten(), testMsg.getWritten());
+            try std.testing.expectEqualSlices(u8, correctMsg.getWritten(), testMsg.getWritten());
         }
     }
 }

@@ -41,14 +41,14 @@ test "bignum" {
     var bgn = try BigNumParser.parseAlloc(std.math.big.int.Managed, void, allocator, MakeBigNum().reader());
     defer bgn.deinit();
 
-    const bgnStr = try bgn.toString(allocator, 10, false);
+    const bgnStr = try bgn.toString(allocator, 10, .lower);
     defer allocator.free(bgnStr);
-    testing.expectEqualSlices(u8, "1234567899990000009999876543211234567890", bgnStr);
+    try testing.expectEqualSlices(u8, "1234567899990000009999876543211234567890", bgnStr);
 
     const str = try BigNumParser.parseAlloc([]u8, void, allocator, MakeBigNum().reader());
     defer allocator.free(str);
 
-    testing.expectEqualSlices(u8, bgnStr, str);
+    try testing.expectEqualSlices(u8, bgnStr, str);
 }
 
 fn MakeBigNum() std.io.FixedBufferStream([]const u8) {

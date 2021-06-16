@@ -66,6 +66,6 @@ test "serializer" {
             correctMsg.writer(),
             .{ "BITOP", "AND", "mykey", "key1", "key2" },
         );
-        std.testing.expectEqualSlices(u8, correctMsg.getWritten(), testMsg.getWritten());
+        try std.testing.expectEqualSlices(u8, correctMsg.getWritten(), testMsg.getWritten());
     }
 }

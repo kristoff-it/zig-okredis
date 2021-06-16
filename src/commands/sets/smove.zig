@@ -38,7 +38,7 @@ test "basic usage" {
     try cmd.validate();
 
     const cmd1 = SMOVE.init("source", "source", "element");
-    std.testing.expectError(error.SameSourceAndDestination, cmd1.validate());
+    try std.testing.expectError(error.SameSourceAndDestination, cmd1.validate());
 }
 
 test "serializer" {
@@ -65,7 +65,7 @@ test "serializer" {
             );
 
             // std.debug.warn("{}\n\n\n{}\n", .{ correctMsg.getWritten(), testMsg.getWritten() });
-            std.testing.expectEqualSlices(u8, correctMsg.getWritten(), testMsg.getWritten());
+            try std.testing.expectEqualSlices(u8, correctMsg.getWritten(), testMsg.getWritten());
         }
     }
 }

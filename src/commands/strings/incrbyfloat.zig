@@ -45,6 +45,6 @@ test "serializer" {
             .{ "INCRBYFLOAT", "mykey", 42.1337 },
         );
 
-        std.testing.expectEqualSlices(u8, correctMsg.getWritten(), testMsg.getWritten());
+        try std.testing.expectEqualSlices(u8, correctMsg.getWritten(), testMsg.getWritten());
     }
 }

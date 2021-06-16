@@ -65,28 +65,28 @@ test "WithAttribs" {
         allocator,
         MakeComplexListWithAttributes().reader(),
     );
-    testing.expectEqual(@as(usize, 2), res.attribs.len);
-    testing.expectEqualSlices(u8, "Ciao", res.attribs[0][0].data.String.string);
-    testing.expectEqualSlices(u8, "World", res.attribs[0][1].data.String.string);
-    testing.expectEqualSlices(u8, "Peach", res.attribs[1][0].data.String.string);
-    testing.expectEqual(@as(f64, 9.99), res.attribs[1][1].data.Double);
+   try testing.expectEqual(@as(usize, 2), res.attribs.len);
+   try testing.expectEqualSlices(u8, "Ciao", res.attribs[0][0].data.String.string);
+   try testing.expectEqualSlices(u8, "World", res.attribs[0][1].data.String.string);
+   try testing.expectEqualSlices(u8, "Peach", res.attribs[1][0].data.String.string);
+   try testing.expectEqual(@as(f64, 9.99), res.attribs[1][1].data.Double);
 
-    testing.expectEqual(@as(usize, 0), res.data[0].data[0].attribs.len);
-    testing.expectEqual(@as(i64, 20), res.data[0].data[0].data);
+   try testing.expectEqual(@as(usize, 0), res.data[0].data[0].attribs.len);
+   try testing.expectEqual(@as(i64, 20), res.data[0].data[0].data);
 
-    testing.expectEqual(@as(usize, 1), res.data[0].data[1].attribs.len);
-    testing.expectEqualSlices(u8, "ttl", res.data[0].data[1].attribs[0][0].data.String.string);
-    testing.expectEqual(@as(i64, 128), res.data[0].data[1].attribs[0][1].data.Number);
-    testing.expectEqual(@as(i64, 100), res.data[0].data[1].data);
+   try testing.expectEqual(@as(usize, 1), res.data[0].data[1].attribs.len);
+   try testing.expectEqualSlices(u8, "ttl", res.data[0].data[1].attribs[0][0].data.String.string);
+   try testing.expectEqual(@as(i64, 128), res.data[0].data[1].attribs[0][1].data.Number);
+   try testing.expectEqual(@as(i64, 100), res.data[0].data[1].data);
 
-    testing.expectEqual(@as(usize, 0), res.data[1].attribs.len);
-    testing.expectEqual(@as(usize, 1), res.data[1].data[0].attribs.len);
-    testing.expectEqualSlices(u8, "Banana", res.data[1].data[0].attribs[0][0].data.String.string);
-    testing.expectEqual(true, res.data[1].data[0].attribs[0][1].data.Bool);
-    testing.expectEqual(@as(i64, 123), res.data[1].data[0].data);
+   try testing.expectEqual(@as(usize, 0), res.data[1].attribs.len);
+   try testing.expectEqual(@as(usize, 1), res.data[1].data[0].attribs.len);
+   try testing.expectEqualSlices(u8, "Banana", res.data[1].data[0].attribs[0][0].data.String.string);
+   try testing.expectEqual(true, res.data[1].data[0].attribs[0][1].data.Bool);
+   try testing.expectEqual(@as(i64, 123), res.data[1].data[0].data);
 
-    testing.expectEqual(@as(usize, 0), res.data[1].data[1].attribs.len);
-    testing.expectEqual(@as(i64, 99), res.data[1].data[1].data);
+   try testing.expectEqual(@as(usize, 0), res.data[1].data[1].attribs.len);
+   try testing.expectEqual(@as(i64, 99), res.data[1].data[1].data);
 }
 //zig fmt: off
 fn MakeComplexListWithAttributes() std.io.FixedBufferStream([]const u8) {

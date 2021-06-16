@@ -135,7 +135,7 @@ test "serializer" {
                 .{ "SET", "mykey", "42" },
             );
 
-            std.testing.expectEqualSlices(u8, correctMsg.getWritten(), testMsg.getWritten());
+            try std.testing.expectEqualSlices(u8, correctMsg.getWritten(), testMsg.getWritten());
         }
 
         {
@@ -151,7 +151,7 @@ test "serializer" {
                 .{ "SET", "mykey", "banana", "NX" },
             );
 
-            std.testing.expectEqualSlices(u8, correctMsg.getWritten(), testMsg.getWritten());
+            try std.testing.expectEqualSlices(u8, correctMsg.getWritten(), testMsg.getWritten());
         }
 
         {
@@ -167,7 +167,7 @@ test "serializer" {
                 .{ "SET", "mykey", "banana", "EX", "20", "XX" },
             );
 
-            std.testing.expectEqualSlices(u8, correctMsg.getWritten(), testMsg.getWritten());
+            try std.testing.expectEqualSlices(u8, correctMsg.getWritten(), testMsg.getWritten());
         }
     }
 }

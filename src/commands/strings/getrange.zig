@@ -47,6 +47,6 @@ test "serializer" {
             .{ "GETRANGE", "mykey", 1, 99 },
         );
 
-        std.testing.expectEqualSlices(u8, correctMsg.getWritten(), testMsg.getWritten());
+        try std.testing.expectEqualSlices(u8, correctMsg.getWritten(), testMsg.getWritten());
     }
 }

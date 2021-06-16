@@ -46,6 +46,6 @@ test "serializer" {
             .{ "SCARD", "myset" },
         );
 
-        std.testing.expectEqualSlices(u8, correctMsg.getWritten(), testMsg.getWritten());
+        try std.testing.expectEqualSlices(u8, correctMsg.getWritten(), testMsg.getWritten());
     }
 }

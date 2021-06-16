@@ -1,13 +1,12 @@
 const std = @import("std");
 const builtin = @import("builtin");
-const Mode = builtin.Mode;
 const Builder = std.build.Builder;
 
 pub fn build(b: *Builder) void {
     const mode = b.standardReleaseOptions();
 
     const tests = b.addTest("src/okredis.zig");
-    tests.setBuildMode(Mode.Debug);
+    tests.setBuildMode(mode);
     tests.setNamePrefix("debug test");
 
     const test_step = b.step("test", "Run all tests in debug mode.");
