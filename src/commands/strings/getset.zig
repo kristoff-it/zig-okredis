@@ -31,5 +31,5 @@ pub const GETSET = struct {
 };
 
 test "example" {
-    const cmd = GETSET.init("lol", "banana");
+    _ = GETSET.init("lol", "banana");
 }

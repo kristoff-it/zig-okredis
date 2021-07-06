@@ -71,7 +71,7 @@ pub const BlobStringParser = struct {
         };
     }
 
-    pub fn parseAlloc(comptime T: type, comptime rootParser: type, allocator: *std.mem.Allocator, msg: anytype) !T {
+    pub fn parseAlloc(comptime T: type, comptime _: type, allocator: *std.mem.Allocator, msg: anytype) !T {
         // @compileLog(@typeInfo(T));
         // std.debug.print("\n\nTYPE={}\n\n", .{@typeInfo(T)});
         switch (@typeInfo(T)) {
@@ -122,16 +122,16 @@ pub const BlobStringParser = struct {
 
 test "string" {
     {
-       try testing.expect(1337 == try BlobStringParser.parse(u32, struct {}, MakeInt().reader()));
-       try testing.expectError(error.InvalidCharacter, BlobStringParser.parse(u32, struct {}, MakeString().reader()));
-       try testing.expect(1337.0 == try BlobStringParser.parse(f32, struct {}, MakeInt().reader()));
-       try testing.expect(12.34 == try BlobStringParser.parse(f64, struct {}, MakeFloat().reader()));
+        try testing.expect(1337 == try BlobStringParser.parse(u32, struct {}, MakeInt().reader()));
+        try testing.expectError(error.InvalidCharacter, BlobStringParser.parse(u32, struct {}, MakeString().reader()));
+        try testing.expect(1337.0 == try BlobStringParser.parse(f32, struct {}, MakeInt().reader()));
+        try testing.expect(12.34 == try BlobStringParser.parse(f64, struct {}, MakeFloat().reader()));
 
-       try testing.expectEqualSlices(u8, "Hello World!", &try BlobStringParser.parse([12]u8, struct {}, MakeString().reader()));
+        try testing.expectEqualSlices(u8, "Hello World!", &try BlobStringParser.parse([12]u8, struct {}, MakeString().reader()));
 
         const res = try BlobStringParser.parse([2][4]u8, struct {}, MakeEmoji2().reader());
-       try testing.expectEqualSlices(u8, "😈", &res[0]);
-       try testing.expectEqualSlices(u8, "👿", &res[1]);
+        try testing.expectEqualSlices(u8, "😈", &res[0]);
+        try testing.expectEqualSlices(u8, "👿", &res[1]);
     }
 
     {
@@ -139,28 +139,28 @@ test "string" {
         {
             const s = try BlobStringParser.parseAlloc([]u8, struct {}, allocator, MakeString().reader());
             defer allocator.free(s);
-           try testing.expectEqualSlices(u8, s, "Hello World!");
+            try testing.expectEqualSlices(u8, s, "Hello World!");
         }
         {
             const s = try BlobStringParser.parseAlloc([*c]u8, struct {}, allocator, MakeString().reader());
             defer allocator.free(s[0..12]);
-           try testing.expectEqualSlices(u8, s[0..13], "Hello World!\x00");
+            try testing.expectEqualSlices(u8, s[0..13], "Hello World!\x00");
         }
         {
             const s = try BlobStringParser.parseAlloc([][4]u8, struct {}, allocator, MakeEmoji2().reader());
             defer allocator.free(s);
-           try testing.expectEqualSlices(u8, "😈", &s[0]);
-           try testing.expectEqualSlices(u8, "👿", &s[1]);
+            try testing.expectEqualSlices(u8, "😈", &s[0]);
+            try testing.expectEqualSlices(u8, "👿", &s[1]);
         }
         {
             const s = try BlobStringParser.parseAlloc([*c][4]u8, struct {}, allocator, MakeEmoji2().reader());
             defer allocator.free(s[0..3]);
-           try testing.expectEqualSlices(u8, "😈", &s[0]);
-           try testing.expectEqualSlices(u8, "👿", &s[1]);
-           try testing.expectEqualSlices(u8, &[4]u8{ 0, 0, 0, 0 }, &s[3]);
+            try testing.expectEqualSlices(u8, "😈", &s[0]);
+            try testing.expectEqualSlices(u8, "👿", &s[1]);
+            try testing.expectEqualSlices(u8, &[4]u8{ 0, 0, 0, 0 }, &s[3]);
         }
         {
-           try testing.expectError(error.LengthMismatch, BlobStringParser.parseAlloc([][5]u8, struct {}, allocator, MakeString().reader()));
+            try testing.expectError(error.LengthMismatch, BlobStringParser.parseAlloc([][5]u8, struct {}, allocator, MakeString().reader()));
         }
     }
 }

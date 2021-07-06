@@ -10,7 +10,7 @@ pub const PFADD = struct {
     }
 
     /// Validates if the command is syntactically correct.
-    pub fn validate(self: PFADD) !void {}
+    pub fn validate(_: PFADD) !void {}
 
     pub const RedisCommand = struct {
         pub fn serialize(self: PFADD, comptime rootSerializer: type, msg: anytype) !void {

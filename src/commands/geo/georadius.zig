@@ -52,7 +52,7 @@ pub const GEORADIUS = struct {
         };
     }
 
-    pub fn validate(self: GEORADIUS) !void {}
+    pub fn validate(_: GEORADIUS) !void {}
 
     pub const RedisCommand = struct {
         pub fn serialize(self: GEORADIUS, comptime rootSerializer: type, msg: anytype) !void {

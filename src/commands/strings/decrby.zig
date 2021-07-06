@@ -20,5 +20,5 @@ pub const DECRBY = struct {
 };
 
 test "basic usage" {
-    const cmd = DECRBY.init("lol", 42);
+    _ = DECRBY.init("lol", 42);
 }

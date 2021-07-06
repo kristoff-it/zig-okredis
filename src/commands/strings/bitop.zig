@@ -41,7 +41,7 @@ pub const BITOP = struct {
 };
 
 test "basic usage" {
-    const cmd = BITOP.init(.AND, "result", &[_][]const u8{ "key1", "key2" });
+    _ = BITOP.init(.AND, "result", &[_][]const u8{ "key1", "key2" });
 }
 
 test "serializer" {

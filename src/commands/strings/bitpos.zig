@@ -60,7 +60,7 @@ const Bounds = struct {
 };
 
 test "basic usage" {
-    const cmd = BITPOS.init("test", .Zero, -3, null);
+    _ = BITPOS.init("test", .Zero, -3, null);
 }
 
 test "serializer" {

@@ -97,8 +97,8 @@ pub const SET = struct {
             pub fn serialize(self: Conditions, comptime rootSerializer: type, msg: anytype) !void {
                 switch (self) {
                     .NoConditions => {},
-                    .IfNotExisting => |s| try rootSerializer.serializeArgument(msg, []const u8, "NX"),
-                    .IfAlreadyExisting => |m| try rootSerializer.serializeArgument(msg, []const u8, "XX"),
+                    .IfNotExisting => try rootSerializer.serializeArgument(msg, []const u8, "NX"),
+                    .IfAlreadyExisting => try rootSerializer.serializeArgument(msg, []const u8, "XX"),
                 }
             }
         };

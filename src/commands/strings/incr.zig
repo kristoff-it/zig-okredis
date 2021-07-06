@@ -19,7 +19,7 @@ pub const INCR = struct {
 };
 
 test "example" {
-    const cmd = INCR.init("lol");
+    _ = INCR.init("lol");
 }
 
 test "serializer" {

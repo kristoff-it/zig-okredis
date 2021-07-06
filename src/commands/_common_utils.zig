@@ -3,7 +3,7 @@ pub const FV = struct {
     value: []const u8,
 
     pub const RedisArguments = struct {
-        pub fn count(self: FV) usize {
+        pub fn count(_: FV) usize {
             return 2;
         }
 
@@ -32,7 +32,7 @@ pub const Value = union(enum) {
     }
 
     pub const RedisArguments = struct {
-        pub fn count(self: Value) usize {
+        pub fn count(_: Value) usize {
             return 1;
         }
 

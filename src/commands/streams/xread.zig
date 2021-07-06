@@ -91,7 +91,7 @@ pub const XREAD = struct {
             pub fn serialize(self: Block, comptime rootSerializer: type, msg: anytype) !void {
                 switch (self) {
                     .NoBlock => {},
-                    .Forever => |m| {
+                    .Forever => {
                         try rootSerializer.serializeArgument(msg, []const u8, "BLOCK");
                         try rootSerializer.serializeArgument(msg, u64, 0);
                     },

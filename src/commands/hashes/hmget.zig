@@ -1,7 +1,6 @@
 // HMGET key field [field ...]
 
 const std = @import("std");
-const common = @import("../utils/common.zig");
 const FV = common.FV;
 
 pub const HMGET = struct {
@@ -66,11 +65,11 @@ fn _forStruct(comptime T: type) type {
 
         // We are marking ouserlves also as an argument to manage struct serialization.
         pub const RedisArguments = struct {
-            pub fn count(self: Self) usize {
+            pub fn count(_: Self) usize {
                 return comptime std.meta.fields(T).len;
             }
 
-            pub fn serialize(self: Self, comptime rootSerializer: type, msg: anytype) !void {
+            pub fn serialize(_: Self, comptime rootSerializer: type, msg: anytype) !void {
                 inline for (std.meta.fields(T)) |field| {
                     try rootSerializer.serializeArgument(msg, []const u8, field.name);
                 }

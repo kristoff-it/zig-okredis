@@ -20,7 +20,7 @@ pub const GETBIT = struct {
 };
 
 test "basic usage" {
-    const cmd = GETBIT.init("lol", 100);
+    _ = GETBIT.init("lol", 100);
 }
 
 test "serializer" {

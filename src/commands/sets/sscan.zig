@@ -62,7 +62,7 @@ pub const SSCAN = struct {
     }
 
     /// Validates if the command is syntactically correct.
-    pub fn validate(self: SSCAN) !void {}
+    pub fn validate(_: SSCAN) !void {}
 
     pub const RedisCommand = struct {
         pub fn serialize(self: SSCAN, comptime rootSerializer: type, msg: anytype) !void {

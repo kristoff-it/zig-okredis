@@ -10,7 +10,7 @@ pub const PFMERGE = struct {
     }
 
     /// Validates if the command is syntactically correct.
-    pub fn validate(self: PFMERGE) !void {}
+    pub fn validate(_: PFMERGE) !void {}
 
     pub const RedisCommand = struct {
         pub fn serialize(self: PFMERGE, comptime rootSerializer: type, msg: anytype) !void {

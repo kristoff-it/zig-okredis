@@ -36,7 +36,7 @@ pub const SPOP = struct {
     }
 
     /// Validates if the command is syntactically correct.
-    pub fn validate(self: SPOP) !void {}
+    pub fn validate(_: SPOP) !void {}
 
     pub const RedisCommand = struct {
         pub fn serialize(self: SPOP, comptime rootSerializer: type, msg: anytype) !void {

@@ -85,7 +85,7 @@ pub const SetParser = struct {
                     };
 
                     // If we got here then no error occurred and we can add the key.
-                    (if (isManaged) hmap.put(key.*, {}) else hmap.put(allocator.ptr, key.*, {})) catch |err| {
+                    (if (isManaged) hmap.put(key.*, {}) else hmap.put(allocator.ptr, key.*, {})) catch {
                         hashMapError = true;
                         continue;
                     };

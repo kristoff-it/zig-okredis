@@ -13,7 +13,7 @@ pub const SISMEMBER = struct {
     }
 
     /// Validates if the command is syntactically correct.
-    pub fn validate(self: SISMEMBER) !void {}
+    pub fn validate(_: SISMEMBER) !void {}
 
     pub const RedisCommand = struct {
         pub fn serialize(self: SISMEMBER, comptime rootSerializer: type, msg: anytype) !void {

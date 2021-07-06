@@ -9,7 +9,7 @@ pub const HINCRBY = struct {
         return .{ .key = key, .field = field, .increment = increment };
     }
 
-    pub fn validate(self: HINCRBY) !void {}
+    pub fn validate(_: HINCRBY) !void {}
 
     pub const RedisCommand = struct {
         pub fn serialize(self: HINCRBY, comptime rootSerializer: type, msg: anytype) !void {
@@ -24,7 +24,7 @@ pub const HINCRBY = struct {
 };
 
 test "basic usage" {
-    const cmd = HINCRBY.init("hashname", "fieldname", 42);
+    _ = HINCRBY.init("hashname", "fieldname", 42);
 }
 
 test "serializer" {

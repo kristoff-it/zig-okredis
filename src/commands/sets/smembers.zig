@@ -12,7 +12,7 @@ pub const SMEMBERS = struct {
     }
 
     /// Validates if the command is syntactically correct.
-    pub fn validate(self: SMEMBERS) !void {}
+    pub fn validate(_: SMEMBERS) !void {}
 
     pub const RedisCommand = struct {
         pub fn serialize(self: SMEMBERS, comptime rootSerializer: type, msg: anytype) !void {

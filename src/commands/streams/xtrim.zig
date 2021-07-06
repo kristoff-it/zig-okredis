@@ -51,7 +51,7 @@ pub const XTRIM = struct {
 };
 
 test "basic usage" {
-    const cmd = XTRIM.init("mykey", XTRIM.Strategy{ .MaxLen = .{ .count = 10 } });
+    _ = XTRIM.init("mykey", XTRIM.Strategy{ .MaxLen = .{ .count = 10 } });
 }
 
 test "serializer" {

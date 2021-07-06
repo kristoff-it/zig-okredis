@@ -260,7 +260,7 @@ pub const RESP3Parser = struct {
                     allocator.destroy(val);
                 },
             },
-            .Union => |unn| if (comptime traits.isParserType(T)) {
+            .Union => if (comptime traits.isParserType(T)) {
                 T.Redis.Parser.destroy(val, rootParser, allocator);
             } else {
                 @compileError("sendAlloc cannot return Unions or Enums that don't implement " ++
@@ -303,7 +303,6 @@ test "parser" {
 }
 
 test "evil indirection" {
-    const WithAttribs = @import("./types/attributes.zig").WithAttribs;
     const allocator = std.heap.page_allocator;
 
     {
@@ -311,7 +310,7 @@ test "evil indirection" {
         defer RESP3Parser.freeReply(yes, allocator);
 
         if (yes) |v| {
-           try testing.expectEqual(@as(f32, 123.45), v.*.*.?.*);
+            try testing.expectEqual(@as(f32, 123.45), v.*.*.?.*);
         } else {
             unreachable;
         }
@@ -319,10 +318,11 @@ test "evil indirection" {
 
     {
         const no = try RESP3Parser.parseAlloc(?***f32, allocator, MakeEvilNil().reader());
-        if (no) |v| unreachable;
+        if (no) |_| unreachable;
     }
 
     {
+        // const WithAttribs = @import("./types/attributes.zig").WithAttribs;
         // const OrErr = @import("./types/error.zig").OrErr;
         // const yes = try RESP3Parser.parseAlloc(***WithAttribs(?***f32), allocator, &MakeEvilFloat().stream);
         // defer RESP3Parser.freeReply(yes, allocator);
@@ -336,7 +336,7 @@ test "evil indirection" {
     }
 }
 
-//zig fmt: off
+// zig fmt: off
 fn MakeEvilFloat() std.io.FixedBufferStream([]const u8) {
     return std.io.fixedBufferStream(
         ("|2\r\n" ++
@@ -358,7 +358,7 @@ fn MakeEvilNil() std.io.FixedBufferStream([]const u8) {
         "_\r\n")
     [0..]);
 }
-//zig fmt: on
+// zig fmt: on
 
 test "float" {
 
@@ -366,7 +366,7 @@ test "float" {
     {
         var input = std.io.fixedBufferStream(",120.23\r\n"[0..]);
         const p1 = RESP3Parser.parse(f32, input.reader()) catch unreachable;
-       try testing.expect(p1 == 120.23);
+        try testing.expect(p1 == 120.23);
     }
 
     //Alloc
@@ -375,12 +375,12 @@ test "float" {
         {
             const f = try RESP3Parser.parseAlloc(*f32, allocator, Make1Float().reader());
             defer allocator.destroy(f);
-           try testing.expect(f.* == 120.23);
+            try testing.expect(f.* == 120.23);
         }
         {
             const f = try RESP3Parser.parseAlloc([]f32, allocator, Make2Float().reader());
             defer allocator.free(f);
-           try testing.expectEqualSlices(f32, &[_]f32{ 1.1, 2.2 }, f);
+            try testing.expectEqualSlices(f32, &[_]f32{ 1.1, 2.2 }, f);
         }
     }
 }
@@ -397,34 +397,34 @@ test "optional" {
     const maybeInt: ?i64 = null;
     const maybeBool: ?bool = null;
     const maybeArr: ?[4]bool = null;
-   try testing.expectEqual(maybeInt, try RESP3Parser.parse(?i64, MakeNull().reader()));
-   try testing.expectEqual(maybeBool, try RESP3Parser.parse(?bool, MakeNull().reader()));
-   try testing.expectEqual(maybeArr, try RESP3Parser.parse(?[4]bool, MakeNull().reader()));
+    try testing.expectEqual(maybeInt, try RESP3Parser.parse(?i64, MakeNull().reader()));
+    try testing.expectEqual(maybeBool, try RESP3Parser.parse(?bool, MakeNull().reader()));
+    try testing.expectEqual(maybeArr, try RESP3Parser.parse(?[4]bool, MakeNull().reader()));
 }
 fn MakeNull() std.io.FixedBufferStream([]const u8) {
     return std.io.fixedBufferStream("_\r\n"[0..]);
 }
 
 test "array" {
-   try testing.expectError(error.LengthMismatch, RESP3Parser.parse([5]i64, MakeArray().reader()));
+    try testing.expectError(error.LengthMismatch, RESP3Parser.parse([5]i64, MakeArray().reader()));
     //try testing.expectError(error.LengthMismatch, RESP3Parser.parse([0]i64, MakeArray().reader()));
-   try testing.expectError(error.UnsupportedConversion, RESP3Parser.parse([2]i64, MakeArray().reader()));
-   try testing.expectEqual([2]f32{ 1.2, 3.4 }, try RESP3Parser.parse([2]f32, MakeArray().reader()));
+    try testing.expectError(error.UnsupportedConversion, RESP3Parser.parse([2]i64, MakeArray().reader()));
+    try testing.expectEqual([2]f32{ 1.2, 3.4 }, try RESP3Parser.parse([2]f32, MakeArray().reader()));
 }
 fn MakeArray() std.io.FixedBufferStream([]const u8) {
     return std.io.fixedBufferStream("*2\r\n,1.2\r\n,3.4\r\n"[0..]);
 }
 
 test "string" {
-   try testing.expectError(error.LengthMismatch, RESP3Parser.parse([5]u8, MakeString().reader()));
-   try testing.expectError(error.LengthMismatch, RESP3Parser.parse([2]u16, MakeString().reader()));
-   try testing.expectEqualSlices(u8, "Hello World!", &try RESP3Parser.parse([12]u8, MakeSimpleString().reader()));
-   try testing.expectError(error.LengthMismatch, RESP3Parser.parse([11]u8, MakeSimpleString().reader()));
-   try testing.expectError(error.LengthMismatch, RESP3Parser.parse([13]u8, MakeSimpleString().reader()));
+    try testing.expectError(error.LengthMismatch, RESP3Parser.parse([5]u8, MakeString().reader()));
+    try testing.expectError(error.LengthMismatch, RESP3Parser.parse([2]u16, MakeString().reader()));
+    try testing.expectEqualSlices(u8, "Hello World!", &try RESP3Parser.parse([12]u8, MakeSimpleString().reader()));
+    try testing.expectError(error.LengthMismatch, RESP3Parser.parse([11]u8, MakeSimpleString().reader()));
+    try testing.expectError(error.LengthMismatch, RESP3Parser.parse([13]u8, MakeSimpleString().reader()));
 
     const allocator = std.heap.page_allocator;
-   try testing.expectEqualSlices(u8, "Banana", try RESP3Parser.parseAlloc([]u8, allocator, MakeString().reader()));
-   try testing.expectEqualSlices(u8, "Hello World!", try RESP3Parser.parseAlloc([]u8, allocator, MakeSimpleString().reader()));
+    try testing.expectEqualSlices(u8, "Banana", try RESP3Parser.parseAlloc([]u8, allocator, MakeString().reader()));
+    try testing.expectEqualSlices(u8, "Hello World!", try RESP3Parser.parseAlloc([]u8, allocator, MakeSimpleString().reader()));
 }
 fn MakeString() std.io.FixedBufferStream([]const u8) {
     return std.io.fixedBufferStream("$6\r\nBanana\r\n"[0..]);
@@ -442,17 +442,17 @@ test "map2struct" {
     };
 
     const res = try RESP3Parser.parse(MyStruct, MakeMap().reader());
-   try testing.expect(res.first == 12.34);
-   try testing.expect(res.second == true);
-   try testing.expectEqualSlices(u8, "Hello World", res.third.toSlice());
+    try testing.expect(res.first == 12.34);
+    try testing.expect(res.second == true);
+    try testing.expectEqualSlices(u8, "Hello World", res.third.toSlice());
 }
 test "hashmap" {
     const allocator = std.heap.page_allocator;
     const FloatDict = std.StringHashMap(f64);
     const res = try RESP3Parser.parseAlloc(FloatDict, allocator, MakeFloatMap().reader());
-   try testing.expect(12.34 == res.get("aaa").?);
-   try testing.expect(56.78 == res.get("bbb").?);
-   try testing.expect(99.99 == res.get("ccc").?);
+    try testing.expect(12.34 == res.get("aaa").?);
+    try testing.expect(56.78 == res.get("bbb").?);
+    try testing.expect(99.99 == res.get("ccc").?);
 }
 fn MakeFloatMap() std.io.FixedBufferStream([]const u8) {
     return std.io.fixedBufferStream("%3\r\n$3\r\naaa\r\n,12.34\r\n$3\r\nbbb\r\n,56.78\r\n$3\r\nccc\r\n,99.99\r\n"[0..]);
@@ -466,57 +466,57 @@ test "consume right amount" {
 
     {
         var msg_err = std.io.fixedBufferStream("-ERR banana\r\n"[0..]);
-       try testing.expectError(error.GotErrorReply, RESP3Parser.parse(void, msg_err.reader()));
-       try testing.expectError(error.EndOfStream, (msg_err.reader()).readByte());
+        try testing.expectError(error.GotErrorReply, RESP3Parser.parse(void, msg_err.reader()));
+        try testing.expectError(error.EndOfStream, (msg_err.reader()).readByte());
 
         msg_err.pos = 0;
-       try testing.expectError(error.GotErrorReply, RESP3Parser.parse(i64, msg_err.reader()));
-       try testing.expectError(error.EndOfStream, (msg_err.reader()).readByte());
+        try testing.expectError(error.GotErrorReply, RESP3Parser.parse(i64, msg_err.reader()));
+        try testing.expectError(error.EndOfStream, (msg_err.reader()).readByte());
 
         msg_err.pos = 0;
-       try testing.expectError(error.GotErrorReply, RESP3Parser.parse(FixBuf(100), msg_err.reader()));
-       try testing.expectError(error.EndOfStream, (msg_err.reader()).readByte());
+        try testing.expectError(error.GotErrorReply, RESP3Parser.parse(FixBuf(100), msg_err.reader()));
+        try testing.expectError(error.EndOfStream, (msg_err.reader()).readByte());
     }
 
     {
         var msg_err = std.io.fixedBufferStream("!10\r\nERR banana\r\n"[0..]);
-       try testing.expectError(error.GotErrorReply, RESP3Parser.parse(void, msg_err.reader()));
-       try testing.expectError(error.EndOfStream, (msg_err.reader()).readByte());
+        try testing.expectError(error.GotErrorReply, RESP3Parser.parse(void, msg_err.reader()));
+        try testing.expectError(error.EndOfStream, (msg_err.reader()).readByte());
 
         msg_err.pos = 0;
-       try testing.expectError(error.GotErrorReply, RESP3Parser.parse(u64, msg_err.reader()));
-       try testing.expectError(error.EndOfStream, (msg_err.reader()).readByte());
+        try testing.expectError(error.GotErrorReply, RESP3Parser.parse(u64, msg_err.reader()));
+        try testing.expectError(error.EndOfStream, (msg_err.reader()).readByte());
 
         msg_err.pos = 0;
-       try testing.expectError(error.GotErrorReply, RESP3Parser.parse([10]u8, msg_err.reader()));
-       try testing.expectError(error.EndOfStream, (msg_err.reader()).readByte());
+        try testing.expectError(error.GotErrorReply, RESP3Parser.parse([10]u8, msg_err.reader()));
+        try testing.expectError(error.EndOfStream, (msg_err.reader()).readByte());
     }
 
     {
         var msg_err = std.io.fixedBufferStream("*2\r\n:123\r\n!10\r\nERR banana\r\n"[0..]);
-       try testing.expectError(error.GotErrorReply, RESP3Parser.parse([2]u64, msg_err.reader()));
-       try testing.expectError(error.EndOfStream, (msg_err.reader()).readByte());
+        try testing.expectError(error.GotErrorReply, RESP3Parser.parse([2]u64, msg_err.reader()));
+        try testing.expectError(error.EndOfStream, (msg_err.reader()).readByte());
 
         const MyStruct = struct {
             a: u8,
             b: u8,
         };
         msg_err.pos = 0;
-       try testing.expectError(error.GotErrorReply, RESP3Parser.parse(MyStruct, msg_err.reader()));
-       try testing.expectError(error.EndOfStream, (msg_err.reader()).readByte());
+        try testing.expectError(error.GotErrorReply, RESP3Parser.parse(MyStruct, msg_err.reader()));
+        try testing.expectError(error.EndOfStream, (msg_err.reader()).readByte());
     }
 
     {
         var msg_err = std.io.fixedBufferStream("*2\r\n:123\r\n!10\r\nERR banana\r\n"[0..]);
-       try testing.expectError(error.GotErrorReply, RESP3Parser.parse([2]u64, msg_err.reader()));
-       try testing.expectError(error.EndOfStream, (msg_err.reader()).readByte());
+        try testing.expectError(error.GotErrorReply, RESP3Parser.parse([2]u64, msg_err.reader()));
+        try testing.expectError(error.EndOfStream, (msg_err.reader()).readByte());
 
         const MyStruct = struct {
             a: u8,
             b: u8,
         };
         msg_err.pos = 0;
-       try testing.expectError(error.GotErrorReply, RESP3Parser.parse(MyStruct, msg_err.reader()));
-       try testing.expectError(error.EndOfStream, (msg_err.reader()).readByte());
+        try testing.expectError(error.GotErrorReply, RESP3Parser.parse(MyStruct, msg_err.reader()));
+        try testing.expectError(error.EndOfStream, (msg_err.reader()).readByte());
     }
 }

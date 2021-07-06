@@ -51,7 +51,7 @@ pub const BITCOUNT = struct {
 };
 
 test "example" {
-    const cmd = BITCOUNT.init("test", BITCOUNT.Bounds{ .Slice = .{ .start = -2, .end = -1 } });
+    _ = BITCOUNT.init("test", BITCOUNT.Bounds{ .Slice = .{ .start = -2, .end = -1 } });
 }
 
 test "serializer" {

@@ -12,7 +12,7 @@ pub const GEODIST = struct {
         return .{ .key = key, .member1 = member1, .member2 = member2, .unit = unit };
     }
 
-    pub fn validate(self: GEODIST) !void {}
+    pub fn validate(_: GEODIST) !void {}
 
     pub const RedisCommand = struct {
         pub fn serialize(self: GEODIST, comptime rootSerializer: type, msg: anytype) !void {
@@ -28,5 +28,5 @@ pub const GEODIST = struct {
 };
 
 test "basic usage" {
-    const cmd = GEODIST.init("cities", "rome", "paris", .meters);
+    _ = GEODIST.init("cities", "rome", "paris", .meters);
 }

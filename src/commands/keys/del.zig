@@ -14,5 +14,5 @@ pub const DEL = struct {
 };
 
 test "basic usage" {
-    const cmd = DEL.init(&[_][]const u8{ "lol", "123", "test" });
+    _ = DEL.init(&[_][]const u8{ "lol", "123", "test" });
 }

@@ -3,7 +3,6 @@ const std = @import("std");
 const testing = std.testing;
 const fmt = std.fmt;
 const FixBuf = @import("../types/fixbuf.zig").FixBuf;
-const perfectHash = @import("../lib/perfect_hash.zig").perfectHash;
 
 // // TODO: decide what tho do with this weird trait.
 // inline fn isFragmentType(comptime T: type) bool {
@@ -125,7 +124,7 @@ pub const MapParser = struct {
                         };
 
                         if (!foundErr and !foundNil) {
-                            (if (isManaged) hmap.put(key.*, val.*) else hmap.put(allocator.ptr, key.*, val.*)) catch |err| {
+                            (if (isManaged) hmap.put(key.*, val.*) else hmap.put(allocator.ptr, key.*, val.*)) catch {
                                 hashMapError = true;
                                 continue;
                             };

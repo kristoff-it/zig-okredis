@@ -5,7 +5,7 @@ pub const Unit = enum {
     miles,
 
     pub const RedisArguments = struct {
-        pub fn count(self: Unit) usize {
+        pub fn count(_: Unit) usize {
             return 1;
         }
 

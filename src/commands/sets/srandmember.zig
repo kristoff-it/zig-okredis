@@ -36,7 +36,7 @@ pub const SRANDMEMBER = struct {
     }
 
     /// Validates if the command is syntactically correct.
-    pub fn validate(self: SRANDMEMBER) !void {}
+    pub fn validate(_: SRANDMEMBER) !void {}
 
     pub const RedisCommand = struct {
         pub fn serialize(self: SRANDMEMBER, comptime rootSerializer: type, msg: anytype) !void {

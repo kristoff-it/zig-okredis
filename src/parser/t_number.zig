@@ -36,7 +36,7 @@ pub const NumberParser = struct {
         return isSupported(T);
     }
 
-    pub fn parseAlloc(comptime T: type, comptime _: type, allocator: *std.mem.Allocator, msg: anytype) !T {
-        return parse(T, struct {}, msg);
+    pub fn parseAlloc(comptime T: type, comptime rootParser: type, _: *std.mem.Allocator, msg: anytype) !T {
+        return parse(T, rootParser, msg); // TODO: before I passed down an empty struct type. Was I insane? Did I have a plan?
     }
 };

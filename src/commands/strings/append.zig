@@ -20,7 +20,7 @@ pub const APPEND = struct {
 };
 
 test "example" {
-    const cmd = APPEND.init("noun", "ism");
+    _ = APPEND.init("noun", "ism");
 }
 
 test "serializer" {

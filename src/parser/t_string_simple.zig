@@ -47,9 +47,8 @@ pub const SimpleStringParser = struct {
             .Array => |arr| {
                 var res: [arr.len]arr.child = undefined;
                 var bytesSlice = mem.sliceAsBytes(res[0..]);
-                var end: usize = 0;
                 var ch = try msg.readByte();
-                for (bytesSlice) |*elem, i| {
+                for (bytesSlice) |*elem| {
                     if (ch == '\r') {
                         return error.LengthMismatch;
                     }

@@ -25,18 +25,20 @@ pub const BoolParser = struct {
         return isSupported(T);
     }
 
-    pub fn parseAlloc(comptime T: type, comptime _: type, allocator: *std.mem.Allocator, msg: anytype) !T {
-        return parse(T, struct {}, msg);
+    pub fn parseAlloc(comptime T: type, comptime rootParser: type, allocator: *std.mem.Allocator, msg: anytype) !T {
+        _ = allocator;
+        
+        return parse(T, rootParser, msg);
     }
 };
 
 test "parses bools" {
-   try testing.expect(true == try BoolParser.parse(bool, struct {}, TrueMSG().reader()));
-   try testing.expect(false == try BoolParser.parse(bool, struct {}, FalseMSG().reader()));
-   try testing.expect(1 == try BoolParser.parse(i64, struct {}, TrueMSG().reader()));
-   try testing.expect(0 == try BoolParser.parse(u32, struct {}, FalseMSG().reader()));
-   try testing.expect(1.0 == try BoolParser.parse(f32, struct {}, TrueMSG().reader()));
-   try testing.expect(0.0 == try BoolParser.parse(f64, struct {}, FalseMSG().reader()));
+    try testing.expect(true == try BoolParser.parse(bool, struct {}, TrueMSG().reader()));
+    try testing.expect(false == try BoolParser.parse(bool, struct {}, FalseMSG().reader()));
+    try testing.expect(1 == try BoolParser.parse(i64, struct {}, TrueMSG().reader()));
+    try testing.expect(0 == try BoolParser.parse(u32, struct {}, FalseMSG().reader()));
+    try testing.expect(1.0 == try BoolParser.parse(f32, struct {}, TrueMSG().reader()));
+    try testing.expect(0.0 == try BoolParser.parse(f64, struct {}, FalseMSG().reader()));
 }
 
 fn TrueMSG() std.io.FixedBufferStream([]const u8) {

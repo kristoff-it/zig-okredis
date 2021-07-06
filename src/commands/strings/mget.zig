@@ -24,5 +24,5 @@ pub const MGET = struct {
 };
 
 test "basic usage" {
-    const cmd = MGET.init(&[_][]const u8{ "lol", "key1", "key2" });
+    _ = MGET.init(&[_][]const u8{ "lol", "key1", "key2" });
 }

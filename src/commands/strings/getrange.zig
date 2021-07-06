@@ -21,7 +21,7 @@ pub const GETRANGE = struct {
 };
 
 test "basic usage" {
-    const cmd = GETRANGE.init("lol", 5, 100);
+    _ = GETRANGE.init("lol", 5, 100);
 }
 
 test "serializer" {

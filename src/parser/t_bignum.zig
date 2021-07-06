@@ -3,11 +3,11 @@ const testing = std.testing;
 
 /// Parses RedisNumber values
 pub const BigNumParser = struct {
-    pub fn isSupported(comptime T: type) bool {
+    pub fn isSupported(comptime _: type) bool {
         return false;
     }
 
-    pub fn parse(comptime T: type, comptime _: type, msg: anytype) !T {
+    pub fn parse(comptime _: type, comptime _: type, _: anytype) !T {
         @compileError("The BigNum parser handles a type that needs an allocator.");
     }
 

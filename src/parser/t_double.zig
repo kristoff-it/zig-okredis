@@ -35,7 +35,8 @@ pub const DoubleParser = struct {
         return isSupported(T);
     }
 
-    pub fn parseAlloc(comptime T: type, comptime _: type, allocator: *std.mem.Allocator, msg: anytype) !T {
-        return parse(T, struct {}, msg);
+    pub fn parseAlloc(comptime T: type, comptime rootParser: type, allocator: *std.mem.Allocator, msg: anytype) !T {
+        _ = allocator;
+        return parse(T, rootParser, msg);
     }
 };

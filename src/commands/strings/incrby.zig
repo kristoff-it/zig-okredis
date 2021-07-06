@@ -19,7 +19,7 @@ pub const INCRBY = struct {
 };
 
 test "basic usage" {
-    const cmd = INCRBY.init("lol", 42);
+    _ = INCRBY.init("lol", 42);
 }
 
 test "serializer" {

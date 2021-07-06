@@ -27,7 +27,7 @@ pub const SETBIT = struct {
 };
 
 test "basic usage" {
-    const cmd = SETBIT.init("lol", 100, "banana");
+    _ = SETBIT.init("lol", 100, "banana");
 }
 
 test "serializer" {

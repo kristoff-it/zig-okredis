@@ -198,12 +198,4 @@ pub const CommandSerializer = struct {
     }
 };
 
-fn fieldArgNum(field: anytype) usize {
-    if (comptime traits.isArguments(ArgT)) {
-        return ArgT.RedisArguments.count(arg);
-    } else {
-        return 1;
-    }
-}
 
-// fn sequenceArgNum()

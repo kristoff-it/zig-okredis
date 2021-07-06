@@ -19,5 +19,5 @@ pub const DECR = struct {
 };
 
 test "basic usage" {
-    const cmd = DECR.init("lol");
+    _ = DECR.init("lol");
 }

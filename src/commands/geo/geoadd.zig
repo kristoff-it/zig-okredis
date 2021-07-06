@@ -12,7 +12,7 @@ pub const GEOADD = struct {
         member: []const u8,
 
         pub const RedisArguments = struct {
-            pub fn count(self: GeoPoint) usize {
+            pub fn count(_: GeoPoint) usize {
                 return 3;
             }
 

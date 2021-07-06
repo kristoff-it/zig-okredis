@@ -19,7 +19,7 @@ pub const INCRBYFLOAT = struct {
 };
 
 test "basic usage" {
-    const cmd = INCRBYFLOAT.init("lol", 42);
+    _ = INCRBYFLOAT.init("lol", 42);
 }
 
 test "serializer" {

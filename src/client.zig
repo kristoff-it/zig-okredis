@@ -18,7 +18,7 @@ pub const Logging = union(enum) {
 
 pub const Client = RedisClient(.NoBuffering, .NoLogging);
 pub const BufferedClient = RedisClient(.{ .Fixed = 4096 }, .NoLogging);
-pub fn RedisClient(buffering: Buffering, logging: Logging) type {
+pub fn RedisClient(buffering: Buffering, _: Logging) type {
     const ReadBuffer = switch (buffering) {
         .NoBuffering => void,
         .Fixed => |b| std.io.BufferedReader(b, net.Stream.Reader),
@@ -33,11 +33,11 @@ pub fn RedisClient(buffering: Buffering, logging: Logging) type {
         conn: net.Stream,
         reader: switch (buffering) {
             .NoBuffering => net.Stream.Reader,
-            .Fixed => |b| ReadBuffer.Reader,
+            .Fixed => ReadBuffer.Reader,
         },
         writer: switch (buffering) {
             .NoBuffering => net.Stream.Writer,
-            .Fixed => |b| WriteBuffer.Writer,
+            .Fixed => WriteBuffer.Writer,
         },
         readBuffer: ReadBuffer,
         writeBuffer: WriteBuffer,
@@ -113,7 +113,6 @@ pub fn RedisClient(buffering: Buffering, logging: Logging) type {
             // TODO: this is not threadsafe.
             _ = try self.send(void, .{"MULTI"});
 
-            const len = comptime std.meta.fields(@TypeOf(cmds)).len;
             try self.pipe(void, cmds);
 
             if (@hasField(@TypeOf(allocator), "ptr")) {
