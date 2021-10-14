@@ -245,7 +245,7 @@ pub fn RedisClient(buffering: Buffering, _: Logging) type {
                                 },
                                 .Many => {
                                     if (@hasField(@TypeOf(allocator), "ptr")) {
-                                        result = try allocator.alloc(ptr.child, size);
+                                        result = try allocator.alloc(ptr.child, ptr.size);
                                         errdefer allocator.free(result);
 
                                         for (result) |*elem| {

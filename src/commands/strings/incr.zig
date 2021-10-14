@@ -3,6 +3,8 @@
 pub const INCR = struct {
     key: []const u8,
 
+    const Self = @This();
+
     pub fn init(key: []const u8) INCR {
         return .{ .key = key };
     }

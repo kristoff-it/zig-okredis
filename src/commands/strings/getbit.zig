@@ -4,6 +4,8 @@ pub const GETBIT = struct {
     key: []const u8,
     offset: usize,
 
+    const Self = @This();
+
     pub fn init(key: []const u8, offset: usize) GETBIT {
         return .{ .key = key, .offset = offset };
     }

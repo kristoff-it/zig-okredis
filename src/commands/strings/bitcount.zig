@@ -8,6 +8,8 @@ pub const BITCOUNT = struct {
     key: []const u8,
     bounds: Bounds = .FullString,
 
+    const Self = @This();
+
     pub fn init(key: []const u8, bounds: Bounds) BITCOUNT {
         return .{ .key = key, .bounds = bounds };
     }

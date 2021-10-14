@@ -1,6 +1,7 @@
 // HMGET key field [field ...]
 
 const std = @import("std");
+const common = @import("../_common_utils.zig");
 const FV = common.FV;
 
 pub const HMGET = struct {

@@ -7,7 +7,9 @@ pub const BigNumParser = struct {
         return false;
     }
 
-    pub fn parse(comptime _: type, comptime _: type, _: anytype) !T {
+    pub fn parse(comptime T: type, comptime _: type, _: anytype) !T {
+        _ = T;
+
         @compileError("The BigNum parser handles a type that needs an allocator.");
     }
 

@@ -295,7 +295,7 @@ pub const MapParser = struct {
                             else => return err,
                         };
                     } else {
-                        couple[0] = try rootParser.parse(@TypeOf(couple[0]), ptr, msg) catch |err| switch (err) {
+                        couple[0] = try rootParser.parse(@TypeOf(couple[0]), allocator.ptr, msg) catch |err| switch (err) {
                             error.GotNilReply => blk: {
                                 foundNil = true;
                                 break :blk undefined;
@@ -306,7 +306,7 @@ pub const MapParser = struct {
                             },
                             else => return err,
                         };
-                        couple[1] = try rootParser.parse(@TypeOf(couple[0]), ptr, msg) catch |err| switch (err) {
+                        couple[1] = try rootParser.parse(@TypeOf(couple[0]), allocator.ptr, msg) catch |err| switch (err) {
                             error.GotNilReply => blk: {
                                 foundNil = true;
                                 break :blk undefined;

@@ -4,6 +4,8 @@ pub const DECRBY = struct {
     key: []const u8,
     decrement: i64,
 
+    const Self = @This();
+
     pub fn init(key: []const u8, decrement: i64) DECRBY {
         return .{ .key = key, .decrement = decrement };
     }
