@@ -3,6 +3,8 @@ pub const INCRBYFLOAT = struct {
     key: []const u8,
     increment: f64,
 
+    const Self = @This();
+
     pub fn init(key: []const u8, increment: f64) INCRBYFLOAT {
         return .{ .key = key, .increment = increment };
     }

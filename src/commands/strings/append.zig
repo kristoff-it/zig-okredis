@@ -3,6 +3,8 @@ pub const APPEND = struct {
     key: []const u8,
     value: []const u8,
 
+    const Self = @This();
+
     pub fn init(key: []const u8, value: []const u8) APPEND {
         return .{ .key = key, .value = value };
     }

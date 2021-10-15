@@ -5,6 +5,8 @@ pub const GETRANGE = struct {
     start: isize,
     end: isize,
 
+    const Self = @This();
+
     pub fn init(key: []const u8, start: isize, end: isize) GETRANGE {
         return .{ .key = key, .start = start, .end = end };
     }

@@ -10,6 +10,8 @@ pub const GETSET = struct {
     key: []const u8,
     value: Value,
 
+    const Self = @This();
+
     pub fn init(key: []const u8, value: anytype) GETSET {
         return .{
             .key = key,
