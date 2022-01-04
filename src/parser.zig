@@ -29,12 +29,12 @@ pub const RESP3Parser = struct {
         return parseImpl(T, tag, .{}, msg);
     }
 
-    pub fn parseAlloc(comptime T: type, allocator: *Allocator, msg: anytype) !T {
+    pub fn parseAlloc(comptime T: type, allocator: Allocator, msg: anytype) !T {
         const tag = try msg.readByte();
         return try parseImpl(T, tag, .{ .ptr = allocator }, msg);
     }
 
-    pub fn parseAllocFromTag(comptime T: type, tag: u8, allocator: *Allocator, msg: anytype) !T {
+    pub fn parseAllocFromTag(comptime T: type, tag: u8, allocator: Allocator, msg: anytype) !T {
         return parseImpl(T, tag, .{ .ptr = allocator }, msg);
     }
 
@@ -203,7 +203,7 @@ pub const RESP3Parser = struct {
     // Frees values created by `sendAlloc`.
     // If the top value is a pointer, it frees that too.
     // TODO: free stdlib types!
-    pub fn freeReply(val: anytype, allocator: *Allocator) void {
+    pub fn freeReply(val: anytype, allocator: Allocator) void {
         const T = @TypeOf(val);
 
         switch (@typeInfo(T)) {

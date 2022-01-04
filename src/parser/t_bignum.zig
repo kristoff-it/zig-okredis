@@ -18,7 +18,7 @@ pub const BigNumParser = struct {
         return T == std.math.big.int.Managed or T == []u8;
     }
 
-    pub fn parseAlloc(comptime T: type, comptime _: type, allocator: *std.mem.Allocator, msg: anytype) !T {
+    pub fn parseAlloc(comptime T: type, comptime _: type, allocator: std.mem.Allocator, msg: anytype) !T {
         // TODO: find a better max_size limit than a random 1k value
         const bigSlice = try msg.readUntilDelimiterAlloc(allocator, '\r', 1000);
         errdefer allocator.free(bigSlice);

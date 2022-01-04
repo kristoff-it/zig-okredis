@@ -33,7 +33,7 @@ pub const DynamicReply = struct {
                 @compileError("DynamicReply requires an allocator. Use `sendAlloc`!");
             }
 
-            pub fn destroy(self: DynamicReply, comptime rootParser: type, allocator: *Allocator) void {
+            pub fn destroy(self: DynamicReply, comptime rootParser: type, allocator: Allocator) void {
                 rootParser.freeReply(self.attribs, allocator);
                 switch (self.data) {
                     .Nil, .Bool, .Number, .Double => {},
@@ -56,7 +56,7 @@ pub const DynamicReply = struct {
                 }
             }
 
-            pub fn parseAlloc(tag: u8, comptime rootParser: type, allocator: *Allocator, msg: anytype) error{DynamicReplyError}!DynamicReply {
+            pub fn parseAlloc(tag: u8, comptime rootParser: type, allocator: Allocator, msg: anytype) error{DynamicReplyError}!DynamicReply {
                 var itemTag = tag;
 
                 var res: DynamicReply = undefined;
@@ -167,12 +167,12 @@ fn MakeComplexListWithAttributes() std.io.FixedBufferStream([]const u8) {
             "+Hello\r\n" ++
             "|1\r\n" ++
                 "+ttl\r\n" ++
-                ":100\r\n" ++ 
+                ":100\r\n" ++
             "#t\r\n" ++
             "*3\r\n" ++
                 "|1\r\n" ++
                     "+Banana\r\n" ++
-                    "#t\r\n" ++ 
+                    "#t\r\n" ++
                 ":123\r\n" ++
                 "(424242\r\n" ++
                 ",12.34\r\n")

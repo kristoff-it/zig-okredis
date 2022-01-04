@@ -28,7 +28,7 @@ pub const SetParser = struct {
         return parseImpl(T, rootParser, .{}, msg);
     }
 
-    pub fn parseAlloc(comptime T: type, comptime rootParser: type, allocator: *std.mem.Allocator, msg: anytype) !T {
+    pub fn parseAlloc(comptime T: type, comptime rootParser: type, allocator: std.mem.Allocator, msg: anytype) !T {
         // HASHMAP
         if (@typeInfo(T) == .Struct and @hasDecl(T, "Entry")) {
             const isManaged = @typeInfo(@TypeOf(T.deinit)).Fn.args.len == 1;

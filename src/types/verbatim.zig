@@ -25,11 +25,11 @@ pub const Verbatim = struct {
                 @compileError("Verbatim requires an allocator, use `parseAlloc`.");
             }
 
-            pub fn destroy(self: Verbatim, comptime _: type, allocator: *Allocator) void {
+            pub fn destroy(self: Verbatim, comptime _: type, allocator: Allocator) void {
                 allocator.free(self.string);
             }
 
-            pub fn parseAlloc(tag: u8, comptime rootParser: type, allocator: *Allocator, msg: anytype) !Verbatim {
+            pub fn parseAlloc(tag: u8, comptime rootParser: type, allocator: Allocator, msg: anytype) !Verbatim {
                 switch (tag) {
                     else => return error.DecodingError,
                     '-', '!' => {

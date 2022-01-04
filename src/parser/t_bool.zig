@@ -25,9 +25,9 @@ pub const BoolParser = struct {
         return isSupported(T);
     }
 
-    pub fn parseAlloc(comptime T: type, comptime rootParser: type, allocator: *std.mem.Allocator, msg: anytype) !T {
+    pub fn parseAlloc(comptime T: type, comptime rootParser: type, allocator: std.mem.Allocator, msg: anytype) !T {
         _ = allocator;
-        
+
         return parse(T, rootParser, msg);
     }
 };

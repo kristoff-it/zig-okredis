@@ -52,14 +52,14 @@ pub fn OrErr(comptime T: type) type {
                     };
                 }
 
-                pub fn destroy(self: Self, comptime rootParser: type, allocator: *Allocator) void {
+                pub fn destroy(self: Self, comptime rootParser: type, allocator: Allocator) void {
                     switch (self) {
                         .Ok => |ok| rootParser.freeReply(ok, allocator),
                         else => {},
                     }
                 }
 
-                pub fn parseAlloc(tag: u8, comptime rootParser: type, allocator: *Allocator, msg: anytype) !Self {
+                pub fn parseAlloc(tag: u8, comptime rootParser: type, allocator: Allocator, msg: anytype) !Self {
                     return switch (tag) {
                         '_', '-', '!' => internalParse(tag, rootParser, msg),
                         else => return Self{ .Ok = try rootParser.parseAllocFromTag(T, tag, allocator, msg) },
@@ -174,7 +174,7 @@ pub fn OrFullErr(comptime T: type) type {
                     @compileError("OrFullErr requires an allocator, use `OrErr` to parse just the error code without the need of an allocator.");
                 }
 
-                pub fn destroy(self: Self, comptime rootParser: type, allocator: *Allocator) void {
+                pub fn destroy(self: Self, comptime rootParser: type, allocator: Allocator) void {
                     switch (self) {
                         .Ok => |ok| rootParser.freeReply(ok, allocator),
                         .Err => |err| allocator.free(err.message),
@@ -182,7 +182,7 @@ pub fn OrFullErr(comptime T: type) type {
                     }
                 }
 
-                pub fn parseAlloc(tag: u8, comptime rootParser: type, allocator: *Allocator, msg: anytype) !Self {
+                pub fn parseAlloc(tag: u8, comptime rootParser: type, allocator: Allocator, msg: anytype) !Self {
                     switch (tag) {
                         else => return Self{ .Ok = try rootParser.parseAllocFromTag(T, tag, allocator, msg) },
                         '_' => {
@@ -337,7 +337,7 @@ const fakeParser = struct {
         _ = rootParser;
         return error.Errror;
     }
-    pub inline fn parseAllocFromTag(comptime T: type, tag: u8, allocator: *Allocator, rootParser: anytype) !T {
+    pub inline fn parseAllocFromTag(comptime T: type, tag: u8, allocator: Allocator, rootParser: anytype) !T {
         _ = T;
         _ = rootParser;
         _ = tag;

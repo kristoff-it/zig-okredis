@@ -21,12 +21,12 @@ pub fn WithAttribs(comptime T: type) type {
                     @compileError("WithAttribs requires an allocator. Use `sendAlloc`.");
                 }
 
-                pub fn destroy(self: Self, comptime rootParser: type, allocator: *Allocator) void {
+                pub fn destroy(self: Self, comptime rootParser: type, allocator: Allocator) void {
                     rootParser.freeReply(self.attribs, allocator);
                     rootParser.freeReply(self.data, allocator);
                 }
 
-                pub fn parseAlloc(tag: u8, comptime rootParser: type, allocator: *Allocator, msg: anytype) !Self {
+                pub fn parseAlloc(tag: u8, comptime rootParser: type, allocator: Allocator, msg: anytype) !Self {
                     var itemTag = tag;
 
                     var res: Self = undefined;
@@ -101,12 +101,12 @@ fn MakeComplexListWithAttributes() std.io.FixedBufferStream([]const u8) {
                 ":20\r\n" ++
                 "|1\r\n" ++
                     "+ttl\r\n" ++
-                    ":128\r\n" ++ 
+                    ":128\r\n" ++
                 ":100\r\n" ++
             "*2\r\n" ++
                 "|1\r\n" ++
                     "+Banana\r\n" ++
-                    "#t\r\n" ++ 
+                    "#t\r\n" ++
                 ":123\r\n" ++
                 ":99\r\n"
     )[0..]);

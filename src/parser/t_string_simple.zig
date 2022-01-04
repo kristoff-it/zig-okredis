@@ -73,7 +73,7 @@ pub const SimpleStringParser = struct {
         };
     }
 
-    pub fn parseAlloc(comptime T: type, comptime _: type, allocator: *std.mem.Allocator, msg: anytype) !T {
+    pub fn parseAlloc(comptime T: type, comptime _: type, allocator: std.mem.Allocator, msg: anytype) !T {
         switch (@typeInfo(T)) {
             .Pointer => |ptr| {
                 switch (ptr.size) {

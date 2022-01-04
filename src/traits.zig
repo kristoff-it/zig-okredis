@@ -2,8 +2,8 @@
 /// It's expected to implement three functions:
 /// ```
 /// fn parse(tag: u8, comptime rootParser: type, msg: var) !Self
-/// fn parseAlloc(tag: u8, comptime rootParser: type, allocator: *Allocator, msg: var) !Self
-/// fn destroy(self: Self, comptime rootParser: type, allocator: *Allocator) void
+/// fn parseAlloc(tag: u8, comptime rootParser: type, allocator: Allocator, msg: var) !Self
+/// fn destroy(self: Self, comptime rootParser: type, allocator: Allocator) void
 /// ```
 /// `rootParser` is a reference to the RESP3Parser, which contains the main
 /// parsing logic. It's passed to the type in order to allow it  to recursively
@@ -30,14 +30,14 @@ pub fn isParserType(comptime T: type) bool {
         if (!@hasDecl(T.Redis.Parser, "parseAlloc"))
             @compileError(
                 \\`Redis.Parser` trait requires implementing:
-                \\    fn parseAlloc(tag: u8, comptime rootParser: type, allocator: *Allocator, msg: var) !Self
+                \\    fn parseAlloc(tag: u8, comptime rootParser: type, allocator: Allocator, msg: var) !Self
                 \\
             );
 
         if (!@hasDecl(T.Redis.Parser, "destroy"))
             @compileError(
                 \\`Redis.Parser` trait requires implementing:
-                \\    fn destroy(self: *Self, comptime rootParser: type, allocator: *Allocator) void
+                \\    fn destroy(self: *Self, comptime rootParser: type, allocator: Allocator) void
                 \\
             );
 

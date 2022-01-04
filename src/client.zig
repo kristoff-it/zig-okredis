@@ -93,7 +93,7 @@ pub fn RedisClient(buffering: Buffering, _: Logging) type {
         }
 
         /// Like `send`, can allocate memory.
-        pub fn sendAlloc(self: *Self, comptime T: type, allocator: *Allocator, cmd: anytype) !T {
+        pub fn sendAlloc(self: *Self, comptime T: type, allocator: Allocator, cmd: anytype) !T {
             return self.pipelineImpl(T, cmd, .{ .one = {}, .ptr = allocator });
         }
 
@@ -105,7 +105,7 @@ pub fn RedisClient(buffering: Buffering, _: Logging) type {
         }
 
         /// Like `trans`, but can allocate memory.
-        pub fn transAlloc(self: *Self, comptime Ts: type, allocator: *Allocator, cmds: anytype) !Ts {
+        pub fn transAlloc(self: *Self, comptime Ts: type, allocator: Allocator, cmds: anytype) !Ts {
             return transactionImpl(self, Ts, cmds, .{ .ptr = allocator });
         }
 
@@ -128,7 +128,7 @@ pub fn RedisClient(buffering: Buffering, _: Logging) type {
         }
 
         /// Like `pipe`, but can allocate memory.
-        pub fn pipeAlloc(self: *Self, comptime Ts: type, allocator: *Allocator, cmds: anytype) !Ts {
+        pub fn pipeAlloc(self: *Self, comptime Ts: type, allocator: Allocator, cmds: anytype) !Ts {
             return pipelineImpl(self, Ts, cmds, .{ .ptr = allocator });
         }
 
