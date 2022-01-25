@@ -45,8 +45,8 @@ as input, so the user can setup custom allocation schemes such as
 ```zig
 const std = @import("std");
 const okredis = @import("./src/okredis.zig");
-const SET = okredis.commands.SET;
-const OrErr = okredis.OrErr;
+const SET = okredis.commands.strings.SET;
+const OrErr = okredis.types.OrErr;
 const Client = okredis.Client;
 
 pub fn main() !void {
@@ -69,7 +69,7 @@ pub fn main() !void {
     switch (otherReply) {
         .Nil => @panic("command should not have returned nil"),
         .Err => @panic("command should not have returned an error"),
-        .Ok => std.debug.warn("success!"),
+        .Ok => std.debug.print("success!", .{}),
     }
 }
 ```

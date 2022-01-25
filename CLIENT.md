@@ -65,8 +65,8 @@ const reply = try client.pipe(struct {
     .{ "ECHO", "banana" },
 });
 
-std.debug.warn("[INCR => {}]\n", .{reply.c2});
-std.debug.warn("[ECHO => {}]\n", .{reply.c3});
+std.debug.print("[INCR => {}]\n", .{reply.c2});
+std.debug.print("[ECHO => {s}]\n", .{reply.c3.toSlice()});
 ```
 
 Let's break down the code above.
@@ -112,7 +112,7 @@ switch (reply) {
     .Err => |e| @panic(e.getCode()),
     .Nil => @panic("got nil"),
     .Ok => |r| {
-        std.debug.warn("\n[SET = {}] [INCR = {}] [INCR (error) = {}]\n", .{
+        std.debug.print("\n[SET = {s}] [INCR = {}] [INCR (error) = {s}]\n", .{
             r.c1.Ok.toSlice(),
             r.c2,
             r.c3.Err.getCode(),
@@ -152,9 +152,9 @@ switch (reply) {
     .Nil => @panic("got nil"),
     .Ok => |r| {
         for (r) |msg| {
-            std.debug.warn("{} ", .{msg});
+            std.debug.print("{s} ", .{msg});
         }
-        std.debug.warn("\n", .{});
+        std.debug.print("\n", .{});
     },
 }
 ```

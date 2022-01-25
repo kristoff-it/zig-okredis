@@ -8,7 +8,13 @@ pub const ListParser = struct {
     // TODO: prevent users from unmarshaling structs out of strings
     pub fn isSupported(comptime T: type) bool {
         return switch (@typeInfo(T)) {
-            .Array, .Struct => true,
+            .Array => true,
+            .Struct => |stc| {
+                for (stc.fields) |f|
+                    if (f.field_type == *anyopaque)
+                        return false;
+                return true;
+            },
             else => false,
         };
     }

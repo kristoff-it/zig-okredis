@@ -38,7 +38,7 @@ try client.send(void, .{ "SET", "key", "42" });
 
 // Ask for a `i64`
 const reply = try client.send(i64, .{ "GET", "key" });
-std.debug.warn("key = {}\n", .{reply});
+std.debug.print("key = {}\n", .{reply});
 ```
 
 What's interesting about this example is that Redis replies to the `GET` command 
@@ -165,7 +165,7 @@ try client.send(void, .{ "HSET", "myhash", "banana", "yes please", "price", "9.9
 switch (try client.send(OrErr(MyHash), .{ "HGETALL", "myhash" })) {
     .Nil, .Err => unreachable,
     .Ok => |val| {
-        std.debug.warn("{?}", val);
+        std.debug.print("{?}", val);
     },
 }
 ```
@@ -210,13 +210,13 @@ try client.send(void, .{ "SET", "stringkey", "banana" });
 // Success
 switch (try client.send(OrErr(FixBuf(100)), .{ "GET", "stringkey" })) {
     .Err, .Nil => @panic(),
-    .Ok => |reply| std.debug.warn("stringkey = {}\n", reply.toSlice()),
+    .Ok => |reply| std.debug.print("stringkey = {s}\n", reply.toSlice()),
 }
 
 // Error
 switch (try client.send(OrErr(i64), .{ "INCR", "stringkey" })) {
     .Ok, .Nil => @panic(),
-    .Err => |err| std.debug.warn("error code = {}\n", err.getCode()),
+    .Err => |err| std.debug.print("error code = {s}\n", err.getCode()),
 }
 ```
 
@@ -285,8 +285,8 @@ switch (incrErr) {
     .Err => |err| {
         // This is where alternatively you would perform manual deallocation: 
         // defer allocator.free(err.message)
-        std.debug.warn("error code = '{}'\n", err.getCode());
-        std.debug.warn("error message = '{}'\n", err.message);
+        std.debug.print("error code = '{s}'\n", err.getCode());
+        std.debug.print("error message = '{s}'\n", err.message);
     },
 }
 ```
@@ -314,7 +314,7 @@ defer freeReply(dynHash, allocator);
 
 switch (dynHash) {
     .Nil, .Err => unreachable,
-    .Ok => |val| std.debug.warn("{?}", val),
+    .Ok => |val| std.debug.print("{?}", val),
 }
 ```
 
@@ -346,7 +346,7 @@ switch (dynReply.data) {
     .Nil, .Bool, .Number, .Double, .Bignum, .String, .List => {},
     .Map => |kvs| {
         for (kvs) |kv| {
-            std.debug.warn("[{}] => '{}'\n", kv.key.data.String, kv.value.data.String);
+            std.debug.print("[{s}] => '{s}'\n", kv.key.data.String, kv.value.data.String);
         }
     },
 }

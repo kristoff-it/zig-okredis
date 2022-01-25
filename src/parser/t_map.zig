@@ -23,7 +23,12 @@ pub const MapParser = struct {
                 // .Struct, .Union => isFVType(), TODO
                 else => false,
             },
-            .Struct => true,
+            .Struct => |stc| {
+                for (stc.fields) |f|
+                    if (f.field_type == *anyopaque)
+                        return false;
+                return true;
+            },
             else => false,
         };
     }

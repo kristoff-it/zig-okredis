@@ -27,16 +27,16 @@ pub fn main() !void {
     // parser is nice enough to try and parse it for us.
     // Works with both integers and floats.
     const reply = try client.send(i64, .{ "GET", "key" });
-    std.debug.warn("key = {}\n", .{reply});
+    std.debug.print("key = {}\n", .{reply});
 
     // Try to get the value, but this time using an optional type,
     // this allows decoding Redis Nil replies.
     try client.send(void, .{ "DEL", "nokey" });
     var maybe = try client.send(?i64, .{ "GET", "nokey" });
     if (maybe) |val| {
-        std.debug.warn("Found nokey with value = {}\n", .{val}); // Won't be printed.
+        std.debug.print("Found nokey with value = {}\n", .{val}); // Won't be printed.
     } else {
-        std.debug.warn("Yep, nokey is not present.\n", .{});
+        std.debug.print("Yep, nokey is not present.\n", .{});
     }
 
     // To decode strings without allocating, use a FixBuf type.
@@ -47,7 +47,7 @@ pub fn main() !void {
 
     try client.send(void, .{ "SET", "stringkey", "Hello World!" });
     var stringkey = try client.send(FixBuf(30), .{ "GET", "stringkey" });
-    std.debug.warn("stringkey = {}\n", .{stringkey.toSlice()});
+    std.debug.print("stringkey = {s}\n", .{stringkey.toSlice()});
 
     // Send a bad command, this time we are interested in the error response.
     // OrErr also has a .Nil case, so you don't need to make your return type
@@ -57,7 +57,7 @@ pub fn main() !void {
 
     switch (try client.send(OrErr(i64), .{ "INCR", "stringkey" })) {
         .Ok, .Nil => unreachable,
-        .Err => |err| std.debug.warn("error code = {}\n", .{err.getCode()}),
+        .Err => |err| std.debug.print("error code = {s}\n", .{err.getCode()}),
     }
 
     const MyHash = struct {
@@ -72,7 +72,7 @@ pub fn main() !void {
     switch (try client.send(OrErr(MyHash), .{ "HGETALL", "myhash" })) {
         .Nil, .Err => unreachable,
         .Ok => |val| {
-            std.debug.warn("myhash = \n\t{}\n", .{val});
+            std.debug.print("myhash = \n\t{}\n", .{val});
         },
     }
 
@@ -95,7 +95,7 @@ pub fn main() !void {
     // But then it's up to you to free all that was allocated.
     var inferno = try client.sendAlloc([]u8, allocator, .{ "GET", "divine" });
     defer allocator.free(inferno);
-    std.debug.warn("\ndivine comedy - inferno 1: \n{}\n\n", .{inferno});
+    std.debug.print("\ndivine comedy - inferno 1: \n{s}\n\n", .{inferno});
 
     // When using sendAlloc, you can use OrFullErr to parse not just the error code
     // but also the full error message. The error message is allocated with `allocator`
@@ -104,7 +104,7 @@ pub fn main() !void {
     var incrErr = try client.sendAlloc(OrFullErr(i64), allocator, .{ "INCR", "divine" });
     switch (incrErr) {
         .Ok, .Nil => unreachable,
-        .Err => |err| std.debug.warn("error code = {} message = '{}'\n", .{ err.getCode(), err.message }),
+        .Err => |err| std.debug.print("error code = {s} message = '{s}'\n", .{ err.getCode(), err.message }),
     }
 
     // To help deallocating resources allocated by `sendAlloc`, you can use `freeReply`.
@@ -123,7 +123,7 @@ pub fn main() !void {
     defer freeReply(allocatedNum, allocator);
     // alternatively: defer allocator.destroy(allocatedNum);
 
-    std.debug.warn("allocated num = {} ptr = {}\n", .{ allocatedNum.*, allocatedNum });
+    std.debug.print("allocated num = {} ptr = {}\n", .{ allocatedNum.*, allocatedNum });
 
     // Now we can decode the reply in a struct that doesn't need a FixBuf
     const MyDynHash = struct {
@@ -137,7 +137,7 @@ pub fn main() !void {
     switch (dynHash) {
         .Nil, .Err => unreachable,
         .Ok => |val| {
-            std.debug.warn("mydynhash = \n\t{}\n", .{val});
+            std.debug.print("mydynhash = \n\t{any}\n", .{val});
         },
     }
     //   -
@@ -153,12 +153,12 @@ pub fn main() !void {
     defer freeReply(dynReply, allocator);
 
     // DynamicReply is a union that represents all possible replies.
-    std.debug.warn("\nmyhash decoded as DynamicReply:\n", .{});
+    std.debug.print("\nmyhash decoded as DynamicReply:\n", .{});
     switch (dynReply.data) {
         .Nil, .Bool, .Number, .Double, .Bignum, .String, .List, .Set => {},
         .Map => |kvs| {
             for (kvs) |kv| {
-                std.debug.warn("\t[{}] => '{}'\n", .{ kv[0].data.String.string, kv[1].data.String });
+                std.debug.print("\t[{s}] => '{s}'\n", .{ kv[0].data.String.string, kv[1].data.String });
             }
         },
     }
@@ -176,8 +176,8 @@ pub fn main() !void {
         .{ "INCR", "counter" },
         .{ "ECHO", "banana" },
     });
-    std.debug.warn("\n\n[INCR => {}]\n", .{r1.c2});
-    std.debug.warn("[ECHO => {}]\n", .{r1.c3});
+    std.debug.print("\n\n[INCR => {}]\n", .{r1.c2});
+    std.debug.print("[ECHO => {s}]\n", .{r1.c3});
 
     // You can also allocate when doing pipelining.
     const r2 = try client.pipeAlloc(struct {
@@ -189,7 +189,7 @@ pub fn main() !void {
     });
     defer freeReply(r2, allocator);
 
-    std.debug.warn("\n[banana] => '{}'\n", .{r2.value});
+    std.debug.print("\n[banana] => '{s}'\n", .{r2.value});
 
     // Transactions are a way of providing isolation and all-or-nothing semantics to
     // a group of Redis commands. The relative methods (`trans` and `transAlloc`) are
@@ -208,7 +208,7 @@ pub fn main() !void {
         .Err => |e| @panic(e.getCode()),
         .Nil => @panic("got nil"),
         .Ok => |tx_reply| {
-            std.debug.warn("\n[SET = {}] [INCR = {}] [INCR (error) = {}]\n", .{
+            std.debug.print("\n[SET = {s}] [INCR = {}] [INCR (error) = {s}]\n", .{
                 tx_reply.c1.Ok.toSlice(),
                 tx_reply.c2,
                 tx_reply.c3.Err.getCode(),
