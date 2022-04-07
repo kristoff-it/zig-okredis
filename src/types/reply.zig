@@ -181,6 +181,5 @@ fn MakeComplexListWithAttributes() std.io.FixedBufferStream([]const u8) {
 // zig fmt: on
 
 test "docs" {
-    @import("std").testing.refAllDecls(@This());
     @import("std").testing.refAllDecls(DynamicReply);
 }
