@@ -179,8 +179,8 @@ pub fn RedisClient(buffering: Buffering, _: Logging) type {
                     if (std.io.is_async) {
                         // TODO: see if this stuff can be implemented nicely
                         // so that you don't have to depend on magic numbers & implementation details.
-                        const held = self.writeLock.mutex.acquire();
-                        defer held.release();
+                        self.writeLock.mutex.lock();
+                        defer self.writeLock.mutex.unlock();
                         if (self.writeLock.head == 1) {
                             try self.writeBuffer.flush();
                         }
