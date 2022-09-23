@@ -18,7 +18,7 @@ pub const Logging = union(enum) {
 
 pub const Client = RedisClient(.NoBuffering, .NoLogging);
 pub const BufferedClient = RedisClient(.{ .Fixed = 4096 }, .NoLogging);
-pub fn RedisClient(buffering: Buffering, _: Logging) type {
+pub fn RedisClient(comptime buffering: Buffering, comptime _: Logging) type {
     const ReadBuffer = switch (buffering) {
         .NoBuffering => void,
         .Fixed => |b| std.io.BufferedReader(b, net.Stream.Reader),

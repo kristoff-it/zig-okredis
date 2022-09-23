@@ -327,18 +327,15 @@ test "parse simple errors" {
 }
 const fakeParser = struct {
     pub inline fn parse(comptime T: type, rootParser: anytype) !T {
-        _ = T;
         _ = rootParser;
         return error.Errror;
     }
     pub inline fn parseFromTag(comptime T: type, tag: u8, rootParser: anytype) !T {
-        _ = T;
         _ = tag;
         _ = rootParser;
         return error.Errror;
     }
     pub inline fn parseAllocFromTag(comptime T: type, tag: u8, allocator: Allocator, rootParser: anytype) !T {
-        _ = T;
         _ = rootParser;
         _ = tag;
         _ = allocator;
