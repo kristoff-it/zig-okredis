@@ -1,5 +1,6 @@
 const std = @import("std");
 const fmt = std.fmt;
+const testing = std.testing;
 
 /// It's a fixed length buffer, useful for parsing strings
 /// without requiring an allocator.
@@ -38,6 +39,7 @@ pub fn FixBuf(comptime size: usize) type {
                             }
                             if (ch != '\r') return error.BufTooSmall;
                             try msg.skipBytes(1, .{});
+                            res.len = res.buf.len;
                             return res;
                         },
                         '$' => {
@@ -80,4 +82,14 @@ pub fn FixBuf(comptime size: usize) type {
 test "docs" {
     @import("std").testing.refAllDecls(@This());
     @import("std").testing.refAllDecls(FixBuf(42));
+}
+
+test "FixBuf" {
+    const parser = @import("../parser.zig").RESP3Parser;
+    {
+        var stream = std.io.fixedBufferStream("+PONG\r\n");
+        const res = try parser.parse(FixBuf(4), stream.reader());
+        try testing.expectEqualSlices(u8, &res.buf, "PONG");
+        try testing.expectEqual(res.buf.len, 4);
+    }
 }
