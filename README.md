@@ -10,34 +10,36 @@
 </p>
 
 ## Handy and Efficient
-OkRedis aims to offer an interface with great ergonomics without 
+OkRedis aims to offer an interface with great ergonomics without
 compromising on performance or flexibility.
 
 ## Project status
-OkRedis is currently in alpha. The main features are mostly complete, but
-a lot of polishing is still required.
+OkRedis is currently in alpha. The main features are mostly complete,
+but a lot of polishing is still required. Zig version `0.10.1` is
+supported. Once `async` is available in a stable release, OkRedis will
+pivot to a new Zig version.
 
-Everything mentioned in the docs is already implemented and you can just 
+Everything mentioned in the docs is already implemented and you can just
 `zig run example.zig` to quickly see what it can do. Remember OkRedis only
 supports Redis 6 and above.
 
 ## Zero dynamic allocations, unless explicitly wanted
-The client has two main interfaces to send commands: `send` and `sendAlloc`. 
-Following Zig's mantra of making dynamic allocations explicit, only `sendAlloc` 
-can allocate dynamic memory, and only does so by using a user-provided allocator. 
+The client has two main interfaces to send commands: `send` and `sendAlloc`.
+Following Zig's mantra of making dynamic allocations explicit, only `sendAlloc`
+can allocate dynamic memory, and only does so by using a user-provided allocator.
 
-The way this is achieved is by making good use of RESP3's typed responses and 
+The way this is achieved is by making good use of RESP3's typed responses and
 Zig's metaprogramming facilities.
-The library uses compile-time reflection to specialize down to the parser level, 
-allowing OkRedis to decode whenever possible a reply directly into a function 
-frame, **without any intermediate dynamic allocation**. If you want more 
+The library uses compile-time reflection to specialize down to the parser level,
+allowing OkRedis to decode whenever possible a reply directly into a function
+frame, **without any intermediate dynamic allocation**. If you want more
 information about Zig's comptime:
 - [Official documentation](https://ziglang.org/documentation/master/#comptime)
 - [What is Zig's Comptime?](https://kristoff.it/blog/what-is-zig-comptime) (blog post written by me)
 
-By using `sendAlloc` you can decode replies with arbrirary shape at the cost of 
-occasionally performing dynamic allocations. The interface takes an allocator 
-as input, so the user can setup custom allocation schemes such as 
+By using `sendAlloc` you can decode replies with arbrirary shape at the cost of
+occasionally performing dynamic allocations. The interface takes an allocator
+as input, so the user can setup custom allocation schemes such as
 [arenas](https://en.wikipedia.org/wiki/Region-based_memory_management).
 
 ## Quickstart
@@ -52,7 +54,7 @@ const Client = okredis.Client;
 pub fn main() !void {
     const addr = try std.net.Address.parseIp4("127.0.0.1", 6379);
     var connection = try std.net.tcpConnectToAddress(addr);
-    
+
     var client: Client = undefined;
     try client.init(connection);
     defer client.close();
@@ -117,7 +119,7 @@ The reference documentation [is available here](https://kristoff.it/zig-okredis#
          * [Adding types used by a higher-level language](REPLIES.md#adding-types-used-by-a-higher-level-language)
 
 ## Extending OkRedis
-If you are a Lua script or Redis module author, you might be interested in 
+If you are a Lua script or Redis module author, you might be interested in
 reading the final sections of `COMMANDS.md` and `REPLIES.md`.
 
 ## Embedding OkRedis in a higher level language
