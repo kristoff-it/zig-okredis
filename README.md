@@ -15,9 +15,8 @@ compromising on performance or flexibility.
 
 ## Project status
 OkRedis is currently in alpha. The main features are mostly complete,
-but a lot of polishing is still required. Zig version `0.10.1` is
-supported. Once `async` is available in a stable release, OkRedis will
-pivot to a new Zig version.
+but a lot of polishing is still required. Zig version `0.14.0` is
+supported.
 
 Everything mentioned in the docs is already implemented and you can just
 `zig run example.zig` to quickly see what it can do. Remember OkRedis only
