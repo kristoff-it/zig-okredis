@@ -1,20 +1,20 @@
-const builtin = @import("builtin");
 const std = @import("std");
 const fmt = std.fmt;
 const testing = std.testing;
 const InStream = std.io.InStream;
 const Allocator = std.mem.Allocator;
+const builtin = @import("builtin");
 
 const BigNumParser = @import("./parser/t_bignum.zig").BigNumParser;
-const VoidParser = @import("./parser/void.zig").VoidParser;
-const NumberParser = @import("./parser/t_number.zig").NumberParser;
 const BoolParser = @import("./parser/t_bool.zig").BoolParser;
-const BlobStringParser = @import("./parser/t_string_blob.zig").BlobStringParser;
-const SimpleStringParser = @import("./parser/t_string_simple.zig").SimpleStringParser;
 const DoubleParser = @import("./parser/t_double.zig").DoubleParser;
 const ListParser = @import("./parser/t_list.zig").ListParser;
-const SetParser = @import("./parser/t_set.zig").SetParser;
 const MapParser = @import("./parser/t_map.zig").MapParser;
+const NumberParser = @import("./parser/t_number.zig").NumberParser;
+const SetParser = @import("./parser/t_set.zig").SetParser;
+const BlobStringParser = @import("./parser/t_string_blob.zig").BlobStringParser;
+const SimpleStringParser = @import("./parser/t_string_simple.zig").SimpleStringParser;
+const VoidParser = @import("./parser/void.zig").VoidParser;
 const traits = @import("./traits.zig");
 
 pub const RESP3Parser = struct {
@@ -86,7 +86,7 @@ pub const RESP3Parser = struct {
         // - Single-item pointers require us to allocate the type and recur.
         // - Slices are the only type of pointer that we want to delegate to sub-parsers.
         switch (@typeInfo(T)) {
-            .Optional => |opt| {
+            .optional => |opt| {
                 var nextTag = tag;
                 if (tag == '|') {
                     // If the type is an optional, we discard any potential attribute.
@@ -103,23 +103,23 @@ pub const RESP3Parser = struct {
                 // Otherwise recur with the underlying type.
                 return try parseImpl(opt.child, nextTag, allocator, msg);
             },
-            .Pointer => |ptr| {
+            .pointer => |ptr| {
                 if (!@hasField(@TypeOf(allocator), "ptr")) {
                     @compileError("`parse` can't perform allocations so it can't handle pointers, use `parseAlloc` instead.");
                 }
                 switch (ptr.size) {
-                    .One => {
+                    .one => {
                         // Single-item pointer, allocate it and recur.
-                        var res: *ptr.child = try allocator.ptr.create(ptr.child);
+                        const res: *ptr.child = try allocator.ptr.create(ptr.child);
                         errdefer allocator.ptr.destroy(res);
                         res.* = try parseImpl(ptr.child, tag, allocator, msg);
                         return res;
                     },
-                    .Many, .C => {
+                    .many, .c => {
                         @panic("!");
                         // @compileError("Pointers to unknown size or C-type are not supported.");
                     },
-                    .Slice => {
+                    .slice => {
                         // Slices are ok. We continue.
                     },
                 }
@@ -134,7 +134,7 @@ pub const RESP3Parser = struct {
         if (tag == '|') {
             // If the type declares to be able to decode attributes, we delegate immediately.
             if (comptime traits.handlesAttributes(T)) {
-                var x: T = if (@hasField(@TypeOf(allocator), "ptr"))
+                const x: T = if (@hasField(@TypeOf(allocator), "ptr"))
                     try T.Redis.Parser.parseAlloc(tag, rootParser, allocator.ptr, msg)
                 else
                     try T.Redis.Parser.parse(tag, rootParser, msg);
@@ -152,7 +152,7 @@ pub const RESP3Parser = struct {
 
         // If the type implement its own decoding procedure, we delegate the job to it.
         if (comptime traits.isParserType(T)) {
-            var x: T = if (@hasField(@TypeOf(allocator), "ptr"))
+            const x: T = if (@hasField(@TypeOf(allocator), "ptr"))
                 try T.Redis.Parser.parseAlloc(tag, rootParser, allocator.ptr, msg)
             else
                 try T.Redis.Parser.parse(nextTag, rootParser, msg);
@@ -208,15 +208,15 @@ pub const RESP3Parser = struct {
 
         switch (@typeInfo(T)) {
             else => return,
-            .Optional => if (val) |v| freeReply(v, allocator),
-            .Array => |arr| {
+            .optional => if (val) |v| freeReply(v, allocator),
+            .array => |arr| {
                 switch (@typeInfo(arr.child)) {
                     else => {},
-                    .Enum,
-                    .Union,
-                    .Struct,
-                    .Pointer,
-                    .Optional,
+                    .@"enum",
+                    .@"union",
+                    .@"struct",
+                    .pointer,
+                    .optional,
                     => {
                         for (val) |elem| {
                             freeReply(elem, allocator);
@@ -225,18 +225,18 @@ pub const RESP3Parser = struct {
                 }
                 // allocator.free(val);
             },
-            .Pointer => |ptr| switch (ptr.size) {
-                .Many => @compileError("sendAlloc is incapable of generating [*] pointers. " ++
+            .pointer => |ptr| switch (ptr.size) {
+                .many => @compileError("sendAlloc is incapable of generating [*] pointers. " ++
                     "You are passing the wrong value!"),
-                .C => allocator.free(val),
-                .Slice => {
+                .c => allocator.free(val),
+                .slice => {
                     switch (@typeInfo(ptr.child)) {
                         else => {},
-                        .Enum,
-                        .Union,
-                        .Struct,
-                        .Pointer,
-                        .Optional,
+                        .@"enum",
+                        .@"union",
+                        .@"struct",
+                        .pointer,
+                        .optional,
                         => {
                             for (val) |elem| {
                                 freeReply(elem, allocator);
@@ -245,14 +245,14 @@ pub const RESP3Parser = struct {
                     }
                     allocator.free(val);
                 },
-                .One => {
+                .one => {
                     switch (@typeInfo(ptr.child)) {
                         else => {},
-                        .Enum,
-                        .Union,
-                        .Struct,
-                        .Pointer,
-                        .Optional,
+                        .@"enum",
+                        .@"union",
+                        .@"struct",
+                        .pointer,
+                        .optional,
                         => {
                             freeReply(val.*, allocator);
                         },
@@ -260,24 +260,24 @@ pub const RESP3Parser = struct {
                     allocator.destroy(val);
                 },
             },
-            .Union => if (comptime traits.isParserType(T)) {
+            .@"union" => if (comptime traits.isParserType(T)) {
                 T.Redis.Parser.destroy(val, rootParser, allocator);
             } else {
                 @compileError("sendAlloc cannot return Unions or Enums that don't implement " ++
                     "custom parsing logic. You are passing the wrong value!");
             },
-            .Struct => |stc| {
+            .@"struct" => |stc| {
                 if (comptime traits.isParserType(T)) {
                     T.Redis.Parser.destroy(val, rootParser, allocator);
                 } else {
                     inline for (stc.fields) |f| {
-                        switch (@typeInfo(f.field_type)) {
+                        switch (@typeInfo(f.type)) {
                             else => {},
-                            .Enum,
-                            .Union,
-                            .Struct,
-                            .Pointer,
-                            .Optional,
+                            .@"enum",
+                            .@"union",
+                            .@"struct",
+                            .pointer,
+                            .optional,
                             => {
                                 freeReply(@field(val, f.name), allocator);
                             },
@@ -306,7 +306,8 @@ test "evil indirection" {
     const allocator = std.heap.page_allocator;
 
     {
-        const yes = try RESP3Parser.parseAlloc(?**?*f32, allocator, MakeEvilFloat().reader());
+        var fbs_evil_f = MakeEvilFloat();
+        const yes = try RESP3Parser.parseAlloc(?**?*f32, allocator, fbs_evil_f.reader());
         defer RESP3Parser.freeReply(yes, allocator);
 
         if (yes) |v| {
@@ -317,7 +318,8 @@ test "evil indirection" {
     }
 
     {
-        const no = try RESP3Parser.parseAlloc(?***f32, allocator, MakeEvilNil().reader());
+        var fbs_evil_nil = MakeEvilNil();
+        const no = try RESP3Parser.parseAlloc(?***f32, allocator, fbs_evil_nil.reader());
         if (no) |_| unreachable;
     }
 
@@ -373,12 +375,14 @@ test "float" {
     const allocator = std.heap.page_allocator;
     {
         {
-            const f = try RESP3Parser.parseAlloc(*f32, allocator, Make1Float().reader());
+            var fbs_1f = Make1Float();
+            const f = try RESP3Parser.parseAlloc(*f32, allocator, fbs_1f.reader());
             defer allocator.destroy(f);
             try testing.expect(f.* == 120.23);
         }
         {
-            const f = try RESP3Parser.parseAlloc([]f32, allocator, Make2Float().reader());
+            var fbs_2f = Make2Float();
+            const f = try RESP3Parser.parseAlloc([]f32, allocator, fbs_2f.reader());
             defer allocator.free(f);
             try testing.expectEqualSlices(f32, &[_]f32{ 1.1, 2.2 }, f);
         }
@@ -397,34 +401,45 @@ test "optional" {
     const maybeInt: ?i64 = null;
     const maybeBool: ?bool = null;
     const maybeArr: ?[4]bool = null;
-    try testing.expectEqual(maybeInt, try RESP3Parser.parse(?i64, MakeNull().reader()));
-    try testing.expectEqual(maybeBool, try RESP3Parser.parse(?bool, MakeNull().reader()));
-    try testing.expectEqual(maybeArr, try RESP3Parser.parse(?[4]bool, MakeNull().reader()));
+    var fbs_null = MakeNull();
+    try testing.expectEqual(maybeInt, try RESP3Parser.parse(?i64, fbs_null.reader()));
+    fbs_null.reset();
+    try testing.expectEqual(maybeBool, try RESP3Parser.parse(?bool, fbs_null.reader()));
+    fbs_null.reset();
+    try testing.expectEqual(maybeArr, try RESP3Parser.parse(?[4]bool, fbs_null.reader()));
 }
 fn MakeNull() std.io.FixedBufferStream([]const u8) {
     return std.io.fixedBufferStream("_\r\n"[0..]);
 }
 
 test "array" {
-    try testing.expectError(error.LengthMismatch, RESP3Parser.parse([5]i64, MakeArray().reader()));
+    var fbs_arr = MakeArray();
+    try testing.expectError(error.LengthMismatch, RESP3Parser.parse([5]i64, fbs_arr.reader()));
     //try testing.expectError(error.LengthMismatch, RESP3Parser.parse([0]i64, MakeArray().reader()));
-    try testing.expectError(error.UnsupportedConversion, RESP3Parser.parse([2]i64, MakeArray().reader()));
-    try testing.expectEqual([2]f32{ 1.2, 3.4 }, try RESP3Parser.parse([2]f32, MakeArray().reader()));
+    fbs_arr.reset();
+    try testing.expectError(error.UnsupportedConversion, RESP3Parser.parse([2]i64, fbs_arr.reader()));
+    fbs_arr.reset();
+    try testing.expectEqual([2]f32{ 1.2, 3.4 }, try RESP3Parser.parse([2]f32, fbs_arr.reader()));
 }
 fn MakeArray() std.io.FixedBufferStream([]const u8) {
     return std.io.fixedBufferStream("*2\r\n,1.2\r\n,3.4\r\n"[0..]);
 }
 
 test "string" {
-    try testing.expectError(error.LengthMismatch, RESP3Parser.parse([5]u8, MakeString().reader()));
-    try testing.expectError(error.LengthMismatch, RESP3Parser.parse([2]u16, MakeString().reader()));
-    try testing.expectEqualSlices(u8, "Hello World!", &try RESP3Parser.parse([12]u8, MakeSimpleString().reader()));
-    try testing.expectError(error.LengthMismatch, RESP3Parser.parse([11]u8, MakeSimpleString().reader()));
-    try testing.expectError(error.LengthMismatch, RESP3Parser.parse([13]u8, MakeSimpleString().reader()));
+    var fbs_str = MakeString();
+    try testing.expectError(error.LengthMismatch, RESP3Parser.parse([5]u8, fbs_str.reader()));
+    fbs_str.reset();
+    try testing.expectError(error.LengthMismatch, RESP3Parser.parse([2]u16, fbs_str.reader()));
+    var fbs_str2 = MakeSimpleString();
+    try testing.expectEqualSlices(u8, "Hello World!", &try RESP3Parser.parse([12]u8, fbs_str2.reader()));
+    fbs_str2.reset();
+    try testing.expectError(error.LengthMismatch, RESP3Parser.parse([13]u8, fbs_str2.reader()));
 
     const allocator = std.heap.page_allocator;
-    try testing.expectEqualSlices(u8, "Banana", try RESP3Parser.parseAlloc([]u8, allocator, MakeString().reader()));
-    try testing.expectEqualSlices(u8, "Hello World!", try RESP3Parser.parseAlloc([]u8, allocator, MakeSimpleString().reader()));
+    fbs_str.reset();
+    try testing.expectEqualSlices(u8, "Banana", try RESP3Parser.parseAlloc([]u8, allocator, fbs_str.reader()));
+    fbs_str2.reset();
+    try testing.expectEqualSlices(u8, "Hello World!", try RESP3Parser.parseAlloc([]u8, allocator, fbs_str2.reader()));
 }
 fn MakeString() std.io.FixedBufferStream([]const u8) {
     return std.io.fixedBufferStream("$6\r\nBanana\r\n"[0..]);
@@ -440,8 +455,8 @@ test "map2struct" {
         second: bool,
         third: FixBuf(11),
     };
-
-    const res = try RESP3Parser.parse(MyStruct, MakeMap().reader());
+    var fbs_map = MakeMap();
+    const res = try RESP3Parser.parse(MyStruct, fbs_map.reader());
     try testing.expect(res.first == 12.34);
     try testing.expect(res.second == true);
     try testing.expectEqualSlices(u8, "Hello World", res.third.toSlice());
@@ -449,11 +464,13 @@ test "map2struct" {
 test "hashmap" {
     const allocator = std.heap.page_allocator;
     const FloatDict = std.StringHashMap(f64);
-    const res = try RESP3Parser.parseAlloc(FloatDict, allocator, MakeFloatMap().reader());
+    var fbs_map = MakeFloatMap();
+    const res = try RESP3Parser.parseAlloc(FloatDict, allocator, fbs_map.reader());
     try testing.expect(12.34 == res.get("aaa").?);
     try testing.expect(56.78 == res.get("bbb").?);
     try testing.expect(99.99 == res.get("ccc").?);
 }
+// TODO: get rid if this
 fn MakeFloatMap() std.io.FixedBufferStream([]const u8) {
     return std.io.fixedBufferStream("%3\r\n$3\r\naaa\r\n,12.34\r\n$3\r\nbbb\r\n,56.78\r\n$3\r\nccc\r\n,99.99\r\n"[0..]);
 }

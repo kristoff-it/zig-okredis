@@ -1,14 +1,14 @@
-const builtin = @import("builtin");
 const std = @import("std");
 const fmt = std.fmt;
 const mem = std.mem;
 const testing = std.testing;
+const builtin = @import("builtin");
 
 /// Parses RedisBlobString values
 pub const BlobStringParser = struct {
     pub fn isSupported(comptime T: type) bool {
         return switch (@typeInfo(T)) {
-            .Int, .Float, .Array => true,
+            .int, .float, .array => true,
             else => false,
         };
     }
@@ -16,7 +16,7 @@ pub const BlobStringParser = struct {
     pub fn parse(comptime T: type, comptime _: type, msg: anytype) !T {
         var buf: [100]u8 = undefined;
         var end: usize = 0;
-        for (buf) |*elem, i| {
+        for (&buf, 0..) |*elem, i| {
             const ch = try msg.readByte();
             elem.* = ch;
             if (ch == '\r') {
@@ -30,7 +30,7 @@ pub const BlobStringParser = struct {
 
         switch (@typeInfo(T)) {
             else => unreachable,
-            .Int => {
+            .int => {
                 // Try to parse an int from the string.
                 // TODO: write real implementation
                 if (size > buf.len) return error.SorryBadImplementation;
@@ -40,7 +40,7 @@ pub const BlobStringParser = struct {
                 try msg.skipBytes(2, .{});
                 return res;
             },
-            .Float => {
+            .float => {
                 // Try to parse a float from the string.
                 // TODO: write real implementation
                 if (size > buf.len) return error.SorryBadImplementation;
@@ -50,9 +50,9 @@ pub const BlobStringParser = struct {
                 try msg.skipBytes(2, .{});
                 return res;
             },
-            .Array => |arr| {
+            .array => |arr| {
                 var res: [arr.len]arr.child = undefined;
-                var bytesSlice = mem.sliceAsBytes(res[0..]);
+                const bytesSlice = mem.sliceAsBytes(res[0..]);
                 if (bytesSlice.len != size) {
                     return error.LengthMismatch;
                 }
@@ -66,7 +66,7 @@ pub const BlobStringParser = struct {
 
     pub fn isSupportedAlloc(comptime T: type) bool {
         return switch (@typeInfo(T)) {
-            .Pointer => true,
+            .pointer => true,
             else => isSupported(T),
         };
     }
@@ -75,11 +75,11 @@ pub const BlobStringParser = struct {
         // @compileLog(@typeInfo(T));
         // std.debug.print("\n\nTYPE={}\n\n", .{@typeInfo(T)});
         switch (@typeInfo(T)) {
-            .Pointer => |ptr| {
+            .pointer => |ptr| {
                 // TODO: write real implementation
                 var buf: [100]u8 = undefined;
                 var end: usize = 0;
-                for (buf) |*elem, i| {
+                for (&buf, 0..) |*elem, i| {
                     const ch = try msg.readByte();
                     elem.* = ch;
                     if (ch == '\r') {
@@ -91,16 +91,16 @@ pub const BlobStringParser = struct {
                 try msg.skipBytes(1, .{});
                 var size = try fmt.parseInt(usize, buf[0..end], 10);
 
-                if (ptr.size == .C) size += @sizeOf(ptr.child);
+                if (ptr.size == .c) size += @sizeOf(ptr.child);
 
                 const elemSize = std.math.divExact(usize, size, @sizeOf(ptr.child)) catch return error.LengthMismatch;
-                var res = try allocator.alignedAlloc(ptr.child, @alignOf(T), elemSize);
+                const res = try allocator.alignedAlloc(ptr.child, @alignOf(T), elemSize);
                 errdefer allocator.free(res);
 
                 var bytes = mem.sliceAsBytes(res);
-                if (ptr.size == .C) {
+                if (ptr.size == .c) {
                     msg.readNoEof(bytes[0 .. size - @sizeOf(ptr.child)]) catch return error.GraveProtocolError;
-                    if (ptr.size == .C) {
+                    if (ptr.size == .c) {
                         // TODO: maybe reword this loop for better performance?
                         for (bytes[(size - @sizeOf(ptr.child))..]) |*b| b.* = 0;
                     }
@@ -110,9 +110,9 @@ pub const BlobStringParser = struct {
                 try msg.skipBytes(2, .{});
 
                 return switch (ptr.size) {
-                    .One, .Many => @compileError("Only Slices and C pointers should reach sub-parsers"),
-                    .Slice => res,
-                    .C => @ptrCast(T, res.ptr),
+                    .one, .many => @compileError("Only Slices and C pointers should reach sub-parsers"),
+                    .slice => res,
+                    .c => @ptrCast(res.ptr),
                 };
             },
             else => return parse(T, struct {}, msg),
@@ -122,14 +122,20 @@ pub const BlobStringParser = struct {
 
 test "string" {
     {
-        try testing.expect(1337 == try BlobStringParser.parse(u32, struct {}, MakeInt().reader()));
-        try testing.expectError(error.InvalidCharacter, BlobStringParser.parse(u32, struct {}, MakeString().reader()));
-        try testing.expect(1337.0 == try BlobStringParser.parse(f32, struct {}, MakeInt().reader()));
-        try testing.expect(12.34 == try BlobStringParser.parse(f64, struct {}, MakeFloat().reader()));
+        var fbs_int = MakeInt();
+        try testing.expect(1337 == try BlobStringParser.parse(u32, struct {}, fbs_int.reader()));
+        var fbs_str = MakeString();
+        try testing.expectError(error.InvalidCharacter, BlobStringParser.parse(u32, struct {}, fbs_str.reader()));
+        var fbs_int2 = MakeInt();
+        try testing.expect(1337.0 == try BlobStringParser.parse(f32, struct {}, fbs_int2.reader()));
+        var fbs_flt = MakeFloat();
+        try testing.expect(12.34 == try BlobStringParser.parse(f64, struct {}, fbs_flt.reader()));
 
-        try testing.expectEqualSlices(u8, "Hello World!", &try BlobStringParser.parse([12]u8, struct {}, MakeString().reader()));
+        var fbs_str2 = MakeString();
+        try testing.expectEqualSlices(u8, "Hello World!", &try BlobStringParser.parse([12]u8, struct {}, fbs_str2.reader()));
 
-        const res = try BlobStringParser.parse([2][4]u8, struct {}, MakeEmoji2().reader());
+        var fbs_ji = MakeEmoji2();
+        const res = try BlobStringParser.parse([2][4]u8, struct {}, fbs_ji.reader());
         try testing.expectEqualSlices(u8, "😈", &res[0]);
         try testing.expectEqualSlices(u8, "👿", &res[1]);
     }
@@ -137,33 +143,40 @@ test "string" {
     {
         const allocator = std.heap.page_allocator;
         {
-            const s = try BlobStringParser.parseAlloc([]u8, struct {}, allocator, MakeString().reader());
+            var fbs_str3 = MakeString();
+            const s = try BlobStringParser.parseAlloc([]u8, struct {}, allocator, fbs_str3.reader());
             defer allocator.free(s);
             try testing.expectEqualSlices(u8, s, "Hello World!");
         }
         {
-            const s = try BlobStringParser.parseAlloc([*c]u8, struct {}, allocator, MakeString().reader());
+            var fbs_str4 = MakeString();
+            const s = try BlobStringParser.parseAlloc([*c]u8, struct {}, allocator, fbs_str4.reader());
             defer allocator.free(s[0..12]);
             try testing.expectEqualSlices(u8, s[0..13], "Hello World!\x00");
         }
         {
-            const s = try BlobStringParser.parseAlloc([][4]u8, struct {}, allocator, MakeEmoji2().reader());
+            var fbs_ji2 = MakeEmoji2();
+            const s = try BlobStringParser.parseAlloc([][4]u8, struct {}, allocator, fbs_ji2.reader());
             defer allocator.free(s);
             try testing.expectEqualSlices(u8, "😈", &s[0]);
             try testing.expectEqualSlices(u8, "👿", &s[1]);
         }
         {
-            const s = try BlobStringParser.parseAlloc([*c][4]u8, struct {}, allocator, MakeEmoji2().reader());
+            var fbs_ji2 = MakeEmoji2();
+            const s = try BlobStringParser.parseAlloc([*c][4]u8, struct {}, allocator, fbs_ji2.reader());
             defer allocator.free(s[0..3]);
             try testing.expectEqualSlices(u8, "😈", &s[0]);
             try testing.expectEqualSlices(u8, "👿", &s[1]);
             try testing.expectEqualSlices(u8, &[4]u8{ 0, 0, 0, 0 }, &s[3]);
         }
         {
-            try testing.expectError(error.LengthMismatch, BlobStringParser.parseAlloc([][5]u8, struct {}, allocator, MakeString().reader()));
+            var fbs_str4 = MakeString();
+            try testing.expectError(error.LengthMismatch, BlobStringParser.parseAlloc([][5]u8, struct {}, allocator, fbs_str4.reader()));
         }
     }
 }
+
+// TODO: get rid of this
 fn MakeEmoji2() std.io.FixedBufferStream([]const u8) {
     return std.io.fixedBufferStream("$8\r\n😈👿\r\n"[1..]);
 }

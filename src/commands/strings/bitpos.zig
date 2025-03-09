@@ -77,7 +77,7 @@ test "serializer" {
         correctMsg.reset();
         testMsg.reset();
 
-        var cmd = BITPOS.init("test", .Zero, -3, null);
+        const cmd = BITPOS.init("test", .Zero, -3, null);
         try serializer.serializeCommand(
             testMsg.writer(),
             cmd,

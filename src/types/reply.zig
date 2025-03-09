@@ -1,7 +1,8 @@
 const std = @import("std");
 const Allocator = std.mem.Allocator;
-const Verbatim = @import("./verbatim.zig").Verbatim;
 const testing = std.testing;
+
+const Verbatim = @import("./verbatim.zig").Verbatim;
 
 pub const E = error.DynamicReplyError;
 
@@ -95,12 +96,14 @@ test "dynamic replies" {
     const allocator = std.heap.page_allocator;
 
     {
-        const reply = try DynamicReply.Redis.Parser.parseAlloc('+', parser, allocator, MakeSimpleString().reader());
+        var simple_string_fbs = MakeSimpleString();
+        const reply = try DynamicReply.Redis.Parser.parseAlloc('+', parser, allocator, simple_string_fbs.reader());
         try testing.expectEqualSlices(u8, "Yayyyy I'm a string!", reply.data.String.string);
     }
 
     {
-        const reply = try DynamicReply.Redis.Parser.parseAlloc('*', parser, allocator, MakeComplexList().reader());
+        var complex_list_fbs = MakeComplexList();
+        const reply = try DynamicReply.Redis.Parser.parseAlloc('*', parser, allocator, complex_list_fbs.reader());
         try testing.expectEqual(@as(usize, 0), reply.attribs.len);
 
         try testing.expectEqualSlices(u8, "Hello", reply.data.List[0].data.String.string);
@@ -118,7 +121,8 @@ test "dynamic replies" {
     }
 
     {
-        const reply = try DynamicReply.Redis.Parser.parseAlloc('|', parser, allocator, MakeComplexListWithAttributes().reader());
+        var cmplx_set = MakeComplexListWithAttributes();
+        const reply = try DynamicReply.Redis.Parser.parseAlloc('|', parser, allocator, cmplx_set.reader());
         try testing.expectEqual(@as(usize, 2), reply.attribs.len);
         try testing.expectEqualSlices(u8, "Ciao", reply.attribs[0][0].data.String.string);
         try testing.expectEqualSlices(u8, "World", reply.attribs[0][1].data.String.string);

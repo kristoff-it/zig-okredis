@@ -1,0 +1,12 @@
+.{
+    .name = .okredis,
+    .version = "0.0.0",
+    .fingerprint = 0x3fa63be1eaf60e0a, // Changing this has security and trust implications.
+    .minimum_zig_version = "0.14.0",
+    .paths = .{
+        "build.zig",
+        "build.zig.zon",
+        "src",
+        "LICENSE",
+    },
+}

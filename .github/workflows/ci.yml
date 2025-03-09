@@ -1,23 +1,24 @@
-name: CI
-on: 
+name: Tests
+
+on:
   push:
-    paths:
-      - 'src/**'
+
+  pull_request:
+    branches:
+      - main
+
 jobs:
-
   build:
-    name: Build
     runs-on: ubuntu-latest
+
     steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
 
-    - name: Get latest Zig
-      run: sudo snap install zig --classic --edge
+      - name: Setup Zig Compiler
+        uses: mlugg/setup-zig@v1
+        with:
+          version: master
 
-    - name: Check out code 
-      uses: actions/checkout@v1
-      
-    - name: LMAO
-      run: sudo chown root:root /
-      
-    - name: Run tests
-      run: zig build test
+      - name: Build and test Zig Project
+        run: zig build

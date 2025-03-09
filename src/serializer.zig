@@ -1,4 +1,5 @@
 const std = @import("std");
+
 const traits = @import("./traits.zig");
 
 pub const CommandSerializer = struct {
@@ -38,17 +39,16 @@ pub const CommandSerializer = struct {
         }
 
         switch (@typeInfo(CmdT)) {
-            else => {
-                @compileLog(CmdT);
-                @compileError("unsupported");
-            },
-            .Struct => {
+            else => comptime unreachable,
+            .@"struct" => {
+                // TODO: see isTuple
+
                 // Since we already handled structs that implement the
                 // Command trait, the expectation here is that this struct
                 // is in fact a Zig Tuple.
-                if (!(comptime std.meta.trait.isTuple(CmdT))) {
-                    @compileError("Only Zig tuples and Redis.Command types are allowed as argument to send.");
-                }
+                // if (!(comptime std.meta.trait.isTuple(CmdT))) {
+                //     @compileError("Only Zig tuples and Redis.Command types are allowed as argument to send.");
+                // }
 
                 // Count the number of arguments
                 var argNum: usize = 0;
@@ -59,11 +59,11 @@ pub const CommandSerializer = struct {
                         argNum += ArgT.RedisArguments.count(arg);
                     } else {
                         argNum += switch (@typeInfo(ArgT)) {
-                            .Array => |arr| if (arr.child != u8) arg.len else 1,
-                            .Pointer => |ptr| switch (ptr.size) {
-                                .Slice => if (ptr.child != u8) arg.len else 1,
-                                .One => switch (@typeInfo(ptr.child)) {
-                                    .Array => |arr| if (arr.child != u8) arg.len else 1,
+                            .array => |arr| if (arr.child != u8) arg.len else 1,
+                            .pointer => |ptr| switch (ptr.size) {
+                                .slice => if (ptr.child != u8) arg.len else 1,
+                                .one => switch (@typeInfo(ptr.child)) {
+                                    .array => |arr| if (arr.child != u8) arg.len else 1,
                                     else => @compileError("unsupported"),
                                 },
                                 else => @compileError("unsupported"),
@@ -85,7 +85,7 @@ pub const CommandSerializer = struct {
                         try ArgT.RedisArguments.serialize(arg, CommandSerializer, msg);
                     } else {
                         switch (@typeInfo(ArgT)) {
-                            .Array => |arr| if (arr.child != u8) {
+                            .array => |arr| if (arr.child != u8) {
                                 for (arg) |elem| {
                                     if (comptime traits.isArguments(arr.child)) {
                                         try arr.child.RedisArguments.serialize(elem, CommandSerializer, msg);
@@ -96,8 +96,8 @@ pub const CommandSerializer = struct {
                             } else {
                                 try serializeArgument(msg, ArgT, arg);
                             },
-                            .Pointer => |ptr| switch (ptr.size) {
-                                .Slice => {
+                            .pointer => |ptr| switch (ptr.size) {
+                                .slice => {
                                     if (ptr.child != u8) {
                                         for (arg) |elem| {
                                             if (comptime traits.isArguments(ptr.child)) {
@@ -110,8 +110,8 @@ pub const CommandSerializer = struct {
                                         try serializeArgument(msg, ArgT, arg);
                                     }
                                 },
-                                .One => switch (@typeInfo(ptr.child)) {
-                                    .Array => |arr| {
+                                .one => switch (@typeInfo(ptr.child)) {
+                                    .array => |arr| {
                                         if (arr.child != u8) {
                                             for (arg) |elem| {
                                                 if (comptime traits.isArguments(arr.child)) {
@@ -148,32 +148,32 @@ pub const CommandSerializer = struct {
         // and serializeCommand(), Redis.Argument types
         // can call this function and pass a basic type.
         switch (@typeInfo(T)) {
-            .Int,
-            .Float,
-            .ComptimeInt,
+            .int,
+            .float,
+            .comptime_int,
             => {
                 // TODO: write a better method
                 var buf: [100]u8 = undefined;
-                var res = try std.fmt.bufPrint(buf[0..], "{}", .{val});
+                const res = try std.fmt.bufPrint(buf[0..], "{}", .{val});
                 // std.debug.warn("${}\r\n{s}\r\n", res.len, res);
                 try msg.print("${}\r\n{s}\r\n", .{ res.len, res });
             },
-            .ComptimeFloat => {
+            .comptime_float => {
                 // TODO: write a better method, avoid duplication?
                 var buf: [100]u8 = undefined;
-                var res = try std.fmt.bufPrint(buf[0..], "{}", .{@as(f64, val)});
+                const res = try std.fmt.bufPrint(buf[0..], "{}", .{@as(f64, val)});
                 // std.debug.warn("${}\r\n{s}\r\n", res.len, res);
                 try msg.print("${}\r\n{s}\r\n", .{ res.len, res });
             },
-            .Array => {
+            .array => {
                 // std.debug.warn("${}\r\n{s}\r\n", val.len, val);
                 try msg.print("${}\r\n{s}\r\n", .{ val.len, val });
             },
-            .Pointer => |ptr| {
+            .pointer => |ptr| {
                 switch (ptr.size) {
-                    // .One => {
+                    // .one => {
                     //     switch (@typeInfo(ptr.child)) {
-                    //         .Array => {
+                    //         .array => {
                     //             const arr = val.*;
                     //             try msg.print("${}\r\n{s}\r\n", .{ arr.len, arr });
                     //             return;
@@ -181,11 +181,11 @@ pub const CommandSerializer = struct {
                     //         else => @compileError("unsupported"),
                     //     }
                     // },
-                    .Slice => {
+                    .slice => {
                         try msg.print("${}\r\n{s}\r\n", .{ val.len, val });
                     },
                     else => {
-                        if ((ptr.size != .Slice or ptr.size != .One) or ptr.child != u8) {
+                        if ((ptr.size != .slice or ptr.size != .one) or ptr.child != u8) {
                             @compileLog(ptr.size);
                             @compileLog(ptr.child);
                             @compileError("Type " ++ T ++ " is not supported.");
@@ -197,5 +197,3 @@ pub const CommandSerializer = struct {
         }
     }
 };
-
-

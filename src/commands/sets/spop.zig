@@ -7,20 +7,20 @@ pub const SPOP = struct {
     count: Count,
 
     pub const Count = union(enum) {
-        One,
+        one,
         Count: usize,
 
         pub const RedisArguments = struct {
             pub fn count(self: Count) usize {
                 return switch (self) {
-                    .One => 0,
+                    .one => 0,
                     .Count => 1,
                 };
             }
 
             pub fn serialize(self: Count, comptime rootSerializer: type, msg: anytype) !void {
                 switch (self) {
-                    .One => {},
+                    .one => {},
                     .Count => |c| {
                         try rootSerializer.serializeArgument(msg, usize, c);
                     },
@@ -50,7 +50,7 @@ pub const SPOP = struct {
 };
 
 test "basic usage" {
-    const cmd = SPOP.init("myset", .One);
+    const cmd = SPOP.init("myset", .one);
     try cmd.validate();
 
     const cmd1 = SPOP.init("myset", SPOP.Count{ .Count = 5 });
@@ -73,7 +73,7 @@ test "serializer" {
 
             try serializer.serializeCommand(
                 testMsg.writer(),
-                SPOP.init("s", .One),
+                SPOP.init("s", .one),
             );
             try serializer.serializeCommand(
                 correctMsg.writer(),

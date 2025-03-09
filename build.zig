@@ -1,33 +1,47 @@
 const std = @import("std");
-const builtin = @import("builtin");
-const Builder = std.build.Builder;
 
-pub fn build(b: *Builder) void {
-    const mode = b.standardReleaseOptions();
+pub fn build(b: *std.Build) void {
+    const target = b.standardTargetOptions(.{});
+    const optimize = b.standardOptimizeOption(.{});
+    const okredis = b.addModule("okredis", .{
+        .root_source_file = b.path("src/root.zig"),
+    });
+    const lib_unit_tests = b.addTest(.{
+        .root_source_file = b.path("src/root.zig"),
+        .target = target,
+        .optimize = optimize,
+    });
+    const run_lib_unit_tests = b.addRunArtifact(lib_unit_tests);
+    b.default_step.dependOn(&run_lib_unit_tests.step);
 
-    const tests = b.addTest("src/okredis.zig");
-    tests.setBuildMode(mode);
-    tests.setNamePrefix("debug test");
+    const docs_step = b.step("docs", "Emit docs");
 
-    const test_step = b.step("test", "Run all tests in debug mode.");
-    test_step.dependOn(&tests.step);
-
-    const build_docs = b.addSystemCommand(&[_][]const u8{
-        b.zig_exe,
-        "test",
-        "src/okredis.zig",
-        // "-target",
-        // "x86_64-linux",
-        "-femit-docs",
-        "-fno-emit-bin",
-        "--output-dir",
-        ".",
+    const docs_install = b.addInstallDirectory(.{
+        .install_dir = .prefix,
+        .install_subdir = "docs",
+        .source_dir = lib_unit_tests.getEmittedDocs(),
     });
 
-    const all_step = b.step("all", "Builds docs and runs all tests");
-    const docs = b.step("docs", "Builds docs");
-    docs.dependOn(&build_docs.step);
-    all_step.dependOn(test_step);
-    all_step.dependOn(docs);
-    b.default_step.dependOn(docs);
+    docs_step.dependOn(&docs_install.step);
+    b.default_step.dependOn(docs_step);
+
+    // example
+    const example_step = b.step("example", "Build example");
+    const simple_example = b.addExecutable(.{
+        .name = "example",
+        .target = target,
+        .optimize = optimize,
+        .root_source_file = b.path("example.zig"),
+    });
+    simple_example.root_module.addImport("okredis", okredis);
+    const example_install = b.addInstallArtifact(simple_example, .{});
+    example_step.dependOn(&example_install.step);
+    b.default_step.dependOn(example_step);
+
+    const run_example = b.addRunArtifact(simple_example);
+
+    run_example.step.dependOn(b.getInstallStep());
+
+    const run_step = b.step("run-example", "Run the example");
+    run_step.dependOn(&run_example.step);
 }

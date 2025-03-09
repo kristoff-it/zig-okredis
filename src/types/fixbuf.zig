@@ -27,7 +27,7 @@ pub fn FixBuf(comptime size: usize) type {
                         '+', '(' => {
                             var res: Self = undefined;
                             var ch = try msg.readByte();
-                            for (res.buf) |*elem, i| {
+                            for (&res.buf, 0..) |*elem, i| {
                                 if (ch == '\r') {
                                     res.len = i;
                                     try msg.skipBytes(1, .{});
@@ -44,7 +44,7 @@ pub fn FixBuf(comptime size: usize) type {
                             // TODO: write real implementation
                             var buf: [100]u8 = undefined;
                             var end: usize = 0;
-                            for (buf) |*elem, i| {
+                            for (&buf, 0..) |*elem, i| {
                                 const ch = try msg.readByte();
                                 elem.* = ch;
                                 if (ch == '\r') {

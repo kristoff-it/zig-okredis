@@ -1,8 +1,9 @@
 /// XADD key id [MAXLEN [~] count] field value [field value ...]
 const std = @import("std");
-const utils = @import("./_utils.zig");
+
 const common = @import("../_common_utils.zig");
 const FV = common.FV;
+const utils = @import("./_utils.zig");
 
 pub const XADD = struct {
     //! Command builder for XADD.
@@ -107,7 +108,7 @@ pub const XADD = struct {
 
 fn _forStruct(comptime T: type) type {
     // TODO: support pointers to struct, check that the struct is serializable (strings and numbers).
-    if (@typeInfo(T) != .Struct) @compileError("Only Struct types allowed.");
+    if (@typeInfo(T) != .@"struct") @compileError("Only Struct types allowed.");
     return struct {
         key: []const u8,
         id: []const u8,

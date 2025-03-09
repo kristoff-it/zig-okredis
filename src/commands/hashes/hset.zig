@@ -1,6 +1,7 @@
 // HSET key field value [field value ...]
 
 const std = @import("std");
+
 const common = @import("../_common_utils.zig");
 const FV = common.FV;
 
@@ -53,7 +54,7 @@ pub const HSET = struct {
 fn _forStruct(comptime T: type) type {
     // TODO: support pointers to struct, check that the struct is serializable (strings and numbers).
     // TODO: there is some duplicated code with xread. Values should be a dedicated generic type.
-    if (@typeInfo(T) != .Struct) @compileError("Only Struct types allowed.");
+    if (@typeInfo(T) != .@"struct") @compileError("Only Struct types allowed.");
     return struct {
         key: []const u8,
         values: T,

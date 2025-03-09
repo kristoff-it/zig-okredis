@@ -7,19 +7,19 @@ pub const SetParser = struct {
     // TODO: prevent users from unmarshaling structs out of strings
     pub fn isSupported(comptime T: type) bool {
         return switch (@typeInfo(T)) {
-            .Array => true,
+            .array => true,
             else => false,
         };
     }
 
     pub fn isSupportedAlloc(comptime T: type) bool {
         // HashMap
-        if (@typeInfo(T) == .Struct and @hasDecl(T, "Entry")) {
-            return void == std.meta.fieldInfo(T.Entry, .value_ptr).field_type;
+        if (@typeInfo(T) == .@"struct" and @hasDecl(T, "Entry")) {
+            return void == std.meta.fieldInfo(T.Entry, .value_ptr).type;
         }
 
         return switch (@typeInfo(T)) {
-            .Pointer => true,
+            .pointer => true,
             else => isSupported(T),
         };
     }
@@ -27,16 +27,15 @@ pub const SetParser = struct {
     pub fn parse(comptime T: type, comptime rootParser: type, msg: anytype) !T {
         return parseImpl(T, rootParser, .{}, msg);
     }
-
     pub fn parseAlloc(comptime T: type, comptime rootParser: type, allocator: std.mem.Allocator, msg: anytype) !T {
         // HASHMAP
-        if (@typeInfo(T) == .Struct and @hasDecl(T, "Entry")) {
-            const isManaged = @typeInfo(@TypeOf(T.deinit)).Fn.args.len == 1;
+        if (@typeInfo(T) == .@"struct" and @hasDecl(T, "Entry")) {
+            const isManaged = @typeInfo(@TypeOf(T.deinit)).@"fn".params.len == 1;
 
             // TODO: write real implementation
             var buf: [100]u8 = undefined;
             var end: usize = 0;
-            for (buf) |*elem, i| {
+            for (&buf, 0..) |*elem, i| {
                 const ch = try msg.readByte();
                 elem.* = ch;
                 if (ch == '\r') {
@@ -57,7 +56,7 @@ pub const SetParser = struct {
                 }
             }
 
-            const KeyType = std.meta.fieldInfo(T.Entry, .key_ptr).field_type;
+            const KeyType = std.meta.fieldInfo(T.Entry, .key_ptr).type;
 
             var foundNil = false;
             var foundErr = false;
@@ -72,7 +71,7 @@ pub const SetParser = struct {
                         else => return err,
                     };
                 } else {
-                    var key = rootParser.parseAlloc(KeyType, allocator, msg) catch |err| switch (err) {
+                    const key = rootParser.parseAlloc(KeyType, allocator, msg) catch |err| switch (err) {
                         error.GotNilReply => {
                             foundNil = true;
                             continue;
@@ -125,14 +124,17 @@ test "set" {
     const parser = @import("../parser.zig").RESP3Parser;
     const allocator = std.heap.page_allocator;
 
-    const arr = try SetParser.parse([3]i32, parser, MakeSet().reader());
+    var set1 = MakeSet();
+    const arr = try SetParser.parse([3]i32, parser, set1.reader());
     try testing.expectEqualSlices(i32, &[3]i32{ 1, 2, 3 }, &arr);
 
-    const sli = try SetParser.parseAlloc([]i64, parser, allocator, MakeSet().reader());
+    var set2 = MakeSet();
+    const sli = try SetParser.parseAlloc([]i64, parser, allocator, set2.reader());
     defer allocator.free(sli);
     try testing.expectEqualSlices(i64, &[3]i64{ 1, 2, 3 }, sli);
 
-    var hmap = try SetParser.parseAlloc(std.AutoHashMap(i64, void), parser, allocator, MakeSet().reader());
+    var set3 = MakeSet();
+    var hmap = try SetParser.parseAlloc(std.AutoHashMap(i64, void), parser, allocator, set3.reader());
     defer hmap.deinit();
 
     if (hmap.remove(1)) {} else unreachable;
@@ -142,6 +144,7 @@ test "set" {
     try testing.expectEqual(@as(usize, 0), hmap.count());
 }
 
+// TODO: get rid of this!
 fn MakeSet() std.io.FixedBufferStream([]const u8) {
     return std.io.fixedBufferStream("~3\r\n:1\r\n:2\r\n:3\r\n"[1..]);
 }

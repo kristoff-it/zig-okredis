@@ -1,13 +1,14 @@
-const builtin = @import("builtin");
 const std = @import("std");
 const testing = std.testing;
 const fmt = std.fmt;
+const builtin = @import("builtin");
+
 const FixBuf = @import("../types/fixbuf.zig").FixBuf;
 
 // // TODO: decide what tho do with this weird trait.
 // inline fn isFragmentType(comptime T: type) bool {
 //     const tid = @typeInfo(T);
-//     return (tid == .Struct or tid == .Enum or tid == .Union) and
+//     return (tid == .@"struct" or tid == .@"enum" or tid == .@"union") and
 //         @hasDecl(T, "Redis") and @hasDecl(T.Redis, "Parser") and @hasDecl(T.Redis.Parser, "TokensPerFragment");
 // }
 
@@ -18,14 +19,14 @@ pub const MapParser = struct {
     // the layout of each field-value pair.
     pub fn isSupported(comptime T: type) bool {
         return switch (@typeInfo(T)) {
-            .Array => |arr| switch (@typeInfo(arr.child)) {
-                .Array => |child| child.len == 2,
-                // .Struct, .Union => isFVType(), TODO
+            .array => |arr| switch (@typeInfo(arr.child)) {
+                .array => |child| child.len == 2,
+                // .@"struct", .@"union" => isFVType(), TODO
                 else => false,
             },
-            .Struct => |stc| {
+            .@"struct" => |stc| {
                 for (stc.fields) |f|
-                    if (f.field_type == *anyopaque)
+                    if (f.type == *anyopaque)
                         return false;
                 return true;
             },
@@ -35,9 +36,9 @@ pub const MapParser = struct {
 
     pub fn isSupportedAlloc(comptime T: type) bool {
         return switch (@typeInfo(T)) {
-            .Pointer => |ptr| switch (@typeInfo(ptr.child)) {
-                .Pointer => false, // TODO: decide if we want to support it or not.
-                .Array => |child| child.len == 2,
+            .pointer => |ptr| switch (@typeInfo(ptr.child)) {
+                .pointer => false, // TODO: decide if we want to support it or not.
+                .array => |child| child.len == 2,
                 else => false,
             },
             else => isSupported(T),
@@ -55,7 +56,7 @@ pub const MapParser = struct {
         // TODO: write real implementation
         var buf: [100]u8 = undefined;
         var end: usize = 0;
-        for (buf) |*elem, i| {
+        for (&buf, 0..) |*elem, i| {
             const ch = try msg.readByte();
             elem.* = ch;
             if (ch == '\r') {
@@ -69,7 +70,7 @@ pub const MapParser = struct {
 
         // HASHMAP
         if (@hasField(@TypeOf(allocator), "ptr")) {
-            if (@typeInfo(T) == .Struct and @hasDecl(T, "Entry")) {
+            if (@typeInfo(T) == .@"struct" and @hasDecl(T, "Entry")) {
                 const isManaged = @hasField(T, "unmanaged");
                 var hmap = if (isManaged) T.init(allocator.ptr) else T{};
                 errdefer {
@@ -105,7 +106,7 @@ pub const MapParser = struct {
                     } else {
                         // Differently from the Lists case, here we can't `continue` immediately on fail
                         // because then we would lose count of how many tokens we consumed.
-                        var key = rootParser.parseAlloc(std.meta.fieldInfo(T.Entry, .key_ptr).field_type, allocator.ptr, msg) catch |err| switch (err) {
+                        const key = rootParser.parseAlloc(std.meta.fieldInfo(T.Entry, .key_ptr).type, allocator.ptr, msg) catch |err| switch (err) {
                             error.GotNilReply => blk: {
                                 foundNil = true;
                                 break :blk undefined;
@@ -116,7 +117,7 @@ pub const MapParser = struct {
                             },
                             else => return err,
                         };
-                        var val = rootParser.parseAlloc(std.meta.fieldInfo(T.Entry, .value_ptr).field_type, allocator.ptr, msg) catch |err| switch (err) {
+                        const val = rootParser.parseAlloc(std.meta.fieldInfo(T.Entry, .value_ptr).type, allocator.ptr, msg) catch |err| switch (err) {
                             error.GotNilReply => blk: {
                                 foundNil = true;
                                 break :blk undefined;
@@ -147,7 +148,7 @@ pub const MapParser = struct {
 
         switch (@typeInfo(T)) {
             else => unreachable,
-            .Struct => |stc| {
+            .@"struct" => |stc| {
                 var foundNil = false;
                 var foundErr = false;
                 if (stc.fields.len != size) {
@@ -178,7 +179,7 @@ pub const MapParser = struct {
                 comptime var max_len = 0;
                 comptime var fieldNames: [stc.fields.len][]const u8 = undefined;
                 comptime {
-                    for (stc.fields) |f, i| {
+                    for (stc.fields, 0..) |f, i| {
                         if (f.name.len > max_len) max_len = f.name.len;
                         fieldNames[i] = f.name;
                     }
@@ -226,9 +227,9 @@ pub const MapParser = struct {
                         inline for (stc.fields) |f| {
                             if (std.mem.eql(u8, f.name, hash_field.toSlice())) {
                                 @field(result, f.name) = (if (@hasField(@TypeOf(allocator), "ptr"))
-                                    rootParser.parseAlloc(f.field_type, allocator.ptr, msg)
+                                    rootParser.parseAlloc(f.type, allocator.ptr, msg)
                                 else
-                                    rootParser.parse(f.field_type, msg)) catch |err| switch (err) {
+                                    rootParser.parse(f.type, msg)) catch |err| switch (err) {
                                     error.GotNilReply => blk: {
                                         foundNil = true;
                                         break :blk undefined;
@@ -250,7 +251,7 @@ pub const MapParser = struct {
                 if (foundNil) return error.GotNilReply;
                 return result;
             },
-            .Array => |arr| {
+            .array => |arr| {
                 if (arr.len != size) {
                     // The user requested an array but the map reply from Redis
                     // contains a different amount of items.
@@ -274,7 +275,7 @@ pub const MapParser = struct {
                 // we know the array has a child type of [2]X.
                 var foundNil = false;
                 var foundErr = false;
-                var result: T = undefined;
+                const result: T = undefined;
                 for (result) |*couple| {
                     if (@hasField(@TypeOf(allocator), "ptr")) {
                         couple[0] = rootParser.parseAlloc(@TypeOf(couple[0]), allocator.ptr, msg) catch |err| switch (err) {
@@ -330,7 +331,7 @@ pub const MapParser = struct {
                 if (foundNil) return error.GotNilReply;
                 return result;
             },
-            .Pointer => |ptr| {
+            .pointer => |ptr| {
                 if (!@hasField(@TypeOf(allocator), "ptr")) {
                     @compileError("To decode a slice you need to use sendAlloc / pipeAlloc / transAlloc!");
                 }
@@ -339,7 +340,7 @@ pub const MapParser = struct {
                 // we know the array has a child type of [2]X.
                 var foundNil = false;
                 var foundErr = false;
-                var result = try allocator.ptr.alloc(ptr.child, size); // TODO: recover from OOM?
+                const result = try allocator.ptr.alloc(ptr.child, size); // TODO: recover from OOM?
                 errdefer allocator.ptr.free(result);
 
                 for (result) |*couple| {

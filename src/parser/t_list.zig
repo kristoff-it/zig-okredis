@@ -1,6 +1,6 @@
-const builtin = @import("builtin");
 const std = @import("std");
 const fmt = std.fmt;
+const builtin = @import("builtin");
 
 /// Parses RedisList values.
 /// Uses RESP3Parser to delegate parsing of the list contents recursively.
@@ -8,10 +8,10 @@ pub const ListParser = struct {
     // TODO: prevent users from unmarshaling structs out of strings
     pub fn isSupported(comptime T: type) bool {
         return switch (@typeInfo(T)) {
-            .Array => true,
-            .Struct => |stc| {
+            .array => true,
+            .@"struct" => |stc| {
                 for (stc.fields) |f|
-                    if (f.field_type == *anyopaque)
+                    if (f.type == *anyopaque)
                         return false;
                 return true;
             },
@@ -21,7 +21,7 @@ pub const ListParser = struct {
 
     pub fn isSupportedAlloc(comptime T: type) bool {
         return switch (@typeInfo(T)) {
-            .Pointer => true,
+            .pointer => true,
             else => isSupported(T),
         };
     }
@@ -72,7 +72,7 @@ pub const ListParser = struct {
         // TODO: write real implementation
         var buf: [100]u8 = undefined;
         var end: usize = 0;
-        for (buf) |*elem, i| {
+        for (&buf, 0..) |*elem, i| {
             const ch = try msg.readByte();
             elem.* = ch;
             if (ch == '\r') {
@@ -85,17 +85,17 @@ pub const ListParser = struct {
 
         switch (@typeInfo(T)) {
             else => unreachable,
-            .Pointer => |ptr| {
+            .pointer => |ptr| {
                 if (!@hasField(@TypeOf(allocator), "ptr")) {
                     @compileError("To decode a slice you need to use sendAlloc / pipeAlloc / transAlloc!");
                 }
 
-                var result = try allocator.ptr.alloc(ptr.child, size);
+                const result = try allocator.ptr.alloc(ptr.child, size);
                 errdefer allocator.ptr.free(result);
                 try decodeArray(ptr.child, result, rootParser, allocator, msg);
                 return result;
             },
-            .Array => |arr| {
+            .array => |arr| {
                 if (arr.len != size) {
                     // The user requested an array but the list reply from Redis
                     // contains a different amount of items.
@@ -120,7 +120,7 @@ pub const ListParser = struct {
                 try decodeArray(arr.child, result[0..], rootParser, allocator, msg);
                 return result;
             },
-            .Struct => |stc| {
+            .@"struct" => |stc| {
                 var foundNil = false;
                 var foundErr = false;
                 if (stc.fields.len != size) {
@@ -153,9 +153,9 @@ pub const ListParser = struct {
                         };
                     } else {
                         @field(result, field.name) = (if (@hasField(@TypeOf(allocator), "ptr"))
-                            rootParser.parseAlloc(field.field_type, allocator.ptr, msg)
+                            rootParser.parseAlloc(field.type, allocator.ptr, msg)
                         else
-                            rootParser.parse(field.field_type, msg)) catch |err| switch (err) {
+                            rootParser.parse(field.type, msg)) catch |err| switch (err) {
                             else => return err,
                             error.GotNilReply => blk: {
                                 foundNil = true;

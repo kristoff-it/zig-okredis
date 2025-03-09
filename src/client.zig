@@ -2,9 +2,13 @@ const std = @import("std");
 const os = std.os;
 const net = std.net;
 const Allocator = std.mem.Allocator;
+
 const RESP3 = @import("./parser.zig").RESP3Parser;
 const CommandSerializer = @import("./serializer.zig").CommandSerializer;
 const OrErr = @import("./types/error.zig").OrErr;
+
+// std.io.is_async is gone
+const std_io_is_async = false;
 
 pub const Buffering = union(enum) {
     NoBuffering,
@@ -42,8 +46,8 @@ pub fn RedisClient(comptime buffering: Buffering, comptime _: Logging) type {
         readBuffer: ReadBuffer,
         writeBuffer: WriteBuffer,
 
-        readLock: if (std.io.is_async) std.event.Lock else void,
-        writeLock: if (std.io.is_async) std.event.Lock else void,
+        readLock: if (std_io_is_async) std.event.Lock else void,
+        writeLock: if (std_io_is_async) std.event.Lock else void,
 
         // Connection state
         broken: bool = false,
@@ -66,7 +70,7 @@ pub fn RedisClient(comptime buffering: Buffering, comptime _: Logging) type {
                 },
             }
 
-            if (std.io.is_async) {
+            if (std_io_is_async) {
                 self.readLock = std.event.Lock{};
                 self.writeLock = std.event.Lock{};
             }
@@ -139,30 +143,30 @@ pub fn RedisClient(comptime buffering: Buffering, comptime _: Logging) type {
                 // if (self.broken) return error.BrokenConnection;
                 // errdefer self.broken = true;
             }
-            var heldWrite: std.event.Lock.Held = undefined;
-            var heldRead: std.event.Lock.Held = undefined;
-            var heldReadFrame: @Frame(std.event.Lock.acquire) = undefined;
+            // var heldWrite: std.event.Lock.Held = undefined;
+            // var heldRead: std.event.Lock.Held = undefined;
+            // var heldReadFrame: @Frame(std.event.Lock.acquire) = undefined;
 
             // If we're doing async/await we need to first grab the lock
             // for the write stream. Once we have it, we also need to queue
             // for the read lock, but we don't have to acquire it fully yet.
             // For this reason we don't await `self.readLock.acquire()` and in
             // the meantime we start writing to the write stream.
-            if (std.io.is_async) {
-                heldWrite = self.writeLock.acquire();
-                heldReadFrame = async self.readLock.acquire();
-            }
+            // if (std_io_is_async) {
+            //     heldWrite = self.writeLock.acquire();
+            //     heldReadFrame = async self.readLock.acquire();
+            // }
 
-            var heldReadFrameNotAwaited = true;
-            defer if (std.io.is_async and heldReadFrameNotAwaited) {
-                heldRead = await heldReadFrame;
-                heldRead.release();
-            };
+            // var heldReadFrameNotAwaited = true;
+            // defer if (std_io_is_async and heldReadFrameNotAwaited) {
+            //     heldRead = await heldReadFrame;
+            //     heldRead.release();
+            // };
 
             {
                 // We add a block to release the write lock before we start
                 // reading from the read stream.
-                defer if (std.io.is_async) heldWrite.release();
+                // defer if (std_io_is_async) heldWrite.release();
 
                 // Serialize all the commands
                 if (@hasField(@TypeOf(allocator), "one")) {
@@ -176,7 +180,7 @@ pub fn RedisClient(comptime buffering: Buffering, comptime _: Logging) type {
                 } // Here is where the write lock gets released by the `defer` statement.
 
                 if (buffering == .Fixed) {
-                    if (std.io.is_async) {
+                    if (std_io_is_async) {
                         // TODO: see if this stuff can be implemented nicely
                         // so that you don't have to depend on magic numbers & implementation details.
                         self.writeLock.mutex.lock();
@@ -190,11 +194,11 @@ pub fn RedisClient(comptime buffering: Buffering, comptime _: Logging) type {
                 }
             }
 
-            if (std.io.is_async) {
-                heldReadFrameNotAwaited = false;
-                heldRead = await heldReadFrame;
-            }
-            defer if (std.io.is_async) heldRead.release();
+            // if (std_io_is_async) {
+            //     heldReadFrameNotAwaited = false;
+            //     heldRead = await heldReadFrame;
+            // }
+            // defer if (std_io_is_async) heldRead.release();
 
             // TODO: error procedure
             if (@hasField(@TypeOf(allocator), "one")) {
@@ -215,16 +219,16 @@ pub fn RedisClient(comptime buffering: Buffering, comptime _: Logging) type {
                     return;
                 } else {
                     switch (@typeInfo(Ts)) {
-                        .Struct => {
+                        .@"struct" => {
                             inline for (std.meta.fields(Ts)) |field| {
                                 if (@hasField(@TypeOf(allocator), "ptr")) {
-                                    @field(result, field.name) = try RESP3.parseAlloc(field.field_type, allocator.ptr, self.reader);
+                                    @field(result, field.name) = try RESP3.parseAlloc(field.type, allocator.ptr, self.reader);
                                 } else {
-                                    @field(result, field.name) = try RESP3.parse(field.field_type, self.reader);
+                                    @field(result, field.name) = try RESP3.parse(field.type, self.reader);
                                 }
                             }
                         },
-                        .Array => {
+                        .array => {
                             var i: usize = 0;
                             while (i < Ts.len) : (i += 1) {
                                 if (@hasField(@TypeOf(allocator), "ptr")) {
@@ -234,16 +238,16 @@ pub fn RedisClient(comptime buffering: Buffering, comptime _: Logging) type {
                                 }
                             }
                         },
-                        .Pointer => |ptr| {
+                        .pointer => |ptr| {
                             switch (ptr.size) {
-                                .One => {
+                                .one => {
                                     if (@hasField(@TypeOf(allocator), "ptr")) {
                                         result = try RESP3.parseAlloc(Ts, allocator.ptr, self.reader);
                                     } else {
                                         result = try RESP3.parse(Ts, self.reader);
                                     }
                                 },
-                                .Many => {
+                                .many => {
                                     if (@hasField(@TypeOf(allocator), "ptr")) {
                                         result = try allocator.alloc(ptr.child, ptr.size);
                                         errdefer allocator.free(result);
