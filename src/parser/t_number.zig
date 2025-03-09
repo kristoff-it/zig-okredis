@@ -1,13 +1,13 @@
-const builtin = @import("builtin");
 const std = @import("std");
 const fmt = std.fmt;
 const InStream = std.io.InStream;
+const builtin = @import("builtin");
 
 /// Parses RedisNumber values
 pub const NumberParser = struct {
     pub fn isSupported(comptime T: type) bool {
         return switch (@typeInfo(T)) {
-            .Float, .Int => true,
+            .float, .int => true,
             else => false,
         };
     }
@@ -16,7 +16,7 @@ pub const NumberParser = struct {
         // TODO: write real implementation
         var buf: [100]u8 = undefined;
         var end: usize = 0;
-        for (buf) |*elem, i| {
+        for (&buf, 0..) |*elem, i| {
             const ch = try msg.readByte();
             elem.* = ch;
             if (ch == '\r') {
@@ -27,8 +27,8 @@ pub const NumberParser = struct {
         try msg.skipBytes(1, .{});
         return switch (@typeInfo(T)) {
             else => unreachable,
-            .Int => try fmt.parseInt(T, buf[0..end], 10),
-            .Float => try fmt.parseFloat(T, buf[0..end]),
+            .int => try fmt.parseInt(T, buf[0..end], 10),
+            .float => try fmt.parseFloat(T, buf[0..end]),
         };
     }
 

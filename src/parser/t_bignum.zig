@@ -30,7 +30,7 @@ pub const BigNumParser = struct {
             return bigSlice;
         }
 
-        // T has to be `std.math.big.Int`
+        // T has to be `std.math.big.int`
         var res: T = try T.init(allocator);
         try res.setString(10, bigSlice);
         allocator.free(bigSlice);
@@ -40,19 +40,22 @@ pub const BigNumParser = struct {
 
 test "bignum" {
     const allocator = std.heap.page_allocator;
-    var bgn = try BigNumParser.parseAlloc(std.math.big.int.Managed, void, allocator, MakeBigNum().reader());
+    var fbs_bignum = MakeBigNum();
+    var bgn = try BigNumParser.parseAlloc(std.math.big.int.Managed, void, allocator, fbs_bignum.reader());
     defer bgn.deinit();
 
     const bgnStr = try bgn.toString(allocator, 10, .lower);
     defer allocator.free(bgnStr);
     try testing.expectEqualSlices(u8, "1234567899990000009999876543211234567890", bgnStr);
 
-    const str = try BigNumParser.parseAlloc([]u8, void, allocator, MakeBigNum().reader());
+    var fbs_bignum2 = MakeBigNum();
+    const str = try BigNumParser.parseAlloc([]u8, void, allocator, fbs_bignum2.reader());
     defer allocator.free(str);
 
     try testing.expectEqualSlices(u8, bgnStr, str);
 }
 
+// TODO: get rid of this
 fn MakeBigNum() std.io.FixedBufferStream([]const u8) {
     return std.io.fixedBufferStream("(1234567899990000009999876543211234567890\r\n"[1..]);
 }

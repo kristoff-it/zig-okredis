@@ -1,14 +1,14 @@
 const std = @import("std");
-const client = @import("./client.zig");
-const parser = @import("./parser.zig");
-const serializer = @import("./serializer.zig");
 
-pub const commands = @import("./commands.zig");
-pub const types = @import("./types.zig");
-pub const traits = @import("./traits.zig");
-pub const freeReply = parser.RESP3Parser.freeReply;
+const client = @import("./client.zig");
 pub const Client = client.Client;
 pub const BufferedClient = client.BufferedClient;
+pub const commands = @import("./commands.zig");
+const parser = @import("./parser.zig");
+pub const freeReply = parser.RESP3Parser.freeReply;
+const serializer = @import("./serializer.zig");
+pub const traits = @import("./traits.zig");
+pub const types = @import("./types.zig");
 
 test "okredis" {
     _ = @import("./client.zig");

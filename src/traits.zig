@@ -17,7 +17,7 @@
 /// result in a broken connection state.
 pub fn isParserType(comptime T: type) bool {
     const tid = @typeInfo(T);
-    if ((tid == .Struct or tid == .Enum or tid == .Union) and
+    if ((tid == .@"struct" or tid == .@"enum" or tid == .@"union") and
         @hasDecl(T, "Redis") and @hasDecl(T.Redis, "Parser"))
     {
         if (!@hasDecl(T.Redis.Parser, "parse"))
@@ -83,12 +83,12 @@ pub fn noOptionalWrapper(comptime T: type) bool {
 ///     HMSET mystruct field1 val1 field2 val2 ...
 pub fn isArguments(comptime T: type) bool {
     const tid = @typeInfo(T);
-    return (tid == .Struct or tid == .Enum or tid == .Union) and @hasDecl(T, "RedisArguments");
+    return (tid == .@"struct" or tid == .@"enum" or tid == .@"union") and @hasDecl(T, "RedisArguments");
 }
 
 pub fn isCommand(comptime T: type) bool {
     const tid = @typeInfo(T);
-    return (tid == .Struct or tid == .Enum or tid == .Union) and @hasDecl(T, "RedisCommand");
+    return (tid == .@"struct" or tid == .@"enum" or tid == .@"union") and @hasDecl(T, "RedisCommand");
 }
 // test "trait error message" {
 //     const T = struct {

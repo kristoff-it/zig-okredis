@@ -44,7 +44,7 @@ pub fn isNumericStreamID(id: []const u8) bool {
             '0'...'9' => {},
             '-' => {
                 if (hyphenPosition != -1) return false;
-                hyphenPosition = @bitCast(isize, i);
+                hyphenPosition = @bitCast(i);
                 const first_part = id[0..i];
                 if (first_part.len == 0) return false;
                 _ = std.fmt.parseInt(u64, first_part, 10) catch return false;
@@ -52,7 +52,7 @@ pub fn isNumericStreamID(id: []const u8) bool {
             else => return false,
         }
     }
-    const second_part = id[@bitCast(usize, hyphenPosition + 1)..];
+    const second_part = id[@bitCast(hyphenPosition + 1)..];
     if (second_part.len == 0) return false;
     _ = std.fmt.parseInt(u64, second_part, 10) catch return false;
     return true;

@@ -1,8 +1,9 @@
 const std = @import("std");
 const Allocator = std.mem.Allocator;
+const testing = std.testing;
+
 const FixBuf = @import("./fixbuf.zig").FixBuf;
 const DynamicReply = @import("./reply.zig").DynamicReply;
-const testing = std.testing;
 
 /// A generic type that can capture attributes from a Redis reply.
 pub fn WithAttribs(comptime T: type) type {
@@ -60,10 +61,11 @@ test "WithAttribs" {
     const parser = @import("../parser.zig").RESP3Parser;
     const allocator = std.heap.page_allocator;
 
+    var cplx_set = MakeComplexListWithAttributes();
     const res = try parser.parseAlloc(
         WithAttribs([2]WithAttribs([]WithAttribs(i64))),
         allocator,
-        MakeComplexListWithAttributes().reader(),
+        cplx_set.reader(),
     );
     try testing.expectEqual(@as(usize, 2), res.attribs.len);
     try testing.expectEqualSlices(u8, "Ciao", res.attribs[0][0].data.String.string);

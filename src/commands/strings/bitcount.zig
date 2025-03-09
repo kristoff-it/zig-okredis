@@ -2,7 +2,7 @@
 
 pub const BITCOUNT = struct {
     //! ```
-    //! const cmd = BITCOUNT.init("test", BITCOUNT.Bounds{ .Slice = .{ .start = -2, .end = -1 } });
+    //! const cmd = BITCOUNT.init("test", BITCOUNT.Bounds{ .slice = .{ .start = -2, .end = -1 } });
     //! ```
 
     key: []const u8,
@@ -26,7 +26,7 @@ pub const BITCOUNT = struct {
 
     pub const Bounds = union(enum) {
         FullString,
-        Slice: struct {
+        slice: struct {
             start: isize,
             end: isize,
         },
@@ -35,14 +35,14 @@ pub const BITCOUNT = struct {
             pub fn count(self: Bounds) usize {
                 return switch (self) {
                     .FullString => 0,
-                    .Slice => 2,
+                    .slice => 2,
                 };
             }
 
             pub fn serialize(self: Bounds, comptime rootSerializer: type, msg: anytype) !void {
                 switch (self) {
                     .FullString => {},
-                    .Slice => |slice| {
+                    .slice => |slice| {
                         try rootSerializer.serializeArgument(msg, isize, slice.start);
                         try rootSerializer.serializeArgument(msg, isize, slice.end);
                     },
@@ -53,7 +53,7 @@ pub const BITCOUNT = struct {
 };
 
 test "example" {
-    _ = BITCOUNT.init("test", BITCOUNT.Bounds{ .Slice = .{ .start = -2, .end = -1 } });
+    _ = BITCOUNT.init("test", BITCOUNT.Bounds{ .slice = .{ .start = -2, .end = -1 } });
 }
 
 test "serializer" {
@@ -72,7 +72,7 @@ test "serializer" {
 
         try serializer.serializeCommand(
             testMsg.writer(),
-            BITCOUNT.init("mykey", BITCOUNT.Bounds{ .Slice = .{ .start = 1, .end = 10 } }),
+            BITCOUNT.init("mykey", BITCOUNT.Bounds{ .slice = .{ .start = 1, .end = 10 } }),
         );
         try serializer.serializeCommand(
             correctMsg.writer(),

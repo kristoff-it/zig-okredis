@@ -77,7 +77,7 @@ pub fn OrErr(comptime T: type) type {
                             // TODO: write real implementation
                             var buf: [100]u8 = undefined;
                             var end: usize = 0;
-                            for (buf) |*elem, i| {
+                            for (&buf, 0..) |*elem, i| {
                                 const ch = try msg.readByte();
                                 elem.* = ch;
                                 if (ch == '\r') {
@@ -87,12 +87,12 @@ pub fn OrErr(comptime T: type) type {
                             }
 
                             try msg.skipBytes(1, .{});
-                            var size = try fmt.parseInt(usize, buf[0..end], 10);
+                            const size = try fmt.parseInt(usize, buf[0..end], 10);
                             var res = Self{ .Err = undefined };
 
                             // Parse the Code part
                             var ch = try msg.readByte();
-                            for (res.Err._buf) |*elem, i| {
+                            for (&res.Err._buf, 0..) |*elem, i| {
                                 if (i == size) {
                                     elem.* = ch;
                                     res.Err.end = i;
@@ -123,7 +123,7 @@ pub fn OrErr(comptime T: type) type {
 
                             // Parse the Code part
                             var ch = try msg.readByte();
-                            for (res.Err._buf) |*elem, i| {
+                            for (&res.Err._buf, 0..) |*elem, i| {
                                 switch (ch) {
                                     ' ' => {
                                         res.Err.end = i;
@@ -193,7 +193,7 @@ pub fn OrFullErr(comptime T: type) type {
                             // TODO: write real implementation
                             var buf: [100]u8 = undefined;
                             var end: usize = 0;
-                            for (buf) |*elem, i| {
+                            for (&buf, 0..) |*elem, i| {
                                 const ch = try msg.readByte();
                                 elem.* = ch;
                                 if (ch == '\r') {
@@ -203,13 +203,13 @@ pub fn OrFullErr(comptime T: type) type {
                             }
 
                             try msg.skipBytes(1, .{});
-                            var size = try fmt.parseInt(usize, buf[0..end], 10);
+                            const size = try fmt.parseInt(usize, buf[0..end], 10);
                             var res = Self{ .Err = undefined };
                             res.Err.message = &[0]u8{};
 
                             // Parse the Code part
                             var ch = try msg.readByte();
-                            for (res.Err._buf) |*elem, i| {
+                            for (&res.Err._buf, 0..) |*elem, i| {
                                 if (i == size) {
                                     elem.* = ch;
                                     res.Err.end = i;
@@ -235,7 +235,7 @@ pub fn OrFullErr(comptime T: type) type {
                             // Alloc difference:
                             const remainder = size - res.Err.end;
                             if (remainder == 0) return res;
-                            var slice = try allocator.alloc(u8, remainder);
+                            const slice = try allocator.alloc(u8, remainder);
                             errdefer allocator.free(slice);
 
                             try msg.readNoEof(slice);
@@ -249,7 +249,7 @@ pub fn OrFullErr(comptime T: type) type {
 
                             // Parse the Code part
                             var ch = try msg.readByte();
-                            for (res.Err._buf) |*elem, i| {
+                            for (&res.Err._buf, 0..) |*elem, i| {
                                 switch (ch) {
                                     ' ' => {
                                         res.Err.end = i;
@@ -283,41 +283,49 @@ pub fn OrFullErr(comptime T: type) type {
     };
 }
 test "parse simple errors" {
-    switch (try OrErr(u8).Redis.Parser.parse('_', fakeParser, MakeNil().reader())) {
+    var fbs_nil = MakeNil();
+    switch (try OrErr(u8).Redis.Parser.parse('_', fakeParser, fbs_nil.reader())) {
         .Ok, .Err => unreachable,
         .Nil => try testing.expect(true),
     }
-    switch (try OrErr(u8).Redis.Parser.parse('!', fakeParser, MakeBlobErr().reader())) {
+    var fbs_blob = MakeBlobErr();
+    switch (try OrErr(u8).Redis.Parser.parse('!', fakeParser, fbs_blob.reader())) {
         .Ok, .Nil => unreachable,
         .Err => |err| try testing.expectEqualSlices(u8, "ERRN\r\nOGOODFOOD", err.getCode()),
     }
 
-    switch (try OrErr(u8).Redis.Parser.parse('-', fakeParser, MakeErr().reader())) {
+    var fbs_err = MakeErr();
+    switch (try OrErr(u8).Redis.Parser.parse('-', fakeParser, fbs_err.reader())) {
         .Ok, .Nil => unreachable,
         .Err => |err| try testing.expectEqualSlices(u8, "ERRNOGOODFOOD", err.getCode()),
     }
 
-    switch (try OrErr(u8).Redis.Parser.parse('-', fakeParser, MakeErroji().reader())) {
+    var fbs_errji = MakeErroji();
+    switch (try OrErr(u8).Redis.Parser.parse('-', fakeParser, fbs_errji.reader())) {
         .Ok, .Nil => unreachable,
         .Err => |err| try testing.expectEqualSlices(u8, "😈", err.getCode()),
     }
 
-    switch (try OrErr(u8).Redis.Parser.parse('-', fakeParser, MakeShortErr().reader())) {
+    var fbs_short_err = MakeShortErr();
+    switch (try OrErr(u8).Redis.Parser.parse('-', fakeParser, fbs_short_err.reader())) {
         .Ok, .Nil => unreachable,
         .Err => |err| try testing.expectEqualSlices(u8, "ABC", err.getCode()),
     }
 
-    try testing.expectError(error.ErrorCodeBufTooSmall, OrErr(u8).Redis.Parser.parse('-', fakeParser, MakeBadErr().reader()));
+    var fbs_bad_err = MakeBadErr();
+    try testing.expectError(error.ErrorCodeBufTooSmall, OrErr(u8).Redis.Parser.parse('-', fakeParser, fbs_bad_err.reader()));
 
     const allocator = std.heap.page_allocator;
-    switch (try OrFullErr(u8).Redis.Parser.parseAlloc('-', fakeParser, allocator, MakeErroji().reader())) {
+    var fbs_errji2 = MakeErroji();
+    switch (try OrFullErr(u8).Redis.Parser.parseAlloc('-', fakeParser, allocator, fbs_errji2.reader())) {
         .Ok, .Nil => unreachable,
         .Err => |err| {
             try testing.expectEqualSlices(u8, "😈", err.getCode());
             try testing.expectEqualSlices(u8, "your Redis belongs to us", err.message);
         },
     }
-    switch (try OrFullErr(u8).Redis.Parser.parseAlloc('!', fakeParser, allocator, MakeBlobErr().reader())) {
+    var fbs_blob2 = MakeBlobErr();
+    switch (try OrFullErr(u8).Redis.Parser.parseAlloc('!', fakeParser, allocator, fbs_blob2.reader())) {
         .Ok, .Nil => unreachable,
         .Err => |err| {
             try testing.expectEqualSlices(u8, "ERRN\r\nOGOODFOOD", err.getCode());
@@ -343,6 +351,7 @@ const fakeParser = struct {
     }
 };
 
+// TODO: get rid of this!!!
 fn MakeErroji() std.io.FixedBufferStream([]const u8) {
     return std.io.fixedBufferStream("-😈 your Redis belongs to us\r\n"[1..]);
 }
