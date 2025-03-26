@@ -83,8 +83,8 @@ pub fn RedisClient(comptime buffering: Buffering, comptime _: Logging) type {
             self.broken = false;
 
             if (auth) |a| {
-                if (a.user != null) {
-                    self.send(void, .{ "AUTH", a.user.?, a.pass }) catch |err| {
+                if (a.user) |user| {
+                    self.send(void, .{ "AUTH", user, a.pass }) catch |err| {
                         self.broken = true;
                         return err;
                     };
