@@ -25,6 +25,10 @@ pub const Auth = struct {
     pass: []const u8,
 };
 
+pub const InitOptions = struct {
+    auth: ?Auth = null,
+};
+
 pub const Client = RedisClient(.NoBuffering, .NoLogging);
 pub const BufferedClient = RedisClient(.{ .Fixed = 4096 }, .NoLogging);
 pub fn RedisClient(comptime buffering: Buffering, comptime _: Logging) type {
@@ -60,7 +64,7 @@ pub fn RedisClient(comptime buffering: Buffering, comptime _: Logging) type {
         const Self = @This();
 
         /// Initializes a Client on a connection / pipe provided by the user.
-        pub fn init(self: *Self, conn: net.Stream, auth: ?Auth) !void {
+        pub fn init(self: *Self, conn: net.Stream, options: InitOptions) !void {
             self.conn = conn;
             switch (buffering) {
                 .NoBuffering => {
@@ -82,7 +86,7 @@ pub fn RedisClient(comptime buffering: Buffering, comptime _: Logging) type {
 
             self.broken = false;
 
-            if (auth) |a| {
+            if (options.auth) |a| {
                 if (a.user) |user| {
                     self.send(void, .{ "AUTH", user, a.pass }) catch |err| {
                         self.broken = true;

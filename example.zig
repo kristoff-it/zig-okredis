@@ -10,7 +10,7 @@ pub fn main() !void {
     const connection = try net.tcpConnectToAddress(addr);
 
     var client: Client = undefined;
-    try client.init(connection);
+    try client.init(connection, .{});
     defer client.close();
 
     //   -
