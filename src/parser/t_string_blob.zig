@@ -94,7 +94,8 @@ pub const BlobStringParser = struct {
                 if (ptr.size == .c) size += @sizeOf(ptr.child);
 
                 const elemSize = std.math.divExact(usize, size, @sizeOf(ptr.child)) catch return error.LengthMismatch;
-                const res = try allocator.alignedAlloc(ptr.child, @alignOf(T), elemSize);
+                const alignment: std.mem.Alignment = @enumFromInt(std.math.log2(@alignOf(T)));
+                const res = try allocator.alignedAlloc(ptr.child, alignment, elemSize);
                 errdefer allocator.free(res);
 
                 var bytes = mem.sliceAsBytes(res);
