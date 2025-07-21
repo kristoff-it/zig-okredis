@@ -1,5 +1,8 @@
 // HINCRBY key field increment
 
+const std = @import("std");
+const Writer = std.Io.Writer;
+
 pub const HINCRBY = struct {
     key: []const u8,
     field: []const u8,
@@ -12,8 +15,12 @@ pub const HINCRBY = struct {
     pub fn validate(_: HINCRBY) !void {}
 
     pub const RedisCommand = struct {
-        pub fn serialize(self: HINCRBY, comptime rootSerializer: type, msg: anytype) !void {
-            return rootSerializer.serializeCommand(msg, .{
+        pub fn serialize(
+            self: HINCRBY,
+            comptime rootSerializer: type,
+            w: *Writer,
+        ) !void {
+            return rootSerializer.serializeCommand(w, .{
                 "HINCRBY",
                 self.key,
                 self.field,
@@ -28,28 +35,31 @@ test "basic usage" {
 }
 
 test "serializer" {
-    const std = @import("std");
     const serializer = @import("../../serializer.zig").CommandSerializer;
 
     var correctBuf: [1000]u8 = undefined;
-    var correctMsg = std.io.fixedBufferStream(correctBuf[0..]);
+    var correctMsg: Writer = .fixed(correctBuf[0..]);
 
     var testBuf: [1000]u8 = undefined;
-    var testMsg = std.io.fixedBufferStream(testBuf[0..]);
+    var testMsg: Writer = .fixed(testBuf[0..]);
 
     {
-        correctMsg.reset();
-        testMsg.reset();
+        correctMsg.end = 0;
+        testMsg.end = 0;
 
         try serializer.serializeCommand(
-            testMsg.writer(),
+            &testMsg,
             HINCRBY.init("mykey", "myfield", 42),
         );
         try serializer.serializeCommand(
-            correctMsg.writer(),
+            &correctMsg,
             .{ "HINCRBY", "mykey", "myfield", 42 },
         );
 
-        try std.testing.expectEqualSlices(u8, correctMsg.getWritten(), testMsg.getWritten());
+        try std.testing.expectEqualSlices(
+            u8,
+            correctMsg.buffered(),
+            testMsg.buffered(),
+        );
     }
 }

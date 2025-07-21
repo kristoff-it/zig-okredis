@@ -1,6 +1,7 @@
 // SMEMBERS key
 
 const std = @import("std");
+const Writer = std.Io.Writer;
 
 pub const SMEMBERS = struct {
     key: []const u8,
@@ -30,27 +31,31 @@ test "serializer" {
     const serializer = @import("../../serializer.zig").CommandSerializer;
 
     var correctBuf: [1000]u8 = undefined;
-    var correctMsg = std.io.fixedBufferStream(correctBuf[0..]);
+    var correctMsg: Writer = .fixed(correctBuf[0..]);
 
     var testBuf: [1000]u8 = undefined;
-    var testMsg = std.io.fixedBufferStream(testBuf[0..]);
+    var testMsg: Writer = .fixed(testBuf[0..]);
 
     {
         {
-            correctMsg.reset();
-            testMsg.reset();
+            correctMsg.end = 0;
+            testMsg.end = 0;
 
             try serializer.serializeCommand(
-                testMsg.writer(),
+                &testMsg,
                 SMEMBERS.init("set1"),
             );
             try serializer.serializeCommand(
-                correctMsg.writer(),
+                &correctMsg,
                 .{ "SMEMBERS", "set1" },
             );
 
             // std.debug.warn("{}\n\n\n{}\n", .{ correctMsg.getWritten(), testMsg.getWritten() });
-            try std.testing.expectEqualSlices(u8, correctMsg.getWritten(), testMsg.getWritten());
+            try std.testing.expectEqualSlices(
+                u8,
+                correctMsg.buffered(),
+                testMsg.buffered(),
+            );
         }
     }
 }

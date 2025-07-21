@@ -1,4 +1,5 @@
 const std = @import("std");
+const Reader = std.Io.Reader;
 const fmt = std.fmt;
 const InStream = std.io.InStream;
 const builtin = @import("builtin");
@@ -12,31 +13,27 @@ pub const NumberParser = struct {
         };
     }
 
-    pub fn parse(comptime T: type, comptime _: type, msg: anytype) !T {
-        // TODO: write real implementation
-        var buf: [100]u8 = undefined;
-        var end: usize = 0;
-        for (&buf, 0..) |*elem, i| {
-            const ch = try msg.readByte();
-            elem.* = ch;
-            if (ch == '\r') {
-                end = i;
-                break;
-            }
-        }
-        try msg.skipBytes(1, .{});
-        return switch (@typeInfo(T)) {
+    pub fn parse(comptime T: type, comptime _: type, r: *Reader) !T {
+        const digits = try r.takeSentinel('\r');
+        const result = switch (@typeInfo(T)) {
             else => unreachable,
-            .int => try fmt.parseInt(T, buf[0..end], 10),
-            .float => try fmt.parseFloat(T, buf[0..end]),
+            .int => try fmt.parseInt(T, digits, 10),
+            .float => try fmt.parseFloat(T, digits),
         };
+        try r.discardAll(1);
+        return result;
     }
 
     pub fn isSupportedAlloc(comptime T: type) bool {
         return isSupported(T);
     }
 
-    pub fn parseAlloc(comptime T: type, comptime rootParser: type, _: std.mem.Allocator, msg: anytype) !T {
-        return parse(T, rootParser, msg); // TODO: before I passed down an empty struct type. Was I insane? Did I have a plan?
+    pub fn parseAlloc(
+        comptime T: type,
+        comptime rootParser: type,
+        _: std.mem.Allocator,
+        r: *Reader,
+    ) !T {
+        return parse(T, rootParser, r); // TODO: before I passed down an empty struct type. Was I insane? Did I have a plan?
     }
 };

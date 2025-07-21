@@ -1,8 +1,8 @@
 .{
     .name = .okredis,
-    .version = "0.0.0",
+    .version = "0.1.0",
     .fingerprint = 0x3fa63be1eaf60e0a, // Changing this has security and trust implications.
-    .minimum_zig_version = "0.14.0",
+    .minimum_zig_version = "0.15.0-dev.1149+4e6a04929",
     .paths = .{
         "build.zig",
         "build.zig.zon",

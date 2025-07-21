@@ -68,25 +68,29 @@ test "serializer" {
     const serializer = @import("../../serializer.zig").CommandSerializer;
 
     var correctBuf: [1000]u8 = undefined;
-    var correctMsg = std.io.fixedBufferStream(correctBuf[0..]);
+    var correctMsg = std.Io.Writer.fixed(correctBuf[0..]);
 
     var testBuf: [1000]u8 = undefined;
-    var testMsg = std.io.fixedBufferStream(testBuf[0..]);
+    var testMsg = std.Io.Writer.fixed(testBuf[0..]);
 
     {
-        correctMsg.reset();
-        testMsg.reset();
+        correctMsg.end = 0;
+        testMsg.end = 0;
 
         const cmd = BITPOS.init("test", .Zero, -3, null);
         try serializer.serializeCommand(
-            testMsg.writer(),
+            &testMsg,
             cmd,
         );
         try serializer.serializeCommand(
-            correctMsg.writer(),
+            &correctMsg,
             .{ "BITPOS", "test", "0", "-3" },
         );
 
-        try std.testing.expectEqualSlices(u8, correctMsg.getWritten(), testMsg.getWritten());
+        try std.testing.expectEqualSlices(
+            u8,
+            correctMsg.buffered(),
+            testMsg.buffered(),
+        );
     }
 }

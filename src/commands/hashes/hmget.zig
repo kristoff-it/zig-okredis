@@ -1,6 +1,7 @@
 // HMGET key field [field ...]
 
 const std = @import("std");
+const Writer = std.Io.Writer;
 
 const common = @import("../_common_utils.zig");
 const FV = common.FV;
@@ -97,32 +98,36 @@ test "serializer" {
     const serializer = @import("../../serializer.zig").CommandSerializer;
 
     var correctBuf: [1000]u8 = undefined;
-    var correctMsg = std.io.fixedBufferStream(correctBuf[0..]);
+    var correctMsg: Writer = .fixed(correctBuf[0..]);
 
     var testBuf: [1000]u8 = undefined;
-    var testMsg = std.io.fixedBufferStream(testBuf[0..]);
+    var testMsg: Writer = .fixed(testBuf[0..]);
 
     {
         {
-            correctMsg.reset();
-            testMsg.reset();
+            correctMsg.end = 0;
+            testMsg.end = 0;
 
             try serializer.serializeCommand(
-                testMsg.writer(),
+                &testMsg,
                 HMGET.init("k1", &[_][]const u8{"f1"}),
             );
             try serializer.serializeCommand(
-                correctMsg.writer(),
+                &correctMsg,
                 .{ "HMGET", "k1", "f1" },
             );
 
-            // std.debug.warn("{}\n\n\n{}\n", .{ correctMsg.getWritten(), testMsg.getWritten() });
-            try std.testing.expectEqualSlices(u8, correctMsg.getWritten(), testMsg.getWritten());
+            // std.debug.warn("{}\n\n\n{}\n", .{ correctMsg.buffered(), testMsg.buffered() });
+            try std.testing.expectEqualSlices(
+                u8,
+                correctMsg.buffered(),
+                testMsg.buffered(),
+            );
         }
 
         {
-            correctMsg.reset();
-            testMsg.reset();
+            correctMsg.end = 0;
+            testMsg.end = 0;
 
             const MyStruct = struct {
                 field1: []const u8,
@@ -133,15 +138,19 @@ test "serializer" {
             const MyHMGET = HMGET.forStruct(MyStruct);
 
             try serializer.serializeCommand(
-                testMsg.writer(),
+                &testMsg,
                 MyHMGET.init("k1"),
             );
             try serializer.serializeCommand(
-                correctMsg.writer(),
+                &correctMsg,
                 .{ "HMGET", "k1", "field1", "field2", "field3" },
             );
 
-            try std.testing.expectEqualSlices(u8, correctMsg.getWritten(), testMsg.getWritten());
+            try std.testing.expectEqualSlices(
+                u8,
+                correctMsg.buffered(),
+                testMsg.buffered(),
+            );
         }
     }
 }

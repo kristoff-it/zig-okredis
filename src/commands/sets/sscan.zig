@@ -1,5 +1,7 @@
 // SSCAN key cursor [MATCH pattern] [COUNT count]
+
 const std = @import("std");
+const Writer = std.Io.Writer;
 
 pub const SSCAN = struct {
     key: []const u8,
@@ -19,12 +21,16 @@ pub const SSCAN = struct {
                 };
             }
 
-            pub fn serialize(self: Pattern, comptime rootSerializer: type, msg: anytype) !void {
+            pub fn serialize(
+                self: Pattern,
+                comptime root: type,
+                w: *Writer,
+            ) !void {
                 switch (self) {
                     .NoPattern => {},
                     .Pattern => |p| {
-                        try rootSerializer.serializeArgument(msg, []const u8, "MATCH");
-                        try rootSerializer.serializeArgument(msg, []const u8, p);
+                        try root.serializeArgument(w, []const u8, "MATCH");
+                        try root.serializeArgument(w, []const u8, p);
                     },
                 }
             }
@@ -43,12 +49,16 @@ pub const SSCAN = struct {
                 };
             }
 
-            pub fn serialize(self: Count, comptime rootSerializer: type, msg: anytype) !void {
+            pub fn serialize(
+                self: Count,
+                comptime root: type,
+                w: *Writer,
+            ) !void {
                 switch (self) {
                     .NoCount => {},
                     .Count => |c| {
-                        try rootSerializer.serializeArgument(msg, []const u8, "COUNT");
-                        try rootSerializer.serializeArgument(msg, usize, c);
+                        try root.serializeArgument(w, []const u8, "COUNT");
+                        try root.serializeArgument(w, usize, c);
                     },
                 }
             }
@@ -65,8 +75,12 @@ pub const SSCAN = struct {
     pub fn validate(_: SSCAN) !void {}
 
     pub const RedisCommand = struct {
-        pub fn serialize(self: SSCAN, comptime rootSerializer: type, msg: anytype) !void {
-            return rootSerializer.serializeCommand(msg, .{
+        pub fn serialize(
+            self: SSCAN,
+            comptime root: type,
+            w: *Writer,
+        ) !void {
+            return root.serializeCommand(w, .{
                 "SSCAN",
                 self.key,
                 self.cursor,
@@ -89,44 +103,48 @@ test "serializer" {
     const serializer = @import("../../serializer.zig").CommandSerializer;
 
     var correctBuf: [1000]u8 = undefined;
-    var correctMsg = std.io.fixedBufferStream(correctBuf[0..]);
+    var correctMsg: Writer = .fixed(correctBuf[0..]);
 
     var testBuf: [1000]u8 = undefined;
-    var testMsg = std.io.fixedBufferStream(testBuf[0..]);
+    var testMsg: Writer = .fixed(testBuf[0..]);
 
     {
         {
-            correctMsg.reset();
-            testMsg.reset();
+            correctMsg.end = 0;
+            testMsg.end = 0;
 
             try serializer.serializeCommand(
-                testMsg.writer(),
+                &testMsg,
                 SSCAN.init("myset", "0", .NoPattern, .NoCount),
             );
             try serializer.serializeCommand(
-                correctMsg.writer(),
+                &correctMsg,
                 .{ "SSCAN", "myset", "0" },
             );
 
-            // std.debug.warn("{}\n\n\n{}\n", .{ correctMsg.getWritten(), testMsg.getWritten() });
-            try std.testing.expectEqualSlices(u8, correctMsg.getWritten(), testMsg.getWritten());
+            // std.debug.warn("{}\n\n\n{}\n", .{ correctMsg.buffered(), testMsg.buffered() });
+            try std.testing.expectEqualSlices(u8, correctMsg.buffered(), testMsg.buffered());
         }
 
         {
-            correctMsg.reset();
-            testMsg.reset();
+            correctMsg.end = 0;
+            testMsg.end = 0;
 
             try serializer.serializeCommand(
-                testMsg.writer(),
+                &testMsg,
                 SSCAN.init("myset", "0", SSCAN.Pattern{ .Pattern = "zig_*" }, SSCAN.Count{ .Count = 5 }),
             );
             try serializer.serializeCommand(
-                correctMsg.writer(),
+                &correctMsg,
                 .{ "SSCAN", "myset", 0, "MATCH", "zig_*", "COUNT", 5 },
             );
 
-            // std.debug.warn("\n{}\n\n\n{}\n", .{ correctMsg.getWritten(), testMsg.getWritten() });
-            try std.testing.expectEqualSlices(u8, correctMsg.getWritten(), testMsg.getWritten());
+            // std.debug.warn("\n{}\n\n\n{}\n", .{ correctMsg.buffered(), testMsg.buffered() });
+            try std.testing.expectEqualSlices(
+                u8,
+                correctMsg.buffered(),
+                testMsg.buffered(),
+            );
         }
     }
 }

@@ -1,4 +1,5 @@
 const std = @import("std");
+const Reader = std.Io.Reader;
 const fmt = std.fmt;
 
 /// It's a fixed length buffer, useful for parsing strings
@@ -17,51 +18,45 @@ pub fn FixBuf(comptime size: usize) type {
 
         pub const Redis = struct {
             pub const Parser = struct {
-                pub fn parse(tag: u8, comptime rootParser: type, msg: anytype) !Self {
+                pub fn parse(
+                    tag: u8,
+                    comptime rootParser: type,
+                    r: *Reader,
+                ) !Self {
                     switch (tag) {
                         else => return error.UnsupportedConversion,
                         '-', '!' => {
-                            try rootParser.parseFromTag(void, tag, msg);
+                            try rootParser.parseFromTag(void, tag, r);
                             return error.GotErrorReply;
                         },
                         '+', '(' => {
                             var res: Self = undefined;
-                            var ch = try msg.readByte();
+                            var ch = try r.takeByte();
                             for (&res.buf, 0..) |*elem, i| {
                                 if (ch == '\r') {
                                     res.len = i;
-                                    try msg.skipBytes(1, .{});
+                                    try r.discardAll(1);
                                     return res;
                                 }
                                 elem.* = ch;
-                                ch = try msg.readByte();
+                                ch = try r.takeByte();
                             }
                             if (ch != '\r') return error.BufTooSmall;
-                            try msg.skipBytes(1, .{});
+                            try r.discardAll(1);
                             return res;
                         },
                         '$' => {
-                            // TODO: write real implementation
-                            var buf: [100]u8 = undefined;
-                            var end: usize = 0;
-                            for (&buf, 0..) |*elem, i| {
-                                const ch = try msg.readByte();
-                                elem.* = ch;
-                                if (ch == '\r') {
-                                    end = i;
-                                    break;
-                                }
-                            }
-
-                            try msg.skipBytes(1, .{});
-                            const respSize = try fmt.parseInt(usize, buf[0..end], 10);
+                            const digits = try r.takeSentinel('\r');
+                            const respSize = try fmt.parseInt(usize, digits, 10);
+                            try r.discardAll(1);
 
                             if (respSize > size) return error.BufTooSmall;
 
                             var res: Self = undefined;
                             res.len = respSize;
-                            _ = try msg.readNoEof(res.buf[0..respSize]);
-                            try msg.skipBytes(2, .{});
+                            try r.readSliceAll(res.buf[0..respSize]);
+                            try r.discardAll(2);
+
                             return res;
                         },
                     }

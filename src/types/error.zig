@@ -1,4 +1,5 @@
 const std = @import("std");
+const Reader = std.Io.Reader;
 const fmt = std.fmt;
 const testing = std.testing;
 const Allocator = std.mem.Allocator;
@@ -8,7 +9,7 @@ pub const Error = struct {
     end: usize,
 
     /// Get the error code.
-    pub fn getCode(self: Error) []const u8 {
+    pub fn getCode(self: *const Error) []const u8 {
         return self._buf[0..self.end];
     }
 };
@@ -21,7 +22,7 @@ pub const FullError = struct {
     message: []u8,
 
     /// Get the error code.
-    pub fn getCode(self: FullError) []const u8 {
+    pub fn getCode(self: *const FullError) []const u8 {
         return self._buf[0..self.end];
     }
 };
@@ -45,107 +46,80 @@ pub fn OrErr(comptime T: type) type {
             pub const Parser = struct {
                 pub const NoOptionalWrapper = true;
 
-                pub fn parse(tag: u8, comptime rootParser: type, msg: anytype) !Self {
+                pub fn parse(
+                    tag: u8,
+                    comptime rootParser: type,
+                    r: *Reader,
+                ) !Self {
                     return switch (tag) {
-                        '_', '-', '!' => internalParse(tag, rootParser, msg),
-                        else => Self{ .Ok = try rootParser.parseFromTag(T, tag, msg) },
+                        '_', '-', '!' => internalParse(tag, rootParser, r),
+                        else => Self{ .Ok = try rootParser.parseFromTag(T, tag, r) },
                     };
                 }
 
-                pub fn destroy(self: Self, comptime rootParser: type, allocator: Allocator) void {
+                pub fn destroy(
+                    self: Self,
+                    comptime rootParser: type,
+                    allocator: Allocator,
+                ) void {
                     switch (self) {
                         .Ok => |ok| rootParser.freeReply(ok, allocator),
                         else => {},
                     }
                 }
 
-                pub fn parseAlloc(tag: u8, comptime rootParser: type, allocator: Allocator, msg: anytype) !Self {
+                pub fn parseAlloc(
+                    tag: u8,
+                    comptime rootParser: type,
+                    allocator: Allocator,
+                    r: *Reader,
+                ) !Self {
                     return switch (tag) {
-                        '_', '-', '!' => internalParse(tag, rootParser, msg),
-                        else => return Self{ .Ok = try rootParser.parseAllocFromTag(T, tag, allocator, msg) },
+                        '_', '-', '!' => internalParse(tag, rootParser, r),
+                        else => return Self{
+                            .Ok = try rootParser.parseAllocFromTag(
+                                T,
+                                tag,
+                                allocator,
+                                r,
+                            ),
+                        },
                     };
                 }
 
-                fn internalParse(tag: u8, comptime _: type, msg: anytype) !Self {
+                fn internalParse(tag: u8, comptime _: type, r: *Reader) !Self {
                     switch (tag) {
                         else => unreachable,
                         '_' => {
-                            try msg.skipBytes(2, .{});
+                            try r.discardAll(2);
                             return Self{ .Nil = {} };
                         },
                         '!' => {
-                            // TODO: write real implementation
-                            var buf: [100]u8 = undefined;
-                            var end: usize = 0;
-                            for (&buf, 0..) |*elem, i| {
-                                const ch = try msg.readByte();
-                                elem.* = ch;
-                                if (ch == '\r') {
-                                    end = i;
-                                    break;
-                                }
-                            }
+                            const digits = try r.takeSentinel('\r');
+                            const size = try fmt.parseInt(usize, digits, 10);
+                            try r.discardAll(1);
 
-                            try msg.skipBytes(1, .{});
-                            const size = try fmt.parseInt(usize, buf[0..end], 10);
                             var res = Self{ .Err = undefined };
 
                             // Parse the Code part
-                            var ch = try msg.readByte();
-                            for (&res.Err._buf, 0..) |*elem, i| {
-                                if (i == size) {
-                                    elem.* = ch;
-                                    res.Err.end = i;
-                                    // res.Err.code = res.Err._buf[0..i];
-                                    try msg.skipBytes(2, .{});
-                                    return res;
-                                }
-                                switch (ch) {
-                                    ' ' => {
-                                        res.Err.end = i;
-                                        // res.Err.code = res.Err._buf[0..i];
-                                        break;
-                                    },
-                                    else => {
-                                        elem.* = ch;
-                                        ch = try msg.readByte();
-                                    },
-                                }
-                            }
+                            var code_w = std.Io.Writer.fixed(&res.Err._buf);
+                            res.Err.end = try r.streamDelimiter(&code_w, ' ');
+                            r.toss(1);
 
-                            if (ch != ' ') return error.ErrorCodeBufTooSmall;
                             const remainder = size - res.Err.end + 2; // +2 because of `\r\n`
-                            if (remainder > 0) try msg.skipBytes(remainder, .{});
+                            try r.discardAll(remainder);
                             return res;
                         },
                         '-' => {
                             var res = Self{ .Err = undefined };
 
                             // Parse the Code part
-                            var ch = try msg.readByte();
-                            for (&res.Err._buf, 0..) |*elem, i| {
-                                switch (ch) {
-                                    ' ' => {
-                                        res.Err.end = i;
-                                        // res.Err.code = res.Err._buf[0..i];
-                                        break;
-                                    },
-                                    '\r' => {
-                                        res.Err.end = i;
-                                        // res.Err.code = res.Err._buf[0..i];
-                                        try msg.skipBytes(1, .{});
-                                        return res;
-                                    },
-                                    else => {
-                                        elem.* = ch;
-                                        ch = try msg.readByte();
-                                    },
-                                }
-                            }
-                            if (ch != ' ') return error.ErrorCodeBufTooSmall;
+                            var code_w = std.Io.Writer.fixed(&res.Err._buf);
+                            res.Err.end = try r.streamDelimiter(&code_w, ' ');
+                            r.toss(1);
 
                             // Seek through the rest of the message, discarding it.
-                            while (ch != '\n') ch = try msg.readByte();
+                            _ = try r.discardDelimiterInclusive('\n');
                             return res;
                         },
                     }
@@ -182,55 +156,30 @@ pub fn OrFullErr(comptime T: type) type {
                     }
                 }
 
-                pub fn parseAlloc(tag: u8, comptime rootParser: type, allocator: Allocator, msg: anytype) !Self {
+                pub fn parseAlloc(
+                    tag: u8,
+                    comptime rootParser: type,
+                    allocator: Allocator,
+                    r: *Reader,
+                ) !Self {
                     switch (tag) {
-                        else => return Self{ .Ok = try rootParser.parseAllocFromTag(T, tag, allocator, msg) },
+                        else => return Self{ .Ok = try rootParser.parseAllocFromTag(T, tag, allocator, r) },
                         '_' => {
-                            try msg.skipBytes(2, .{});
+                            try r.discardAll(2);
                             return Self{ .Nil = {} };
                         },
                         '!' => {
-                            // TODO: write real implementation
-                            var buf: [100]u8 = undefined;
-                            var end: usize = 0;
-                            for (&buf, 0..) |*elem, i| {
-                                const ch = try msg.readByte();
-                                elem.* = ch;
-                                if (ch == '\r') {
-                                    end = i;
-                                    break;
-                                }
-                            }
+                            const digits = try r.takeSentinel('\r');
+                            const size = try fmt.parseInt(usize, digits, 10);
+                            try r.discardAll(1);
 
-                            try msg.skipBytes(1, .{});
-                            const size = try fmt.parseInt(usize, buf[0..end], 10);
                             var res = Self{ .Err = undefined };
                             res.Err.message = &[0]u8{};
 
                             // Parse the Code part
-                            var ch = try msg.readByte();
-                            for (&res.Err._buf, 0..) |*elem, i| {
-                                if (i == size) {
-                                    elem.* = ch;
-                                    res.Err.end = i;
-                                    // res.Err.code = res.Err._buf[0..i];
-                                    try msg.skipBytes(2, .{});
-                                    return res;
-                                }
-                                switch (ch) {
-                                    ' ' => {
-                                        res.Err.end = i;
-                                        // res.Err.code = res.Err._buf[0..i];
-                                        break;
-                                    },
-                                    else => {
-                                        elem.* = ch;
-                                        ch = try msg.readByte();
-                                    },
-                                }
-                            }
-
-                            if (ch != ' ') return error.ErrorCodeBufTooSmall;
+                            var code_w = std.Io.Writer.fixed(&res.Err._buf);
+                            res.Err.end = try r.streamDelimiter(&code_w, ' ');
+                            r.toss(1);
 
                             // Alloc difference:
                             const remainder = size - res.Err.end;
@@ -238,9 +187,9 @@ pub fn OrFullErr(comptime T: type) type {
                             const slice = try allocator.alloc(u8, remainder);
                             errdefer allocator.free(slice);
 
-                            try msg.readNoEof(slice);
+                            try r.readSliceAll(slice);
                             res.Err.message = slice;
-                            try msg.skipBytes(2, .{});
+                            try r.discardAll(2);
                             return res;
                         },
                         '-' => {
@@ -248,32 +197,16 @@ pub fn OrFullErr(comptime T: type) type {
                             res.Err.message = &[0]u8{};
 
                             // Parse the Code part
-                            var ch = try msg.readByte();
-                            for (&res.Err._buf, 0..) |*elem, i| {
-                                switch (ch) {
-                                    ' ' => {
-                                        res.Err.end = i;
-                                        // res.Err.code = res.Err._buf[0..i];
-                                        break;
-                                    },
-                                    '\r' => {
-                                        res.Err.end = i;
-                                        // res.Err.code = res.Err._buf[0..i];
-                                        try msg.skipBytes(1, .{});
-                                        return res;
-                                    },
-                                    else => {
-                                        elem.* = ch;
-                                        ch = try msg.readByte();
-                                    },
-                                }
-                            }
-                            if (ch != ' ') return error.ErrorCodeBufTooSmall;
+                            var code_w = std.Io.Writer.fixed(&res.Err._buf);
+                            res.Err.end = try r.streamDelimiter(&code_w, ' ');
+                            r.toss(1);
 
-                            // Seek through the rest of the message,
-                            // discarding it.
-                            res.Err.message = try msg.readUntilDelimiterAlloc(allocator, '\r', 4096);
-                            try msg.skipBytes(1, .{});
+                            var msg_w: std.Io.Writer.Allocating = .init(allocator);
+                            errdefer msg_w.deinit();
+                            _ = try r.streamDelimiter(&msg_w.writer, '\r');
+
+                            res.Err.message = try msg_w.toOwnedSlice();
+                            try r.discardAll(2);
                             return res;
                         },
                     }
@@ -283,49 +216,70 @@ pub fn OrFullErr(comptime T: type) type {
     };
 }
 test "parse simple errors" {
-    var fbs_nil = MakeNil();
-    switch (try OrErr(u8).Redis.Parser.parse('_', fakeParser, fbs_nil.reader())) {
+    var nil = MakeNil();
+    switch (try OrErr(u8).Redis.Parser.parse('_', fakeParser, &nil)) {
         .Ok, .Err => unreachable,
         .Nil => try testing.expect(true),
     }
-    var fbs_blob = MakeBlobErr();
-    switch (try OrErr(u8).Redis.Parser.parse('!', fakeParser, fbs_blob.reader())) {
+    var blob = MakeBlobErr();
+    switch (try OrErr(u8).Redis.Parser.parse('!', fakeParser, &blob)) {
         .Ok, .Nil => unreachable,
-        .Err => |err| try testing.expectEqualSlices(u8, "ERRN\r\nOGOODFOOD", err.getCode()),
+        .Err => |err| try testing.expectEqualSlices(
+            u8,
+            "ERRN\r\nOGOODFOOD",
+            err.getCode(),
+        ),
     }
 
-    var fbs_err = MakeErr();
-    switch (try OrErr(u8).Redis.Parser.parse('-', fakeParser, fbs_err.reader())) {
+    var r_err = MakeErr();
+    switch (try OrErr(u8).Redis.Parser.parse('-', fakeParser, &r_err)) {
         .Ok, .Nil => unreachable,
-        .Err => |err| try testing.expectEqualSlices(u8, "ERRNOGOODFOOD", err.getCode()),
+        .Err => |err| try testing.expectEqualSlices(
+            u8,
+            "ERRNOGOODFOOD",
+            err.getCode(),
+        ),
     }
 
-    var fbs_errji = MakeErroji();
-    switch (try OrErr(u8).Redis.Parser.parse('-', fakeParser, fbs_errji.reader())) {
+    var errji = MakeErroji();
+    switch (try OrErr(u8).Redis.Parser.parse('-', fakeParser, &errji)) {
         .Ok, .Nil => unreachable,
         .Err => |err| try testing.expectEqualSlices(u8, "😈", err.getCode()),
     }
 
-    var fbs_short_err = MakeShortErr();
-    switch (try OrErr(u8).Redis.Parser.parse('-', fakeParser, fbs_short_err.reader())) {
+    var short_err = MakeShortErr();
+    switch (try OrErr(u8).Redis.Parser.parse('-', fakeParser, &short_err)) {
         .Ok, .Nil => unreachable,
         .Err => |err| try testing.expectEqualSlices(u8, "ABC", err.getCode()),
     }
 
-    var fbs_bad_err = MakeBadErr();
-    try testing.expectError(error.ErrorCodeBufTooSmall, OrErr(u8).Redis.Parser.parse('-', fakeParser, fbs_bad_err.reader()));
+    var bad_err = MakeBadErr();
+    try testing.expectError(
+        error.WriteFailed,
+        OrErr(u8).Redis.Parser.parse('-', fakeParser, &bad_err),
+    );
 
     const allocator = std.heap.page_allocator;
-    var fbs_errji2 = MakeErroji();
-    switch (try OrFullErr(u8).Redis.Parser.parseAlloc('-', fakeParser, allocator, fbs_errji2.reader())) {
+    var errji2 = MakeErroji();
+    switch (try OrFullErr(u8).Redis.Parser.parseAlloc(
+        '-',
+        fakeParser,
+        allocator,
+        &errji2,
+    )) {
         .Ok, .Nil => unreachable,
         .Err => |err| {
             try testing.expectEqualSlices(u8, "😈", err.getCode());
             try testing.expectEqualSlices(u8, "your Redis belongs to us", err.message);
         },
     }
-    var fbs_blob2 = MakeBlobErr();
-    switch (try OrFullErr(u8).Redis.Parser.parseAlloc('!', fakeParser, allocator, fbs_blob2.reader())) {
+    var blob2 = MakeBlobErr();
+    switch (try OrFullErr(u8).Redis.Parser.parseAlloc(
+        '!',
+        fakeParser,
+        allocator,
+        &blob2,
+    )) {
         .Ok, .Nil => unreachable,
         .Err => |err| {
             try testing.expectEqualSlices(u8, "ERRN\r\nOGOODFOOD", err.getCode());
@@ -352,23 +306,23 @@ const fakeParser = struct {
 };
 
 // TODO: get rid of this!!!
-fn MakeErroji() std.io.FixedBufferStream([]const u8) {
-    return std.io.fixedBufferStream("-😈 your Redis belongs to us\r\n"[1..]);
+fn MakeErroji() Reader {
+    return std.Io.Reader.fixed("-😈 your Redis belongs to us\r\n"[1..]);
 }
-fn MakeErr() std.io.FixedBufferStream([]const u8) {
-    return std.io.fixedBufferStream("-ERRNOGOODFOOD redis could not find any good food\r\n"[1..]);
+fn MakeErr() Reader {
+    return std.Io.Reader.fixed("-ERRNOGOODFOOD redis could not find any good food\r\n"[1..]);
 }
-fn MakeBadErr() std.io.FixedBufferStream([]const u8) {
-    return std.io.fixedBufferStream("-ARIARIARIARIARIARIARIARIARIARRIVEDERCI *golden wind music starts*\r\n"[1..]);
+fn MakeBadErr() Reader {
+    return std.Io.Reader.fixed("-ARIARIARIARIARIARIARIARIARIARRIVEDERCI *golden wind music starts*\r\n"[1..]);
 }
-fn MakeShortErr() std.io.FixedBufferStream([]const u8) {
-    return std.io.fixedBufferStream("-ABC\r\n"[1..]);
+fn MakeShortErr() Reader {
+    return std.Io.Reader.fixed("-ABC shortmsg\r\n"[1..]);
 }
-fn MakeBlobErr() std.io.FixedBufferStream([]const u8) {
-    return std.io.fixedBufferStream("!55\r\nERRN\r\nOGOODFOOD redis \r\n\r\ncould not find any\r\n good food\r\n"[1..]);
+fn MakeBlobErr() Reader {
+    return std.Io.Reader.fixed("!55\r\nERRN\r\nOGOODFOOD redis \r\n\r\ncould not find any\r\n good food\r\n"[1..]);
 }
-fn MakeNil() std.io.FixedBufferStream([]const u8) {
-    return std.io.fixedBufferStream("_\r\n"[1..]);
+fn MakeNil() Reader {
+    return std.Io.Reader.fixed("_\r\n"[1..]);
 }
 
 test "docs" {

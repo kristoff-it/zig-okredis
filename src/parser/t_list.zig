@@ -1,4 +1,5 @@
 const std = @import("std");
+const Reader = std.Io.Reader;
 const fmt = std.fmt;
 const builtin = @import("builtin");
 
@@ -26,19 +27,30 @@ pub const ListParser = struct {
         };
     }
 
-    pub fn parse(comptime T: type, comptime rootParser: type, msg: anytype) !T {
-        return parseImpl(T, rootParser, .{}, msg);
+    pub fn parse(comptime T: type, comptime rootParser: type, r: *Reader) !T {
+        return parseImpl(T, rootParser, .{}, r);
     }
-    pub fn parseAlloc(comptime T: type, comptime rootParser: type, allocator: std.mem.Allocator, msg: anytype) !T {
-        return parseImpl(T, rootParser, .{ .ptr = allocator }, msg);
+    pub fn parseAlloc(
+        comptime T: type,
+        comptime rootParser: type,
+        allocator: std.mem.Allocator,
+        r: *Reader,
+    ) !T {
+        return parseImpl(T, rootParser, .{ .ptr = allocator }, r);
     }
 
-    fn decodeArray(comptime T: type, result: []T, rootParser: anytype, allocator: anytype, msg: anytype) !void {
+    fn decodeArray(
+        comptime T: type,
+        result: []T,
+        rootParser: anytype,
+        allocator: anytype,
+        r: *Reader,
+    ) !void {
         var foundNil = false;
         var foundErr = false;
         for (result) |*elem| {
             if (foundNil or foundErr) {
-                rootParser.parse(void, msg) catch |err| switch (err) {
+                rootParser.parse(void, r) catch |err| switch (err) {
                     error.GotErrorReply => {
                         foundErr = true;
                     },
@@ -46,9 +58,9 @@ pub const ListParser = struct {
                 };
             } else {
                 elem.* = (if (@hasField(@TypeOf(allocator), "ptr"))
-                    rootParser.parseAlloc(T, allocator.ptr, msg)
+                    rootParser.parseAlloc(T, allocator.ptr, r)
                 else
-                    rootParser.parse(T, msg)) catch |err| switch (err) {
+                    rootParser.parse(T, r)) catch |err| switch (err) {
                     error.GotNilReply => {
                         foundNil = true;
                         continue;
@@ -68,19 +80,19 @@ pub const ListParser = struct {
         return;
     }
 
-    pub fn parseImpl(comptime T: type, comptime rootParser: type, allocator: anytype, msg: anytype) !T {
+    pub fn parseImpl(comptime T: type, comptime rootParser: type, allocator: anytype, r: *Reader) !T {
         // TODO: write real implementation
         var buf: [100]u8 = undefined;
         var end: usize = 0;
         for (&buf, 0..) |*elem, i| {
-            const ch = try msg.readByte();
+            const ch = try r.takeByte();
             elem.* = ch;
             if (ch == '\r') {
                 end = i;
                 break;
             }
         }
-        try msg.skipBytes(1, .{});
+        try r.discardAll(1);
         const size = try fmt.parseInt(usize, buf[0..end], 10);
 
         switch (@typeInfo(T)) {
@@ -92,7 +104,7 @@ pub const ListParser = struct {
 
                 const result = try allocator.ptr.alloc(ptr.child, size);
                 errdefer allocator.ptr.free(result);
-                try decodeArray(ptr.child, result, rootParser, allocator, msg);
+                try decodeArray(ptr.child, result, rootParser, allocator, r);
                 return result;
             },
             .array => |arr| {
@@ -103,7 +115,7 @@ pub const ListParser = struct {
                     var i: usize = 0;
                     while (i < size) : (i += 1) {
                         // Discard all the items
-                        rootParser.parse(void, msg) catch |err| switch (err) {
+                        rootParser.parse(void, r) catch |err| switch (err) {
                             error.GotErrorReply => {
                                 foundErr = true;
                             },
@@ -117,7 +129,7 @@ pub const ListParser = struct {
                 }
 
                 var result: T = undefined;
-                try decodeArray(arr.child, result[0..], rootParser, allocator, msg);
+                try decodeArray(arr.child, result[0..], rootParser, allocator, r);
                 return result;
             },
             .@"struct" => |stc| {
@@ -129,7 +141,7 @@ pub const ListParser = struct {
                     var i: usize = 0;
                     while (i < size) : (i += 1) {
                         // Discard all the items
-                        rootParser.parse(void, msg) catch |err| switch (err) {
+                        rootParser.parse(void, r) catch |err| switch (err) {
                             error.GotErrorReply => {
                                 foundErr = true;
                             },
@@ -145,7 +157,7 @@ pub const ListParser = struct {
                 var result: T = undefined;
                 inline for (stc.fields) |field| {
                     if (foundNil or foundErr) {
-                        rootParser.parse(void, msg) catch |err| switch (err) {
+                        rootParser.parse(void, r) catch |err| switch (err) {
                             error.GotErrorReply => {
                                 foundErr = true;
                             },
@@ -153,9 +165,9 @@ pub const ListParser = struct {
                         };
                     } else {
                         @field(result, field.name) = (if (@hasField(@TypeOf(allocator), "ptr"))
-                            rootParser.parseAlloc(field.type, allocator.ptr, msg)
+                            rootParser.parseAlloc(field.type, allocator.ptr, r)
                         else
-                            rootParser.parse(field.type, msg)) catch |err| switch (err) {
+                            rootParser.parse(field.type, r)) catch |err| switch (err) {
                             else => return err,
                             error.GotNilReply => blk: {
                                 foundNil = true;

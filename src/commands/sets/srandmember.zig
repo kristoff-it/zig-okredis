@@ -61,44 +61,52 @@ test "serializer" {
     const serializer = @import("../../serializer.zig").CommandSerializer;
 
     var correctBuf: [1000]u8 = undefined;
-    var correctMsg = std.io.fixedBufferStream(correctBuf[0..]);
+    var correctMsg = std.Io.Writer.fixed(correctBuf[0..]);
 
     var testBuf: [1000]u8 = undefined;
-    var testMsg = std.io.fixedBufferStream(testBuf[0..]);
+    var testMsg = std.Io.Writer.fixed(testBuf[0..]);
 
     {
         {
-            correctMsg.reset();
-            testMsg.reset();
+            correctMsg.end = 0;
+            testMsg.end = 0;
 
             try serializer.serializeCommand(
-                testMsg.writer(),
+                &testMsg,
                 SRANDMEMBER.init("s", .one),
             );
             try serializer.serializeCommand(
-                correctMsg.writer(),
+                &correctMsg,
                 .{ "SRANDMEMBER", "s" },
             );
 
-            // std.debug.warn("{}\n\n\n{}\n", .{ correctMsg.getWritten(), testMsg.getWritten() });
-            try std.testing.expectEqualSlices(u8, correctMsg.getWritten(), testMsg.getWritten());
+            // std.debug.warn("{}\n\n\n{}\n", .{ correctMsg.buffered(), testMsg.buffered() });
+            try std.testing.expectEqualSlices(
+                u8,
+                correctMsg.buffered(),
+                testMsg.buffered(),
+            );
         }
 
         {
-            correctMsg.reset();
-            testMsg.reset();
+            correctMsg.end = 0;
+            testMsg.end = 0;
 
             try serializer.serializeCommand(
-                testMsg.writer(),
+                &testMsg,
                 SRANDMEMBER.init("s", SRANDMEMBER.Count{ .Count = 5 }),
             );
             try serializer.serializeCommand(
-                correctMsg.writer(),
+                &correctMsg,
                 .{ "SRANDMEMBER", "s", 5 },
             );
 
-            // std.debug.warn("{}\n\n\n{}\n", .{ correctMsg.getWritten(), testMsg.getWritten() });
-            try std.testing.expectEqualSlices(u8, correctMsg.getWritten(), testMsg.getWritten());
+            // std.debug.warn("{}\n\n\n{}\n", .{ correctMsg.buffered(), testMsg.buffered() });
+            try std.testing.expectEqualSlices(
+                u8,
+                correctMsg.buffered(),
+                testMsg.buffered(),
+            );
         }
     }
 }

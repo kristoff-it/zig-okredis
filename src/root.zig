@@ -1,8 +1,6 @@
 const std = @import("std");
 
-const client = @import("./client.zig");
-pub const Client = client.Client;
-pub const BufferedClient = client.BufferedClient;
+pub const Client = @import("./client.zig");
 pub const commands = @import("./commands.zig");
 const parser = @import("./parser.zig");
 pub const freeReply = parser.RESP3Parser.freeReply;

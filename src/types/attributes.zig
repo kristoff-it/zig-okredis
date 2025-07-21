@@ -1,4 +1,5 @@
 const std = @import("std");
+const Reader = std.Io.Reader;
 const Allocator = std.mem.Allocator;
 const testing = std.testing;
 
@@ -22,12 +23,21 @@ pub fn WithAttribs(comptime T: type) type {
                     @compileError("WithAttribs requires an allocator. Use `sendAlloc`.");
                 }
 
-                pub fn destroy(self: Self, comptime rootParser: type, allocator: Allocator) void {
+                pub fn destroy(
+                    self: Self,
+                    comptime rootParser: type,
+                    allocator: Allocator,
+                ) void {
                     rootParser.freeReply(self.attribs, allocator);
                     rootParser.freeReply(self.data, allocator);
                 }
 
-                pub fn parseAlloc(tag: u8, comptime rootParser: type, allocator: Allocator, msg: anytype) !Self {
+                pub fn parseAlloc(
+                    tag: u8,
+                    comptime rootParser: type,
+                    allocator: Allocator,
+                    msg: anytype,
+                ) !Self {
                     var itemTag = tag;
 
                     var res: Self = undefined;
@@ -44,7 +54,7 @@ pub fn WithAttribs(comptime T: type) type {
                             allocator,
                             msg,
                         );
-                        itemTag = try msg.readByte();
+                        itemTag = try msg.takeByte();
                     } else {
                         res.attribs = &[0][2]DynamicReply{};
                     }
@@ -65,7 +75,7 @@ test "WithAttribs" {
     const res = try parser.parseAlloc(
         WithAttribs([2]WithAttribs([]WithAttribs(i64))),
         allocator,
-        cplx_set.reader(),
+        &cplx_set,
     );
     try testing.expectEqual(@as(usize, 2), res.attribs.len);
     try testing.expectEqualSlices(u8, "Ciao", res.attribs[0][0].data.String.string);
@@ -91,8 +101,8 @@ test "WithAttribs" {
     try testing.expectEqual(@as(i64, 99), res.data[1].data[1].data);
 }
 // zig fmt: off
-fn MakeComplexListWithAttributes() std.io.FixedBufferStream([]const u8) {
-    return std.io.fixedBufferStream((
+fn MakeComplexListWithAttributes() Reader {
+    return std.Io.Reader.fixed((
         "|2\r\n" ++
             "+Ciao\r\n" ++
             "+World\r\n" ++

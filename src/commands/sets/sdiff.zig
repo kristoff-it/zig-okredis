@@ -1,6 +1,7 @@
 // SDIFF key [key ...]
 
 const std = @import("std");
+const Writer = std.Io.Writer;
 
 pub const SDIFF = struct {
     keys: []const []const u8,
@@ -17,8 +18,15 @@ pub const SDIFF = struct {
     }
 
     pub const RedisCommand = struct {
-        pub fn serialize(self: SDIFF, comptime rootSerializer: type, msg: anytype) !void {
-            return rootSerializer.serializeCommand(msg, .{ "SDIFF", self.keys });
+        pub fn serialize(
+            self: SDIFF,
+            comptime root_serializer: type,
+            w: *Writer,
+        ) !void {
+            return root_serializer.serializeCommand(w, .{
+                "SDIFF",
+                self.keys,
+            });
         }
     };
 };
@@ -32,27 +40,31 @@ test "serializer" {
     const serializer = @import("../../serializer.zig").CommandSerializer;
 
     var correctBuf: [1000]u8 = undefined;
-    var correctMsg = std.io.fixedBufferStream(correctBuf[0..]);
+    var correctMsg: Writer = .fixed(correctBuf[0..]);
 
     var testBuf: [1000]u8 = undefined;
-    var testMsg = std.io.fixedBufferStream(testBuf[0..]);
+    var testMsg: Writer = .fixed(testBuf[0..]);
 
     {
         {
-            correctMsg.reset();
-            testMsg.reset();
+            correctMsg.end = 0;
+            testMsg.end = 0;
 
             try serializer.serializeCommand(
-                testMsg.writer(),
+                &testMsg,
                 SDIFF.init(&[_][]const u8{ "set1", "set2" }),
             );
             try serializer.serializeCommand(
-                correctMsg.writer(),
+                &correctMsg,
                 .{ "SDIFF", "set1", "set2" },
             );
 
-            // std.debug.warn("{}\n\n\n{}\n", .{ correctMsg.getWritten(), testMsg.getWritten() });
-            try std.testing.expectEqualSlices(u8, correctMsg.getWritten(), testMsg.getWritten());
+            // std.debug.warn("{}\n\n\n{}\n", .{ correctMsg.buffered(), testMsg.buffered() });
+            try std.testing.expectEqualSlices(
+                u8,
+                correctMsg.buffered(),
+                testMsg.buffered(),
+            );
         }
     }
 }

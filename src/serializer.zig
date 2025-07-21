@@ -1,9 +1,10 @@
 const std = @import("std");
+const Writer = std.Io.Writer;
 
 const traits = @import("./traits.zig");
 
 pub const CommandSerializer = struct {
-    pub fn serializeCommand(msg: anytype, command: anytype) !void {
+    pub fn serializeCommand(w: *Writer, command: anytype) !void {
         // Serializes an entire command.
         // Callers can expect this function to:
         // 1. Write the number of arguments in the command
@@ -28,18 +29,18 @@ pub const CommandSerializer = struct {
         // argument.
         const CmdT = @TypeOf(command);
         if (comptime traits.isCommand(CmdT)) {
-            return CmdT.RedisCommand.serialize(command, CommandSerializer, msg);
+            return CmdT.RedisCommand.serialize(command, CommandSerializer, w);
         }
 
         // TODO: decide if this should be removed.
         // Why would someone use Arguments directly?
         if (comptime traits.isArguments(CmdT)) {
-            try msg.print("*{}\r\n", CmdT.RedisArguments.count(command));
-            return CmdT.RedisArguments.serialize(command, CommandSerializer, msg);
+            try w.print("*{}\r\n", CmdT.RedisArguments.count(command));
+            return CmdT.RedisArguments.serialize(command, CommandSerializer, w);
         }
 
         switch (@typeInfo(CmdT)) {
-            else => comptime unreachable,
+            else => unreachable,
             .@"struct" => {
                 // TODO: see isTuple
 
@@ -75,39 +76,39 @@ pub const CommandSerializer = struct {
 
                 // Write the number of arguments
                 // std.debug.warn("*{}\r\n", argNum);
-                try msg.print("*{}\r\n", .{argNum});
+                try w.print("*{}\r\n", .{argNum});
 
                 // Serialize each argument
                 inline for (std.meta.fields(CmdT)) |field| {
                     const arg = @field(command, field.name);
                     const ArgT = @TypeOf(arg);
                     if (comptime traits.isArguments(ArgT)) {
-                        try ArgT.RedisArguments.serialize(arg, CommandSerializer, msg);
+                        try ArgT.RedisArguments.serialize(arg, CommandSerializer, w);
                     } else {
                         switch (@typeInfo(ArgT)) {
                             .array => |arr| if (arr.child != u8) {
                                 for (arg) |elem| {
                                     if (comptime traits.isArguments(arr.child)) {
-                                        try arr.child.RedisArguments.serialize(elem, CommandSerializer, msg);
+                                        try arr.child.RedisArguments.serialize(elem, CommandSerializer, w);
                                     } else {
-                                        try serializeArgument(msg, arr.child, elem);
+                                        try serializeArgument(w, arr.child, elem);
                                     }
                                 }
                             } else {
-                                try serializeArgument(msg, ArgT, arg);
+                                try serializeArgument(w, ArgT, arg);
                             },
                             .pointer => |ptr| switch (ptr.size) {
                                 .slice => {
                                     if (ptr.child != u8) {
                                         for (arg) |elem| {
                                             if (comptime traits.isArguments(ptr.child)) {
-                                                try ptr.child.RedisArguments.serialize(elem, CommandSerializer, msg);
+                                                try ptr.child.RedisArguments.serialize(elem, CommandSerializer, w);
                                             } else {
-                                                try serializeArgument(msg, ptr.child, elem);
+                                                try serializeArgument(w, ptr.child, elem);
                                             }
                                         }
                                     } else {
-                                        try serializeArgument(msg, ArgT, arg);
+                                        try serializeArgument(w, ArgT, arg);
                                     }
                                 },
                                 .one => switch (@typeInfo(ptr.child)) {
@@ -115,20 +116,20 @@ pub const CommandSerializer = struct {
                                         if (arr.child != u8) {
                                             for (arg) |elem| {
                                                 if (comptime traits.isArguments(arr.child)) {
-                                                    try arr.child.RedisArguments.serialize(elem, CommandSerializer, msg);
+                                                    try arr.child.RedisArguments.serialize(elem, CommandSerializer, w);
                                                 } else {
-                                                    try serializeArgument(msg, arr.child, elem);
+                                                    try serializeArgument(w, arr.child, elem);
                                                 }
                                             }
                                         } else {
-                                            try serializeArgument(msg, ptr.child, arg.*);
+                                            try serializeArgument(w, ptr.child, arg.*);
                                         }
                                     },
                                     else => @compileError("unsupported"),
                                 },
                                 else => @compileError("unsupported"),
                             },
-                            else => try serializeArgument(msg, ArgT, arg),
+                            else => try serializeArgument(w, ArgT, arg),
                         }
                     }
                 }

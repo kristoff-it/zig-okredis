@@ -15,8 +15,9 @@ compromising on performance or flexibility.
 
 ## Project status
 OkRedis is currently in alpha. The main features are mostly complete,
-but a lot of polishing is still required. Zig version `0.14.0` is
-supported.
+but a lot of polishing is still required.
+
+Requires Zig v0.15.0-dev or above.
 
 Everything mentioned in the docs is already implemented and you can just
 `zig run example.zig` to quickly see what it can do. Remember OkRedis only
@@ -51,11 +52,16 @@ const OrErr = okredis.types.OrErr;
 const Client = okredis.Client;
 
 pub fn main() !void {
-    const addr = try std.net.Address.parseIp4("127.0.0.1", 6379);
-    var connection = try std.net.tcpConnectToAddress(addr);
+    const addr = try net.Address.parseIp4("127.0.0.1", 6379);
+    const connection = try net.tcpConnectToAddress(addr);
 
-    var client: Client = undefined;
-    try client.init(connection);
+    var rbuf: [1024]u8 = undefined;
+    var wbuf: [1024]u8 = undefined;
+
+    var client = try Client.init(connection, .{
+        .reader_buffer = &rbuf,
+        .writer_buffer = &wbuf,
+    });
     defer client.close();
 
     // Basic interface

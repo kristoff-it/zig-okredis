@@ -1,3 +1,5 @@
+const std = @import("std");
+const Writer = std.Io.Writer;
 const Value = @import("../_common_utils.zig").Value;
 
 // GETSET key value
@@ -25,8 +27,8 @@ pub const GETSET = struct {
 
     const Redis = struct {
         const Command = struct {
-            pub fn serialize(self: GETSET, rootSerializer: type, msg: anytype) !void {
-                return rootSerializer.command(msg, .{ "GETSET", self.key, self.value });
+            pub fn serialize(self: GETSET, root: type, w: *Writer) !void {
+                return root.command(w, .{ "GETSET", self.key, self.value });
             }
         };
     };

@@ -1,4 +1,5 @@
 const std = @import("std");
+const Reader = std.Io.Reader;
 const fmt = std.fmt;
 
 /// A parser that consumes one full reply and discards it. It's written as a
@@ -9,48 +10,37 @@ const fmt = std.fmt;
 /// have found a map instead. This trick is used by the root parser in the
 /// initial setup of both `parse` and `parseAlloc`.
 pub const VoidParser = struct {
-    pub fn discardOne(tag: u8, msg: anytype) !void {
+    pub fn discardOne(tag: u8, r: *Reader) !void {
         // When we start, we have one item to consume.
         // As we inspect it, we might discover that it's a container, requiring
         // us to increase our items count.
-        var foundError = false;
+        var err_found = false;
 
-        var itemTag = tag;
-        var itemsToConsume: usize = 1;
-        while (itemsToConsume > 0) {
-            itemsToConsume -= 1;
-            switch (itemTag) {
+        var current_tag = tag;
+        var items_left: usize = 1;
+        while (items_left > 0) {
+            items_left -= 1;
+            switch (current_tag) {
                 else => std.debug.panic("Found `{c}` in the *VOID* parser's switch." ++
-                    " Probably a bug in a type that implements `Redis.Parser`.", .{itemTag}),
-                '_' => try msg.skipBytes(2, .{}), // `_\r\n`
-                '#' => try msg.skipBytes(3, .{}), // `#t\r\n`, `#t\r\n`
+                    " Probably a bug in a type that implements `Redis.Parser`.", .{current_tag}),
+                '_' => try r.discardAll(2), // `_\r\n`
+                '#' => try r.discardAll(3), // `#t\r\n`, `#t\r\n`
                 '$', '=', '!' => {
                     // Lenght-prefixed string
-                    if (itemTag == '!') {
-                        foundError = true;
+                    if (current_tag == '!') {
+                        err_found = true;
                     }
 
-                    // TODO: write real implementation
-                    var buf: [100]u8 = undefined;
-                    var end: usize = 0;
-                    for (&buf, 0..) |*elem, i| {
-                        const ch = try msg.readByte();
-                        elem.* = ch;
-                        if (ch == '\r') {
-                            end = i;
-                            break;
-                        }
-                    }
-                    const size = try fmt.parseInt(usize, buf[0..end], 10);
-                    try msg.skipBytes(1 + size + 2, .{});
+                    const digits = try r.takeSentinel('\r');
+                    const size = try fmt.parseInt(usize, digits, 10);
+                    try r.discardAll(1 + size + 2); // \n, item, \r\n
                 },
                 ':', ',', '+', '-' => {
                     // Simple element with final `\r\n`
-                    if (itemTag == '-') {
-                        foundError = true;
+                    if (current_tag == '-') {
+                        err_found = true;
                     }
-                    var ch = try msg.readByte();
-                    while (ch != '\n') ch = try msg.readByte();
+                    _ = try r.discardDelimiterInclusive('\n');
                 },
                 '|' => {
                     // Attributes are metadata that precedes a proper reply
@@ -58,52 +48,31 @@ pub const VoidParser = struct {
                     // `itemsToConsume` count. Consume the attribute element
                     // without counting the current item as consumed.
 
-                    // TODO: write real implementation
-                    var buf: [100]u8 = undefined;
-                    var end: usize = 0;
-                    for (&buf, 0..) |*elem, i| {
-                        const ch = try msg.readByte();
-                        elem.* = ch;
-                        if (ch == '\r') {
-                            end = i;
-                            break;
-                        }
-                    }
-                    try msg.skipBytes(1, .{});
-                    var size = try fmt.parseInt(usize, buf[0..end], 10);
+                    const digits = try r.takeSentinel('\r');
+                    var size = try fmt.parseInt(usize, digits, 10);
+                    try r.discardAll(1);
                     size *= 2;
 
                     // Add all the new items to the pile that needs to be
                     // consumed, plus the one that we did not consume this
                     // loop.
-                    itemsToConsume += size + 1;
+                    items_left += size + 1;
                 },
                 '*', '%' => {
                     // Lists, Maps
-                    // TODO: write real implementation
-                    var buf: [100]u8 = undefined;
-                    var end: usize = 0;
-                    for (&buf, 0..) |*elem, i| {
-                        const ch = try msg.readByte();
-                        elem.* = ch;
-                        if (ch == '\r') {
-                            end = i;
-                            break;
-                        }
-                    }
-                    try msg.skipBytes(1, .{});
-                    var size = try fmt.parseInt(usize, buf[0..end], 10);
+                    const digits = try r.takeSentinel('\r');
+                    var size = try fmt.parseInt(usize, digits, 10);
+                    try r.discardAll(1);
 
-                    // Maps advertize the number of field-value pairs,
-                    // so we double the amount in that case.
-                    if (tag == '%') size *= 2;
-                    itemsToConsume += size;
+                    // Maps advertize the number of field-value pairs.
+                    if (current_tag == '%') size *= 2;
+                    items_left += size;
                 },
             }
 
             // If we still have items to consume, read the next tag.
-            if (itemsToConsume > 0) itemTag = try msg.readByte();
+            if (items_left > 0) current_tag = try r.takeByte();
         }
-        if (foundError) return error.GotErrorReply;
+        if (err_found) return error.GotErrorReply;
     }
 };

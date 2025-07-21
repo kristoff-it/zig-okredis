@@ -1,3 +1,5 @@
+const std = @import("std");
+const Writer = std.Io.Writer;
 const Value = @import("../_common_utils.zig").Value;
 
 /// SET key value [EX seconds|PX milliseconds] [NX|XX]
@@ -94,11 +96,23 @@ pub const SET = struct {
                 };
             }
 
-            pub fn serialize(self: Conditions, comptime rootSerializer: type, msg: anytype) !void {
+            pub fn serialize(
+                self: Conditions,
+                comptime root: type,
+                w: *Writer,
+            ) !void {
                 switch (self) {
                     .NoConditions => {},
-                    .IfNotExisting => try rootSerializer.serializeArgument(msg, []const u8, "NX"),
-                    .IfAlreadyExisting => try rootSerializer.serializeArgument(msg, []const u8, "XX"),
+                    .IfNotExisting => try root.serializeArgument(
+                        w,
+                        []const u8,
+                        "NX",
+                    ),
+                    .IfAlreadyExisting => try root.serializeArgument(
+                        w,
+                        []const u8,
+                        "XX",
+                    ),
                 }
             }
         };
@@ -112,62 +126,73 @@ test "basic usage" {
 }
 
 test "serializer" {
-    const std = @import("std");
     const serializer = @import("../../serializer.zig").CommandSerializer;
 
     var correctBuf: [1000]u8 = undefined;
-    var correctMsg = std.io.fixedBufferStream(correctBuf[0..]);
+    var correctMsg: Writer = .fixed(correctBuf[0..]);
 
     var testBuf: [1000]u8 = undefined;
-    var testMsg = std.io.fixedBufferStream(testBuf[0..]);
+    var testMsg: Writer = .fixed(testBuf[0..]);
 
     {
         {
-            correctMsg.reset();
-            testMsg.reset();
+            correctMsg.end = 0;
+            testMsg.end = 0;
 
             try serializer.serializeCommand(
-                testMsg.writer(),
+                &testMsg,
                 SET.init("mykey", 42, .NoExpire, .NoConditions),
             );
             try serializer.serializeCommand(
-                correctMsg.writer(),
+                &correctMsg,
                 .{ "SET", "mykey", "42" },
             );
 
-            try std.testing.expectEqualSlices(u8, correctMsg.getWritten(), testMsg.getWritten());
+            try std.testing.expectEqualSlices(
+                u8,
+                correctMsg.buffered(),
+                testMsg.buffered(),
+            );
         }
 
         {
-            correctMsg.reset();
-            testMsg.reset();
+            correctMsg.end = 0;
+            testMsg.end = 0;
 
             try serializer.serializeCommand(
-                testMsg.writer(),
+                &testMsg,
                 SET.init("mykey", "banana", .NoExpire, .IfNotExisting),
             );
             try serializer.serializeCommand(
-                correctMsg.writer(),
+                &correctMsg,
                 .{ "SET", "mykey", "banana", "NX" },
             );
 
-            try std.testing.expectEqualSlices(u8, correctMsg.getWritten(), testMsg.getWritten());
+            try std.testing.expectEqualSlices(
+                u8,
+                correctMsg.buffered(),
+                testMsg.buffered(),
+            );
         }
 
         {
-            correctMsg.reset();
-            testMsg.reset();
+            correctMsg.end = 0;
+            testMsg.end = 0;
 
             try serializer.serializeCommand(
-                testMsg.writer(),
+                &testMsg,
                 SET.init("mykey", "banana", SET.Expire{ .Seconds = 20 }, .IfAlreadyExisting),
             );
             try serializer.serializeCommand(
-                correctMsg.writer(),
+                &correctMsg,
                 .{ "SET", "mykey", "banana", "EX", "20", "XX" },
             );
 
-            try std.testing.expectEqualSlices(u8, correctMsg.getWritten(), testMsg.getWritten());
+            try std.testing.expectEqualSlices(
+                u8,
+                correctMsg.buffered(),
+                testMsg.buffered(),
+            );
         }
     }
 }

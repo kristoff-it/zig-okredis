@@ -1,4 +1,5 @@
 const std = @import("std");
+const Reader = std.Io.Reader;
 const testing = std.testing;
 
 /// Parses RedisNumber values
@@ -7,8 +8,8 @@ pub const BigNumParser = struct {
         return false;
     }
 
-    pub fn parse(comptime T: type, comptime _: type, msg: anytype) !T {
-        _ = msg;
+    pub fn parse(comptime T: type, comptime _: type, r: *Reader) !T {
+        _ = r;
 
         @compileError("The BigNum parser handles a type that needs an allocator.");
     }
@@ -18,44 +19,60 @@ pub const BigNumParser = struct {
         return T == std.math.big.int.Managed or T == []u8;
     }
 
-    pub fn parseAlloc(comptime T: type, comptime _: type, allocator: std.mem.Allocator, msg: anytype) !T {
-        // TODO: find a better max_size limit than a random 1k value
-        const bigSlice = try msg.readUntilDelimiterAlloc(allocator, '\r', 1000);
-        errdefer allocator.free(bigSlice);
+    pub fn parseAlloc(
+        comptime T: type,
+        comptime _: type,
+        allocator: std.mem.Allocator,
+        r: *Reader,
+    ) !T {
+        var w: std.Io.Writer.Allocating = .init(allocator);
+        errdefer w.deinit();
 
-        // Skip the remaining `\n`
-        try msg.skipBytes(1, .{});
+        _ = try r.streamDelimiter(&w.writer, '\r');
+        try r.discardAll(2);
 
-        if (T == []u8) {
-            return bigSlice;
+        if (T == []u8 or T == []const u8) {
+            return w.toOwnedSlice();
         }
 
+        // TODO: check that the type is correct!
         // T has to be `std.math.big.int`
         var res: T = try T.init(allocator);
-        try res.setString(10, bigSlice);
-        allocator.free(bigSlice);
+        try res.setString(10, try w.toOwnedSlice());
         return res;
     }
 };
 
 test "bignum" {
     const allocator = std.heap.page_allocator;
-    var fbs_bignum = MakeBigNum();
-    var bgn = try BigNumParser.parseAlloc(std.math.big.int.Managed, void, allocator, fbs_bignum.reader());
+    var r_bignum = MakeBigNum();
+    var bgn = try BigNumParser.parseAlloc(
+        std.math.big.int.Managed,
+        void,
+        allocator,
+        &r_bignum,
+    );
     defer bgn.deinit();
 
     const bgnStr = try bgn.toString(allocator, 10, .lower);
     defer allocator.free(bgnStr);
     try testing.expectEqualSlices(u8, "1234567899990000009999876543211234567890", bgnStr);
 
-    var fbs_bignum2 = MakeBigNum();
-    const str = try BigNumParser.parseAlloc([]u8, void, allocator, fbs_bignum2.reader());
+    var r_bignum2 = MakeBigNum();
+    const str = try BigNumParser.parseAlloc(
+        []u8,
+        void,
+        allocator,
+        &r_bignum2,
+    );
     defer allocator.free(str);
 
     try testing.expectEqualSlices(u8, bgnStr, str);
 }
 
 // TODO: get rid of this
-fn MakeBigNum() std.io.FixedBufferStream([]const u8) {
-    return std.io.fixedBufferStream("(1234567899990000009999876543211234567890\r\n"[1..]);
+fn MakeBigNum() Reader {
+    return std.Io.Reader.fixed(
+        "(1234567899990000009999876543211234567890\r\n"[1..],
+    );
 }

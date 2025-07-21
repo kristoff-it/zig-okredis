@@ -1,6 +1,7 @@
 // HSET key field value [field value ...]
 
 const std = @import("std");
+const Writer = std.Io.Writer;
 
 const common = @import("../_common_utils.zig");
 const FV = common.FV;
@@ -124,32 +125,32 @@ test "serializer" {
     const serializer = @import("../../serializer.zig").CommandSerializer;
 
     var correctBuf: [1000]u8 = undefined;
-    var correctMsg = std.io.fixedBufferStream(correctBuf[0..]);
+    var correctMsg: Writer = .fixed(correctBuf[0..]);
 
     var testBuf: [1000]u8 = undefined;
-    var testMsg = std.io.fixedBufferStream(testBuf[0..]);
+    var testMsg: Writer = .fixed(testBuf[0..]);
 
     {
         {
-            correctMsg.reset();
-            testMsg.reset();
+            correctMsg.end = 0;
+            testMsg.end = 0;
 
             try serializer.serializeCommand(
-                testMsg.writer(),
+                &testMsg,
                 HSET.init("k1", &[_]FV{.{ .field = "f1", .value = "v1" }}),
             );
             try serializer.serializeCommand(
-                correctMsg.writer(),
+                &correctMsg,
                 .{ "HSET", "k1", "f1", "v1" },
             );
 
-            // std.debug.warn("{}\n\n\n{}\n", .{ correctMsg.getWritten(), testMsg.getWritten() });
-            try std.testing.expectEqualSlices(u8, correctMsg.getWritten(), testMsg.getWritten());
+            // std.debug.warn("{}\n\n\n{}\n", .{ correctMsg.buffered(), testMsg.buffered() });
+            try std.testing.expectEqualSlices(u8, correctMsg.buffered(), testMsg.buffered());
         }
 
         {
-            correctMsg.reset();
-            testMsg.reset();
+            correctMsg.end = 0;
+            testMsg.end = 0;
 
             const MyStruct = struct {
                 field1: []const u8,
@@ -160,18 +161,27 @@ test "serializer" {
             const MyHSET = HSET.forStruct(MyStruct);
 
             try serializer.serializeCommand(
-                testMsg.writer(),
+                &testMsg,
                 MyHSET.init(
                     "k1",
                     .{ .field1 = "nice!", .field2 = 'a', .field3 = 42 },
                 ),
             );
             try serializer.serializeCommand(
-                correctMsg.writer(),
-                .{ "HSET", "k1", "field1", "nice!", "field2", 'a', "field3", 42 },
+                &correctMsg,
+                .{
+                    "HSET",   "k1",
+                    "field1", "nice!",
+                    "field2", 'a',
+                    "field3", 42,
+                },
             );
 
-            try std.testing.expectEqualSlices(u8, correctMsg.getWritten(), testMsg.getWritten());
+            try std.testing.expectEqualSlices(
+                u8,
+                correctMsg.buffered(),
+                testMsg.buffered(),
+            );
         }
     }
 }

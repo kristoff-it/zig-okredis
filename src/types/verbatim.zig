@@ -1,4 +1,5 @@
 const std = @import("std");
+const Reader = std.Io.Reader;
 const fmt = std.fmt;
 const Allocator = std.mem.Allocator;
 const testing = std.testing;
@@ -25,36 +26,39 @@ pub const Verbatim = struct {
                 @compileError("Verbatim requires an allocator, use `parseAlloc`.");
             }
 
-            pub fn destroy(self: Verbatim, comptime _: type, allocator: Allocator) void {
+            pub fn destroy(
+                self: Verbatim,
+                comptime _: type,
+                allocator: Allocator,
+            ) void {
                 allocator.free(self.string);
             }
 
-            pub fn parseAlloc(tag: u8, comptime rootParser: type, allocator: Allocator, msg: anytype) !Verbatim {
+            pub fn parseAlloc(
+                tag: u8,
+                comptime rootParser: type,
+                allocator: Allocator,
+                r: *Reader,
+            ) !Verbatim {
                 switch (tag) {
                     else => return error.DecodingError,
                     '-', '!' => {
-                        try rootParser.parseFromTag(void, tag, msg);
+                        try rootParser.parseFromTag(void, tag, r);
                         return error.GotErrorReply;
                     },
                     '$', '+' => return Verbatim{
                         .format = Format{ .Simple = {} },
-                        .string = try rootParser.parseAllocFromTag([]u8, tag, allocator, msg),
+                        .string = try rootParser.parseAllocFromTag(
+                            []u8,
+                            tag,
+                            allocator,
+                            r,
+                        ),
                     },
                     '=' => {
-                        // TODO: write real implementation
-                        var buf: [100]u8 = undefined;
-                        var end: usize = 0;
-                        for (&buf, 0..) |*elem, i| {
-                            const ch = try msg.readByte();
-                            elem.* = ch;
-                            if (ch == '\r') {
-                                end = i;
-                                break;
-                            }
-                        }
-
-                        try msg.skipBytes(1, .{});
-                        var size = try fmt.parseInt(usize, buf[0..end], 10);
+                        const digits = try r.takeSentinel('\r');
+                        var size = try fmt.parseInt(usize, digits, 10);
+                        try r.discardAll(1);
 
                         // We must consider the case in which a malformed
                         // verbatim string is received. By the protocol standard
@@ -65,27 +69,26 @@ pub const Verbatim = struct {
                         var format: Format = undefined;
                         if (size >= 4) {
                             format = Format{
-                                .Verbatim = [3]u8{
-                                    try msg.readByte(),
-                                    try msg.readByte(),
-                                    try msg.readByte(),
-                                },
+                                .Verbatim = (try r.takeArray(3)).*,
                             };
 
                             // Skip the `:` character, subtract what we consumed
-                            try msg.skipBytes(1, .{});
+                            try r.discardAll(1);
                             size -= 4;
                         } else {
                             format = Format{ .Err = {} };
                         }
 
-                        var res = try allocator.alloc(u8, size);
+                        const res = try allocator.alloc(u8, size);
                         errdefer allocator.free(res);
 
-                        try msg.readNoEof(res[0..size]);
-                        try msg.skipBytes(2, .{});
+                        try r.readSliceAll(res);
+                        try r.discardAll(2);
 
-                        return Verbatim{ .format = format, .string = res };
+                        return .{
+                            .format = format,
+                            .string = res,
+                        };
                     },
                 }
             }
@@ -98,8 +101,13 @@ test "verbatim" {
     const allocator = std.heap.page_allocator;
 
     {
-        var simple_string_fbs = MakeSimpleString();
-        const reply = try Verbatim.Redis.Parser.parseAlloc('+', parser, allocator, simple_string_fbs.reader());
+        var simple_string = MakeSimpleString();
+        const reply = try Verbatim.Redis.Parser.parseAlloc(
+            '+',
+            parser,
+            allocator,
+            &simple_string,
+        );
         try testing.expectEqualSlices(u8, "Yayyyy I'm a string!", reply.string);
         switch (reply.format) {
             else => unreachable,
@@ -108,8 +116,8 @@ test "verbatim" {
     }
 
     {
-        var blob_string_fbs = MakeBlobString();
-        const reply = try Verbatim.Redis.Parser.parseAlloc('$', parser, allocator, blob_string_fbs.reader());
+        var blob_string = MakeBlobString();
+        const reply = try Verbatim.Redis.Parser.parseAlloc('$', parser, allocator, &blob_string);
         try testing.expectEqualSlices(u8, "Hello World!", reply.string);
         switch (reply.format) {
             else => unreachable,
@@ -118,8 +126,13 @@ test "verbatim" {
     }
 
     {
-        var verb_string_fbs = MakeVerbatimString();
-        const reply = try Verbatim.Redis.Parser.parseAlloc('=', parser, allocator, verb_string_fbs.reader());
+        var verb_string = MakeVerbatimString();
+        const reply = try Verbatim.Redis.Parser.parseAlloc(
+            '=',
+            parser,
+            allocator,
+            &verb_string,
+        );
         try testing.expectEqualSlices(u8, "Oh hello there!", reply.string);
         switch (reply.format) {
             else => unreachable,
@@ -129,7 +142,12 @@ test "verbatim" {
 
     {
         var bad_verb = MakeBadVerbatimString();
-        const reply = try Verbatim.Redis.Parser.parseAlloc('=', parser, allocator, bad_verb.reader());
+        const reply = try Verbatim.Redis.Parser.parseAlloc(
+            '=',
+            parser,
+            allocator,
+            &bad_verb,
+        );
         try testing.expectEqualSlices(u8, "t", reply.string);
         switch (reply.format) {
             else => unreachable,
@@ -139,7 +157,12 @@ test "verbatim" {
 
     {
         var bad_verb_2 = MakeBadVerbatimString2();
-        const reply = try Verbatim.Redis.Parser.parseAlloc('=', parser, allocator, bad_verb_2.reader());
+        const reply = try Verbatim.Redis.Parser.parseAlloc(
+            '=',
+            parser,
+            allocator,
+            &bad_verb_2,
+        );
         try testing.expectEqualSlices(u8, "", reply.string);
         switch (reply.format) {
             else => unreachable,
@@ -149,18 +172,18 @@ test "verbatim" {
 }
 
 // TODO: get rid of these!!!
-fn MakeSimpleString() std.io.FixedBufferStream([]const u8) {
-    return std.io.fixedBufferStream("+Yayyyy I'm a string!\r\n"[1..]);
+fn MakeSimpleString() Reader {
+    return std.Io.Reader.fixed("+Yayyyy I'm a string!\r\n"[1..]);
 }
-fn MakeBlobString() std.io.FixedBufferStream([]const u8) {
-    return std.io.fixedBufferStream("$12\r\nHello World!\r\n"[1..]);
+fn MakeBlobString() Reader {
+    return std.Io.Reader.fixed("$12\r\nHello World!\r\n"[1..]);
 }
-fn MakeVerbatimString() std.io.FixedBufferStream([]const u8) {
-    return std.io.fixedBufferStream("=19\r\ntxt:Oh hello there!\r\n"[1..]);
+fn MakeVerbatimString() Reader {
+    return std.Io.Reader.fixed("=19\r\ntxt:Oh hello there!\r\n"[1..]);
 }
-fn MakeBadVerbatimString() std.io.FixedBufferStream([]const u8) {
-    return std.io.fixedBufferStream("=1\r\nt\r\n"[1..]);
+fn MakeBadVerbatimString() Reader {
+    return std.Io.Reader.fixed("=1\r\nt\r\n"[1..]);
 }
-fn MakeBadVerbatimString2() std.io.FixedBufferStream([]const u8) {
-    return std.io.fixedBufferStream("=4\r\nmkd:\r\n"[1..]);
+fn MakeBadVerbatimString2() Reader {
+    return std.Io.Reader.fixed("=4\r\nmkd:\r\n"[1..]);
 }

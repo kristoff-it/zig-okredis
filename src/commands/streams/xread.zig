@@ -121,17 +121,17 @@ test "serializer" {
     const serializer = @import("../../serializer.zig").CommandSerializer;
 
     var correctBuf: [1000]u8 = undefined;
-    var correctMsg = std.io.fixedBufferStream(correctBuf[0..]);
+    var correctMsg = std.Io.Writer.fixed(correctBuf[0..]);
 
     var testBuf: [1000]u8 = undefined;
-    var testMsg = std.io.fixedBufferStream(testBuf[0..]);
+    var testMsg = std.Io.Writer.fixed(testBuf[0..]);
 
     {
-        correctMsg.reset();
-        testMsg.reset();
+        correctMsg.end = 0;
+        testMsg.end = 0;
 
         try serializer.serializeCommand(
-            testMsg.writer(),
+            &testMsg,
             XREAD.init(
                 .NoCount,
                 .NoBlock,
@@ -140,10 +140,14 @@ test "serializer" {
             ),
         );
         try serializer.serializeCommand(
-            correctMsg.writer(),
+            &correctMsg,
             .{ "XREAD", "STREAMS", "key1", "key2", "$", "$" },
         );
 
-        try std.testing.expectEqualSlices(u8, correctMsg.getWritten(), testMsg.getWritten());
+        try std.testing.expectEqualSlices(
+            u8,
+            correctMsg.buffered(),
+            testMsg.buffered(),
+        );
     }
 }

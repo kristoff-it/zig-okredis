@@ -1,5 +1,8 @@
 // DECRBY key decrement
 
+const std = @import("std");
+const Writer = std.Io.Writer;
+
 pub const DECRBY = struct {
     key: []const u8,
     decrement: i64,
@@ -15,8 +18,15 @@ pub const DECRBY = struct {
     }
 
     pub const RedisCommand = struct {
-        pub fn serialize(self: DECRBY, comptime rootSerializer: type, msg: anytype) !void {
-            return rootSerializer.serializeCommand(msg, .{ "DECRBY", self.key, self.decrement });
+        pub fn serialize(
+            self: DECRBY,
+            comptime root: type,
+            w: *Writer,
+        ) !void {
+            return root.serializeCommand(
+                w,
+                .{ "DECRBY", self.key, self.decrement },
+            );
         }
     };
 };
