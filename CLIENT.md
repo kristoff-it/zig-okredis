@@ -14,17 +14,32 @@ common options.
 
 ```zig
 const std = @import("std");
+const Io = std.Io;
 const okredis = @import("./src/okredis.zig");
 const Client = okredis.Client;
 
 pub fn main() !void {
-    const addr = try std.net.Address.parseIp4("127.0.0.1", 6379);
-    var connection = try std.net.tcpConnectToAddress(addr);
-    
-    var client: Client = undefined;
-    try client.init(connection);
-    defer client.close();
+    const gpa = std.heap.smp_allocator;
 
+    // Pick your preferred Io implementation.
+    var threaded: Io.Threaded = .init(gpa);
+    defer threaded.deinit();
+    const io = threaded.io();
+
+    // Open a TCP connection.
+    // NOTE: managing the connection is your responsibility.
+    const addr: Io.net.IpAddress = try .parseIp4("127.0.0.1", 6379);
+    const connection = try addr.connect(io, .{ .mode = .stream });
+    defer connection.close(io);
+
+    var rbuf: [1024]u8 = undefined;
+    var wbuf: [1024]u8 = undefined;
+    var reader = connection.reader(io, &rbuf);
+    var writer = connection.writer(io, &wbuf);
+
+    // The last argument are auth credentials (null in our case).
+    var client = try Client.init(io, &reader.interface, &writer.interface, null);
+    
     try client.send(void, .{ "SET", "key", "42" });
 
     const reply = try client.send(i64, .{ "GET", "key" });
@@ -39,13 +54,12 @@ Currently the client uses a 4096 bytes long fixed buffer embedded in the
 In the future the option of customizing the buffering strategy will be exposed 
 to the user, once the I/O stream interface becomes more stable in Zig.
 
-## Evented vs blocking I/O
-Evented I/O is supported and the client will properly coordinate with the
-event loop when `pub const io_mode = .evented;` is defined in the root file.
+## Async I/O
+This client supports Zig's new (0.16.0) async I/O.
 
-The implementation has only been tested lightly, so it's recommended to wait for 
-the Zig ecosystem to stabilize more before relying on this feature (which at the
-time of writing only works on Linux).
+No change is necessary on your part, other than using a different allocator
+than `smp_allocator` (like the provided examples suggest). You can use
+`std.heap.GeneralPurposeAllocator` instead.
 
 ## Pipelining
 Redis supports pipelining, which, in short, consists of sending multiple 

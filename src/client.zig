@@ -1,8 +1,8 @@
+const Client = @This();
 const std = @import("std");
-const os = std.os;
-const net = std.net;
+const Io = std.Io;
 const Allocator = std.mem.Allocator;
-
+const assert = std.debug.assert;
 const RESP3 = @import("./parser.zig").RESP3Parser;
 const CommandSerializer = @import("./serializer.zig").CommandSerializer;
 const OrErr = @import("./types/error.zig").OrErr;
@@ -14,28 +14,21 @@ pub const Auth = struct {
 
 pub const InitOptions = struct {
     auth: ?Auth = null,
-    reader_buffer: []u8,
-    writer_buffer: []u8,
 };
 
-conn: net.Stream,
-reader: net.Stream.Reader,
-writer: net.Stream.Writer,
-
-// Connection state
+io: Io,
+w: *Io.Writer,
+r: *Io.Reader,
+wl: Io.Mutex = .init,
+rl: Io.Mutex = .init,
+pending_tail: ?*Pending = null,
 broken: bool = false,
 
-const Client = @This();
+/// Initializes a Client on a Reader and a Writer provided by the user.
+pub fn init(io: Io, reader: *Io.Reader, writer: *Io.Writer, auth: ?Auth) !Client {
+    var client: Client = .{ .io = io, .r = reader, .w = writer };
 
-/// Initializes a Client on a connection / pipe provided by the user.
-pub fn init(conn: net.Stream, options: InitOptions) !Client {
-    var client: Client = .{
-        .conn = conn,
-        .reader = conn.reader(options.reader_buffer),
-        .writer = conn.writer(options.writer_buffer),
-    };
-
-    if (options.auth) |a| {
+    if (auth) |a| {
         if (a.user) |user| {
             client.send(void, .{ "AUTH", user, a.pass }) catch |err| {
                 client.broken = true;
@@ -65,8 +58,8 @@ pub fn init(conn: net.Stream, options: InitOptions) !Client {
     }
 }
 
-pub fn close(self: Client) void {
-    self.conn.close();
+pub fn close(_: Client) void {
+    @compileError("deprecated, okredis.Client doesn't keep a reference to the connection anymore.");
 }
 
 /// Sends a command to Redis and tries to parse the response as the specified
@@ -135,6 +128,12 @@ pub fn pipeAlloc(
     return pipelineImpl(client, Ts, cmds, .{ .ptr = allocator });
 }
 
+const Pending = struct {
+    ready: bool,
+    cond: Io.Condition = .{},
+    next: ?*Pending = null,
+};
+
 fn pipelineImpl(
     client: *Client,
     comptime Ts: type,
@@ -147,77 +146,54 @@ fn pipelineImpl(
         // if (self.broken) return error.BrokenConnection;
         // errdefer self.broken = true;
     }
-    // var heldWrite: std.event.Lock.Held = undefined;
-    // var heldRead: std.event.Lock.Held = undefined;
-    // var heldReadFrame: @Frame(std.event.Lock.acquire) = undefined;
 
-    // If we're doing async/await we need to first grab the lock
-    // for the write stream. Once we have it, we also need to queue
-    // for the read lock, but we don't have to acquire it fully yet.
-    // For this reason we don't await `self.readLock.acquire()` and in
-    // the meantime we start writing to the write stream.
-    // if (std_io_is_async) {
-    //     heldWrite = self.writeLock.acquire();
-    //     heldReadFrame = async self.readLock.acquire();
-    // }
-
-    // var heldReadFrameNotAwaited = true;
-    // defer if (std_io_is_async and heldReadFrameNotAwaited) {
-    //     heldRead = await heldReadFrame;
-    //     heldRead.release();
-    // };
+    try client.wl.lock(client.io);
+    var self_pending: Pending = .{ .ready = client.pending_tail == null };
+    if (client.pending_tail) |pp| pp.next = &self_pending;
+    client.pending_tail = &self_pending;
 
     {
-        // We add a block to release the write lock before we start
-        // reading from the read stream.
-        // defer if (std_io_is_async) heldWrite.release();
-
-        // Serialize all the commands
+        // Serialize all commands
         if (@hasField(@TypeOf(opts), "one")) {
-            try CommandSerializer.serializeCommand(
-                &client.writer.interface,
-                cmds,
-            );
+            try CommandSerializer.serializeCommand(client.w, cmds);
         } else {
             inline for (std.meta.fields(@TypeOf(cmds))) |field| {
                 const cmd = @field(cmds, field.name);
                 // try ArgSerializer.serialize(&self.out.stream, args);
-                try CommandSerializer.serializeCommand(
-                    &client.writer.interface,
-                    cmd,
-                );
+                try CommandSerializer.serializeCommand(client.w, cmd);
             }
-        } // Here is where the write lock gets released by the `defer` statement.
-        try client.writer.interface.flush();
-
-        // TODO: locking
-        // if (buffering == .Fixed) {
-        //     if (std_io_is_async) {
-        //         // TODO: see if this stuff can be implemented nicely
-        //         // so that you don't have to depend on magic numbers & implementation details.
-        //         client.writeLock.mutex.lock();
-        //         defer client.writeLock.mutex.unlock();
-        //         if (client.writeLock.head == 1) {
-        //             try client.writeBuffer.flush();
-        //         }
-        //     } else {
-        //         try client.writeBuffer.flush();
-        //     }
-        // }
+        }
+        try client.w.flush();
     }
 
-    // if (std_io_is_async) {
-    //     heldReadFrameNotAwaited = false;
-    //     heldRead = await heldReadFrame;
-    // }
-    // defer if (std_io_is_async) heldRead.release();
+    client.wl.unlock(client.io);
+    try client.rl.lock(client.io);
+    while (!self_pending.ready) {
+        try self_pending.cond.wait(client.io, &client.rl);
+    }
+
+    defer {
+        client.wl.lockUncancelable(client.io);
+        defer {
+            client.rl.unlock(client.io);
+            client.wl.unlock(client.io);
+        }
+        if (self_pending.next) |np| {
+            assert(client.pending_tail.? != &self_pending);
+            np.ready = true;
+            np.cond.signal(client.io);
+        } else {
+            assert(client.pending_tail.? == &self_pending);
+            client.pending_tail = null;
+        }
+    }
 
     // TODO: error procedure
     if (@hasField(@TypeOf(opts), "one")) {
         if (@hasField(@TypeOf(opts), "ptr")) {
-            return RESP3.parseAlloc(Ts, opts.ptr, client.reader.interface());
+            return RESP3.parseAlloc(Ts, opts.ptr, client.r);
         } else {
-            return RESP3.parse(Ts, client.reader.interface());
+            return RESP3.parse(Ts, client.r);
         }
     } else {
         var result: Ts = undefined;
@@ -226,7 +202,7 @@ fn pipelineImpl(
             const cmd_num = std.meta.fields(@TypeOf(cmds)).len;
             comptime var i: usize = 0;
             inline while (i < cmd_num) : (i += 1) {
-                try RESP3.parse(void, client.reader.interface());
+                try RESP3.parse(void, client.r);
             }
             return;
         } else {
@@ -237,12 +213,12 @@ fn pipelineImpl(
                             @field(result, field.name) = try RESP3.parseAlloc(
                                 field.type,
                                 opts.ptr,
-                                client.reader.interface(),
+                                client.r,
                             );
                         } else {
                             @field(result, field.name) = try RESP3.parse(
                                 field.type,
-                                client.reader.interface(),
+                                client.r,
                             );
                         }
                     }
@@ -251,9 +227,9 @@ fn pipelineImpl(
                     var i: usize = 0;
                     while (i < Ts.len) : (i += 1) {
                         if (@hasField(@TypeOf(opts), "ptr")) {
-                            result[i] = try RESP3.parseAlloc(Ts.Child, opts.ptr, client.reader);
+                            result[i] = try RESP3.parseAlloc(Ts.Child, opts.ptr, client.r);
                         } else {
-                            result[i] = try RESP3.parse(Ts.Child, client.reader);
+                            result[i] = try RESP3.parse(Ts.Child, client.r);
                         }
                     }
                 },
@@ -261,9 +237,9 @@ fn pipelineImpl(
                     switch (ptr.size) {
                         .one => {
                             if (@hasField(@TypeOf(opts), "ptr")) {
-                                result = try RESP3.parseAlloc(Ts, opts.ptr, client.reader);
+                                result = try RESP3.parseAlloc(Ts, opts.ptr, client.r);
                             } else {
-                                result = try RESP3.parse(Ts, client.reader);
+                                result = try RESP3.parse(Ts, client.r);
                             }
                         },
                         .many => {
@@ -272,7 +248,11 @@ fn pipelineImpl(
                                 errdefer opts.free(result);
 
                                 for (result) |*elem| {
-                                    elem.* = try RESP3.parseAlloc(Ts.Child, opts.ptr, client.reader);
+                                    elem.* = try RESP3.parseAlloc(
+                                        Ts.Child,
+                                        opts.ptr,
+                                        client.r,
+                                    );
                                 }
                             } else {
                                 @compileError("Use sendAlloc / pipeAlloc / transAlloc to decode pointer types.");
@@ -285,8 +265,4 @@ fn pipelineImpl(
         }
         return result;
     }
-}
-
-test "docs" {
-    @import("std").testing.refAllDecls(Client);
 }

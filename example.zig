@@ -1,22 +1,30 @@
 const std = @import("std");
-const net = std.net;
+const Io = std.Io;
 
 const okredis = @import("okredis");
 const Client = okredis.Client;
 
 pub fn main() !void {
-    // Connect
-    const addr = try net.Address.parseIp4("127.0.0.1", 6379);
-    const connection = try net.tcpConnectToAddress(addr);
+    const gpa = std.heap.smp_allocator;
+
+    // Pick your preferred Io implementation.
+    var threaded: Io.Threaded = .init(gpa);
+    defer threaded.deinit();
+    const io = threaded.io();
+
+    // Open a TCP connection.
+    // NOTE: managing the connection is your responsibility.
+    const addr: Io.net.IpAddress = try .parseIp4("127.0.0.1", 6379);
+    const connection = try addr.connect(io, .{ .mode = .stream });
+    defer connection.close(io);
 
     var rbuf: [1024]u8 = undefined;
     var wbuf: [1024]u8 = undefined;
+    var reader = connection.reader(io, &rbuf);
+    var writer = connection.writer(io, &wbuf);
 
-    var client = try Client.init(connection, .{
-        .reader_buffer = &rbuf,
-        .writer_buffer = &wbuf,
-    });
-    defer client.close();
+    // The last argument are auth credentials (null in our case).
+    var client = try Client.init(io, &reader.interface, &writer.interface, null);
 
     //   -
     //   == INTRODUCTION ==

@@ -17,7 +17,7 @@ compromising on performance or flexibility.
 OkRedis is currently in alpha. The main features are mostly complete,
 but a lot of polishing is still required.
 
-Requires Zig v0.15.0-dev or above.
+Requires Zig v0.16.0-dev or above.
 
 Everything mentioned in the docs is already implemented and you can just
 `zig run example.zig` to quickly see what it can do. Remember OkRedis only
@@ -46,29 +46,38 @@ as input, so the user can setup custom allocation schemes such as
 
 ```zig
 const std = @import("std");
+const Io = std.Io;
 const okredis = @import("./src/okredis.zig");
 const SET = okredis.commands.strings.SET;
 const OrErr = okredis.types.OrErr;
 const Client = okredis.Client;
 
 pub fn main() !void {
-    const addr = try net.Address.parseIp4("127.0.0.1", 6379);
-    const connection = try net.tcpConnectToAddress(addr);
+    const gpa = std.heap.smp_allocator;
+
+    // Pick your preferred Io implementation.
+    var threaded: Io.Threaded = .init(gpa);
+    defer threaded.deinit();
+    const io = threaded.io();
+
+    // Open a TCP connection.
+    // NOTE: managing the connection is your responsibility.
+    const addr: Io.net.IpAddress = try .parseIp4("127.0.0.1", 6379);
+    const connection = try addr.connect(io, .{ .mode = .stream });
+    defer connection.close(io);
 
     var rbuf: [1024]u8 = undefined;
     var wbuf: [1024]u8 = undefined;
+    var reader = connection.reader(io, &rbuf);
+    var writer = connection.writer(io, &wbuf);
 
-    var client = try Client.init(connection, .{
-        .reader_buffer = &rbuf,
-        .writer_buffer = &wbuf,
-    });
-    defer client.close();
+    // The last argument are auth credentials (null in our case).
+    var client = try Client.init(io, &reader.interface, &writer.interface, null);
 
     // Basic interface
     try client.send(void, .{ "SET", "key", "42" });
     const reply = try client.send(i64, .{ "GET", "key" });
     if (reply != 42) @panic("out of towels");
-
 
     // Command builder interface
     const cmd = SET.init("key", "43", .NoExpire, .IfAlreadyExisting);
@@ -132,8 +141,6 @@ Take a look at the final section of `REPLIES.md`.
 
 ## TODOS
 - Implement remaining command builders
-- Better connection management (ipv6, unixsockets, ...)
 - Streamline design of Zig errors
-- Refine support for async/await and think about connection pooling
 - Refine the Redis traits
 - Pub/Sub
