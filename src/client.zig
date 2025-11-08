@@ -21,6 +21,8 @@ w: *Io.Writer,
 r: *Io.Reader,
 wl: Io.Mutex = .init,
 rl: Io.Mutex = .init,
+
+// Protected by wl (writelock)
 pending_tail: ?*Pending = null,
 broken: bool = false,
 
@@ -129,8 +131,11 @@ pub fn pipeAlloc(
 }
 
 const Pending = struct {
-    ready: bool,
+    // Protected by rl (readlock)
+    state: enum { waiting, ready, canceled },
     cond: Io.Condition = .{},
+
+    // Protected by wl (writelock)
     next: ?*Pending = null,
 };
 
@@ -140,26 +145,58 @@ fn pipelineImpl(
     cmds: anytype,
     opts: anytype, // comptime arg for allocator and one/many commands
 ) !Ts {
-    // TODO: find a way to express some of the metaprogramming requirements
-    // in a more clear way. Using @hasField this way is ugly.
-    {
-        // if (self.broken) return error.BrokenConnection;
-        // errdefer self.broken = true;
+    try client.wl.lock(client.io);
+    if (client.broken) {
+        client.wl.unlock(client.io);
+        return error.BrokenConnection;
     }
 
-    try client.wl.lock(client.io);
-    var self_pending: Pending = .{ .ready = client.pending_tail == null };
-    if (client.pending_tail) |pp| pp.next = &self_pending;
+    var self_pending: Pending = .{
+        .state = if (client.pending_tail == null) .ready else .waiting,
+    };
+    if (client.pending_tail) |pp| {
+        assert(pp.next == null);
+        pp.next = &self_pending;
+    }
     client.pending_tail = &self_pending;
 
+    errdefer {
+        client.rl.lockUncancelable(client.io);
+        // If our pending state is still waiting, a pending reader above us
+        // will eventually attempt to wake us up. We need to wait for them to
+        // do it, otherwise they will try to access a dangling stack pointer.
+        while (self_pending.state == .waiting) {
+            self_pending.cond.waitUncancelable(client.io, &client.rl);
+        }
+        client.wl.lockUncancelable(client.io);
+        defer {
+            client.wl.unlock(client.io);
+            client.rl.unlock(client.io);
+        }
+
+        client.broken = true;
+        if (self_pending.next) |np| {
+            assert(client.pending_tail.? != &self_pending);
+            np.state = .canceled;
+            np.cond.signal(client.io);
+        } else {
+            assert(client.pending_tail.? == &self_pending);
+            client.pending_tail = null;
+        }
+    }
+
     {
+        errdefer {
+            client.broken = true;
+            client.wl.unlock(client.io);
+        }
+
         // Serialize all commands
         if (@hasField(@TypeOf(opts), "one")) {
             try CommandSerializer.serializeCommand(client.w, cmds);
         } else {
             inline for (std.meta.fields(@TypeOf(cmds))) |field| {
                 const cmd = @field(cmds, field.name);
-                // try ArgSerializer.serialize(&self.out.stream, args);
                 try CommandSerializer.serializeCommand(client.w, cmd);
             }
         }
@@ -168,11 +205,20 @@ fn pipelineImpl(
 
     client.wl.unlock(client.io);
     try client.rl.lock(client.io);
-    while (!self_pending.ready) {
-        try self_pending.cond.wait(client.io, &client.rl);
+    {
+        errdefer client.rl.unlock(client.io);
+        while (self_pending.state == .waiting) {
+            self_pending.cond.waitUncancelable(client.io, &client.rl);
+        }
+        // This check is outside of the while loop because we could have been
+        // canceled before we even attempt to wait.
+        if (self_pending.state == .canceled) {
+            return error.Canceled;
+        }
     }
 
-    defer {
+    var any_error = false;
+    defer if (!any_error) {
         client.wl.lockUncancelable(client.io);
         defer {
             client.rl.unlock(client.io);
@@ -180,12 +226,17 @@ fn pipelineImpl(
         }
         if (self_pending.next) |np| {
             assert(client.pending_tail.? != &self_pending);
-            np.ready = true;
+            np.state = if (client.broken) .canceled else .ready;
             np.cond.signal(client.io);
         } else {
             assert(client.pending_tail.? == &self_pending);
             client.pending_tail = null;
         }
+    };
+
+    errdefer {
+        any_error = true;
+        client.rl.unlock(client.io);
     }
 
     // TODO: error procedure

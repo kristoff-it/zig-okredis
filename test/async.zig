@@ -1,7 +1,7 @@
 const std = @import("std");
 const Io = std.Io;
 
-const okredis = @import("../src/root.zig");
+const okredis = @import("src/root.zig");
 const Client = okredis.Client;
 
 const gpa = std.heap.smp_allocator;
@@ -38,7 +38,7 @@ pub fn main() !void {
 
 fn countdown(client: *Client, i: usize, num: u32) void {
     countdownFallible(client, i, num) catch |err| {
-        std.debug.panic("[{}] error: {t}", .{ i, err });
+        std.debug.print("[{}] error: {t}\n", .{ i, err });
     };
 }
 
@@ -48,9 +48,22 @@ fn countdownFallible(client: *Client, i: usize, n: u32) !void {
     try client.send(void, .{ "SET", key, num });
     while (num > 0) {
         const value = try client.send(u32, .{ "INCRBY", key, -1 });
-        // std.debug.print("[{}] {}\n", .{ i, value });
+        // std.debug.print("({})[{}] {}\n", .{
+        //     std.Thread.getCurrentId(),
+        //     i,
+        //     value,
+        // });
         num -= 1;
-        if (value != num) @panic("mismatch!");
+        if (value != num) {
+            std.debug.print("({})[{}] {} != {}\n", .{
+                std.Thread.getCurrentId(),
+                i,
+                value,
+                num,
+            });
+            return error.Mismatch;
+        }
+        // if (value != num) @panic("mismatch!");
     }
     std.log.info("[{}] correct countdown from {}", .{ i, n });
 }
