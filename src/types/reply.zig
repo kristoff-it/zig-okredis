@@ -84,15 +84,31 @@ pub const DynamicReply = struct {
 
                 res.data = switch (itemTag) {
                     else => return E,
-                    '_' => Data{ .Nil = {} },
-                    '#' => Data{ .Bool = rootParser.parseFromTag(bool, '#', r) catch return E },
-                    ':' => Data{ .Number = rootParser.parseFromTag(i64, ':', r) catch return E },
-                    ',' => Data{ .Double = rootParser.parseFromTag(f64, ',', r) catch return E },
-                    '+', '$', '=' => Data{ .String = rootParser.parseAllocFromTag(Verbatim, itemTag, allocator, r) catch return E },
-                    '%' => Data{ .Map = rootParser.parseAllocFromTag([][2]*DynamicReply, '%', allocator, r) catch return E },
-                    '*' => Data{ .List = rootParser.parseAllocFromTag([]DynamicReply, '*', allocator, r) catch return E },
-                    '~' => Data{ .Set = rootParser.parseAllocFromTag([]DynamicReply, '~', allocator, r) catch return E },
-                    '(' => Data{ .Bignum = rootParser.parseAllocFromTag(std.math.big.int.Managed, '(', allocator, r) catch return E },
+                    '_' => .{ .Nil = {} },
+                    '#' => .{
+                        .Bool = rootParser.parseFromTag(bool, '#', r) catch return E,
+                    },
+                    ':' => .{
+                        .Number = rootParser.parseFromTag(i64, ':', r) catch return E,
+                    },
+                    ',' => .{
+                        .Double = rootParser.parseFromTag(f64, ',', r) catch return E,
+                    },
+                    '+', '$', '=' => .{
+                        .String = rootParser.parseAllocFromTag(Verbatim, itemTag, allocator, r) catch return E,
+                    },
+                    '%' => .{
+                        .Map = rootParser.parseAllocFromTag([][2]*DynamicReply, '%', allocator, r) catch return E,
+                    },
+                    '*' => .{
+                        .List = rootParser.parseAllocFromTag([]DynamicReply, '*', allocator, r) catch return E,
+                    },
+                    '~' => .{
+                        .Set = rootParser.parseAllocFromTag([]DynamicReply, '~', allocator, r) catch return E,
+                    },
+                    '(' => .{
+                        .Bignum = rootParser.parseAllocFromTag(std.math.big.int.Managed, '(', allocator, r) catch return E,
+                    },
                 };
 
                 return res;

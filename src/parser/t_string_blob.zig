@@ -69,7 +69,7 @@ pub const BlobStringParser = struct {
                 const elemSize = std.math.divExact(usize, size, @sizeOf(ptr.child)) catch return error.LengthMismatch;
                 const res = try allocator.alignedAlloc(
                     ptr.child,
-                    .of(T),
+                    .fromByteUnits(ptr.alignment),
                     elemSize,
                 );
                 errdefer allocator.free(res);
