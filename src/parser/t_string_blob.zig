@@ -69,7 +69,7 @@ pub const BlobStringParser = struct {
                 const elemSize = std.math.divExact(usize, size, @sizeOf(ptr.child)) catch return error.LengthMismatch;
                 const res = try allocator.alignedAlloc(
                     ptr.child,
-                    .fromByteUnits(ptr.alignment),
+                    .fromByteUnits(ptr.alignment orelse @alignOf(ptr.child)),
                     elemSize,
                 );
                 errdefer allocator.free(res);
@@ -158,7 +158,10 @@ test "string" {
                 allocator,
                 &r_str4,
             );
-            defer allocator.free(s[0..12]);
+            defer {
+                const slice: []const u8 = s[0..12];
+                allocator.free(slice);
+            }
             try testing.expectEqualSlices(u8, s[0..13], "Hello World!\x00");
         }
         {
@@ -181,7 +184,10 @@ test "string" {
                 allocator,
                 &r_ji2,
             );
-            defer allocator.free(s[0..3]);
+            defer {
+                const slice: []const [4]u8 = s[0..3];
+                allocator.free(slice);
+            }
             try testing.expectEqualSlices(u8, "😈", &s[0]);
             try testing.expectEqualSlices(u8, "👿", &s[1]);
             try testing.expectEqualSlices(u8, &[4]u8{ 0, 0, 0, 0 }, &s[3]);

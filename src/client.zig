@@ -133,7 +133,7 @@ pub fn pipeAlloc(
 const Pending = struct {
     // Protected by rl (readlock)
     state: enum { waiting, ready, canceled },
-    cond: Io.Condition = .{},
+    cond: Io.Condition = .init,
 
     // Protected by wl (writelock)
     next: ?*Pending = null,

@@ -8,7 +8,7 @@ pub fn main() !void {
     const gpa = std.heap.smp_allocator;
 
     // Pick your preferred Io implementation.
-    var threaded: Io.Threaded = .init(gpa);
+    var threaded: Io.Threaded = .init(gpa, .{});
     defer threaded.deinit();
     const io = threaded.io();
 
