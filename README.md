@@ -103,10 +103,9 @@ the raw socket, verifies the server certificate against the system root store
 (or accepts a self-signed dev cert with `REDIS_TLS_INSECURE=1`), and hands
 `tls_client.reader` plus a transport-flushing writer to `Client.init`.
 
-> Note: okredis flushes only the writer you pass it, but a `std.crypto.tls`
-> writer's `flush()` encrypts into the transport buffer without flushing the
-> socket, so the example wraps it in a tiny `Io.Writer` whose `flush` also
-> flushes the socket. See [#26](https://github.com/kristoff-it/zig-okredis/issues/26).
+> Note: a `std.crypto.tls` writer's `flush()` flushes only the TLS layer, not
+> the underlying socket (`std.http` flushes both), so the example wraps it in a
+> tiny `Io.Writer` whose `flush` also flushes the socket.
 
 ## Available Documentation
 The reference documentation [is available here](https://kristoff.it/zig-okredis#root).

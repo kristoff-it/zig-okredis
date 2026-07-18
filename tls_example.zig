@@ -15,23 +15,17 @@ fn getEnv(name: [:0]const u8) ?[]const u8 {
     return std.mem.span(std.c.getenv(name) orelse return null);
 }
 
-// --- The one piece TLS needs that a plain socket doesn't ---------------------
+// --- Composing a TLS stream for okredis --------------------------------------
 //
-// okredis is bring-your-own-stream: `Client.init` takes an `Io.Reader` + an
-// `Io.Writer`, and after buffering a command it calls `writer.flush()`.
+// okredis is bring-your-own-stream: it writes commands to the `Io.Writer` you
+// pass and calls `writer.flush()`. For a plain socket that puts the bytes on
+// the wire. A `std.crypto.tls` writer's `flush()`, by design, flushes only the
+// TLS layer - it encrypts into the underlying socket writer's buffer but does
+// not flush the socket (`std.http` likewise flushes both layers explicitly).
 //
-// Over a plain TCP socket that is enough: the socket writer's `flush` puts the
-// bytes on the wire. Over TLS it is NOT: `std.crypto.tls.Client.writer.flush()`
-// only *encrypts* the plaintext into the underlying transport writer's buffer -
-// it does not flush the transport. So a naive
-// `Client.init(io, &tls.reader, &tls.writer, ...)` writes HELLO, "flushes" it
-// into the socket buffer, and then blocks forever waiting for a reply the
-// server never received.
-//
-// `TlsTransport` is a tiny `Io.Writer` that closes that gap: on drain/flush it
-// encrypts through the TLS writer AND flushes the underlying socket, so okredis
-// can drive it exactly like a plain socket. (If okredis grew an optional
-// "flush the transport too" hook, this shim would go away.)
+// So we hand okredis a small `Io.Writer` whose flush encrypts through the TLS
+// writer AND flushes the socket; otherwise a command would sit unsent in the
+// socket buffer.
 const TlsTransport = struct {
     tls: *tls.Client,
     sock: *Io.Writer,
