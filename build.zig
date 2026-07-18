@@ -58,4 +58,23 @@ pub fn build(b: *std.Build) void {
 
     const run_step = b.step("run-example", "Run the example");
     run_step.dependOn(&run_example.step);
+
+    // TLS (rediss://) example
+    const tls_example_step = b.step("tls-example", "Build the TLS (rediss://) example");
+    const tls_example = b.addExecutable(.{
+        .name = "tls_example",
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("tls_example.zig"),
+            .target = target,
+            .optimize = optimize,
+            .link_libc = true,
+        }),
+    });
+    tls_example.root_module.addImport("okredis", okredis);
+    tls_example_step.dependOn(&b.addInstallArtifact(tls_example, .{}).step);
+    b.default_step.dependOn(tls_example_step);
+
+    const run_tls_example = b.addRunArtifact(tls_example);
+    const run_tls_step = b.step("run-tls-example", "Run the TLS (rediss://) example");
+    run_tls_step.dependOn(&run_tls_example.step);
 }

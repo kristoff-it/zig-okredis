@@ -90,6 +90,24 @@ pub fn main() !void {
 }
 ```
 
+## TLS (`rediss://`)
+
+Managed Redis (AWS ElastiCache/Valkey, Upstash, Redis Cloud, ...) requires an
+encrypted `rediss://` connection. Because `Client.init` takes a plain
+`Io.Reader`/`Io.Writer`, TLS is not an okredis feature: you wrap
+`std.crypto.tls` around the socket and hand okredis the *decrypted* stream.
+
+See [`tls_example.zig`](tls_example.zig) for a complete, runnable example
+(`zig build run-tls-example`). It performs the `std.crypto.tls` handshake over
+the raw socket, verifies the server certificate against the system root store
+(or accepts a self-signed dev cert with `REDIS_TLS_INSECURE=1`), and hands
+`tls_client.reader` plus a transport-flushing writer to `Client.init`.
+
+> Note: okredis flushes only the writer you pass it, but a `std.crypto.tls`
+> writer's `flush()` encrypts into the transport buffer without flushing the
+> socket, so the example wraps it in a tiny `Io.Writer` whose `flush` also
+> flushes the socket. See [#26](https://github.com/kristoff-it/zig-okredis/issues/26).
+
 ## Available Documentation
 The reference documentation [is available here](https://kristoff.it/zig-okredis#root).
 
